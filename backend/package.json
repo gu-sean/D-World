@@ -1,0 +1,55 @@
+{
+  "name": "backend",
+  "version": "0.0.1",
+  "description": "",
+  "author": "",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "build": "nest build",
+    "format": "prettier --write \"src/**/*.js\" \"test/**/*.js\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "test": "vitest run --config test/config/vitest.unit.js",
+    "test:watch": "vitest --config test/config/vitest.unit.js",
+    "test:debug": "vitest --config test/config/vitest.e2e.js --inspect-brk --no-file-parallelism",
+    "test:e2e": "vitest run --config test/config/vitest.e2e.js",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
+    "format:check": "prettier --check \"src/**/*.js\" \"test/**/*.js\"",
+    "lint": "prettier --check \"src/**/*.js\" \"scripts/**/*.mjs\"",
+    "db:verify": "docker compose -f ../docker-compose.yml exec -T -e PGUSER=dworld -e PGPASSWORD=dworld postgres sh /db/scripts/verify.sh"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1161.0",
+    "@aws-sdk/s3-request-presigner": "^3.1161.0",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/jwt": "^12.0.3",
+    "@nestjs/platform-express": "^12.0.1",
+    "@nestjs/throttler": "^6.7.1",
+    "argon2": "^0.45.1",
+    "helmet": "^8.3.0",
+    "jose": "^6.2.15",
+    "pg": "^8.23.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12.0.0",
+    "@nestjs/schematics": "^12.0.0",
+    "@nestjs/testing": "^12.0.1",
+    "@swc/cli": "^0.8.2",
+    "@swc/core": "^1.16.21",
+    "prettier": "^3.4.2",
+    "supertest": "^7.0.0",
+    "unplugin-swc": "^2.0.0",
+    "vitest": "^4.1.2"
+  },
+  "engines": {
+    "node": ">=22.9"
+  }
+}

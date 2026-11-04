@@ -1,0 +1,14 @@
+import { Module } from '@nestjs/common';
+import { AchievementsModule } from '../achievements/achievements.module.js';
+import { PointsModule } from '../points/points.module.js';
+import { StreakController } from './streak.controller.js';
+import { StreakService } from './streak.service.js';
+
+/** 판정 반영(VerificationModule)과 주기 작업(JobsModule)이 import해서 StreakService를 호출 */
+@Module({
+  imports: [PointsModule, AchievementsModule],
+  controllers: [StreakController],
+  providers: [StreakService],
+  exports: [StreakService],
+})
+export class StreakModule {}
