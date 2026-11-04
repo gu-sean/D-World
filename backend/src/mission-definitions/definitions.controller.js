@@ -1,0 +1,153 @@
+import {
+  idOf,
+  integer,
+  number,
+  oneOf,
+  string,
+  uuid,
+  validateBody,
+} from '../common/validation.js';
+import { VERIFICATION_METHODS } from '../missions/missions.constants.js';
+import { PUBLICATION_STATUSES } from './definitions.constants.js';
+import { DefinitionsService } from './definitions.service.js';
+import {
+  BadRequestException,
+  Bind,
+  Body,
+  Controller,
+  Delete,
+  Dependencies,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
+import { RequireActive } from '../accounts/active-account.guard.js';
+
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 50;
+
+const title = (options) =>
+  string({
+    min: 1,
+    max: 200,
+    pattern: /\S/,
+    patternMessage: '공백만 입력할 수 없음',
+    ...options,
+  });
+// 빈 문자열은 설명 삭제를 뜻함
+const description = () => string({ min: 0, max: 2000, optional: true });
+const targetValue = () =>
+  number({ min: 0.01, max: 99_999_999.99, optional: true });
+const targetUnit = () =>
+  string({ min: 1, max: 20, pattern: /\S/, optional: true });
+const duration = () => integer({ min: 1, max: 86_400, optional: true });
+
+export function readLimit(query) {
+  if (query.limit === undefined) return DEFAULT_LIMIT;
+  const limit = Number(query.limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
+    throw new BadRequestException([`limit: 1~${MAX_LIMIT} 정수여야 함`]);
+  }
+  return limit;
+}
+
+@Controller()
+@Dependencies(DefinitionsService)
+export class DefinitionsController {
+  constructor(definitions) {
+    this.definitions = definitions;
+  }
+
+  /** scope=public(기본): 공개 원형 탐색, scope=mine: 내가 만든 원형(검수 상태 포함) */
+  @Get('mission-definitions')
+  @Bind(Req(), Query())
+  list(req, query) {
+    const filters = validateBody(query, {
+      scope: oneOf(['public', 'mine'], { optional: true }),
+      categoryId: uuid({ optional: true }),
+      difficultyId: uuid({ optional: true }),
+      status: oneOf(PUBLICATION_STATUSES, { optional: true }),
+      cursor: string({ min: 1, max: 500, optional: true }),
+    });
+    const limit = readLimit(query);
+    if (filters.scope === 'mine') {
+      return this.definitions.listMine(req.auth.userId, {
+        status: filters.status,
+        cursor: filters.cursor,
+        limit,
+      });
+    }
+    if (filters.status !== undefined) {
+      throw new BadRequestException(['status는 scope=mine에서만 쓸 수 있음']);
+    }
+    return this.definitions.listPublic({
+      categoryId: filters.categoryId,
+      difficultyId: filters.difficultyId,
+      cursor: filters.cursor,
+      limit,
+    });
+  }
+
+  @Get('mission-definitions/:id')
+  @Bind(Req(), Param('id'))
+  get(req, id) {
+    return this.definitions.getDefinition(req.auth.userId, idOf(id));
+  }
+
+  @Post('me/mission-definitions')
+  @RequireActive()
+  @Bind(Req(), Body())
+  create(req, body) {
+    return this.definitions.createDefinition(
+      req.auth.userId,
+      validateBody(body, {
+        title: title(),
+        description: description(),
+        categoryId: uuid(),
+        difficultyId: uuid(),
+        verificationMethod: oneOf(VERIFICATION_METHODS),
+        targetValue: targetValue(),
+        targetUnit: targetUnit(),
+        estimatedDurationSeconds: duration(),
+      }),
+    );
+  }
+
+  @Patch('me/mission-definitions/:id')
+  @Bind(Req(), Param('id'), Body())
+  update(req, id, body) {
+    return this.definitions.updateDefinition(
+      req.auth.userId,
+      idOf(id),
+      validateBody(body, {
+        title: title({ optional: true }),
+        description: description(),
+        categoryId: uuid({ optional: true }),
+        difficultyId: uuid({ optional: true }),
+        verificationMethod: oneOf(VERIFICATION_METHODS, { optional: true }),
+        targetValue: targetValue(),
+        targetUnit: targetUnit(),
+        estimatedDurationSeconds: duration(),
+      }),
+    );
+  }
+
+  @Delete('me/mission-definitions/:id')
+  @HttpCode(204)
+  @Bind(Req(), Param('id'))
+  async remove(req, id) {
+    await this.definitions.deleteDefinition(req.auth.userId, idOf(id));
+  }
+
+  @Post('me/mission-definitions/:id/publication-request')
+  @HttpCode(200)
+  @RequireActive()
+  @Bind(Req(), Param('id'))
+  requestPublication(req, id) {
+    return this.definitions.requestPublication(req.auth.userId, idOf(id));
+  }
+}
