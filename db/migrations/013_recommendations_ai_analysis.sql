@@ -58,6 +58,9 @@ CREATE TABLE ai_analysis_runs (
     failure_reason text,
     requested_at timestamptz NOT NULL DEFAULT now(),
     completed_at timestamptz,
+    -- 재생성: 완료된 실행을 한 번 대체하고 generation_no를 올림
+    generation_no integer NOT NULL DEFAULT 1 CHECK (generation_no > 0),
+    superseded_at timestamptz,
     UNIQUE (id, user_id),
     UNIQUE (id, run_type),
     CHECK (
@@ -78,11 +81,18 @@ CREATE TABLE ai_analysis_runs (
             AND engine_version IS NOT NULL AND failure_reason IS NULL)
         OR (status = 'failed' AND completed_at IS NOT NULL
             AND failure_reason IS NOT NULL AND length(btrim(failure_reason)) > 0)
-    )
+    ),
+    CONSTRAINT ai_runs_superseded_needs_completion
+        CHECK (superseded_at IS NULL
+               OR (status = 'completed' AND superseded_at >= completed_at))
 );
 
-CREATE UNIQUE INDEX ai_runs_one_live_period_uq
+-- 대체된 실행은 현재 실행 유일성에서 제외, 세대 번호는 실패하지 않은 실행끼리만 고유
+CREATE UNIQUE INDEX ai_runs_one_current_period_uq
     ON ai_analysis_runs (user_id, run_type, period_start)
+    WHERE period_start IS NOT NULL AND status <> 'failed' AND superseded_at IS NULL;
+CREATE UNIQUE INDEX ai_runs_generation_uq
+    ON ai_analysis_runs (user_id, run_type, period_start, generation_no)
     WHERE period_start IS NOT NULL AND status <> 'failed';
 CREATE INDEX ai_runs_user_recent_idx
     ON ai_analysis_runs (user_id, run_type, requested_at DESC);
@@ -104,6 +114,9 @@ CREATE TABLE plan_adjustment_proposals (
     created_at timestamptz NOT NULL DEFAULT now(),
     expires_at timestamptz,
     decided_at timestamptz,
+    -- 재조정: 이전 계획과 사유, decided_at은 적용 시각
+    before_plan jsonb NOT NULL CHECK (jsonb_typeof(before_plan) = 'object'),
+    reason text,
     UNIQUE (run_id, goal_id),
     FOREIGN KEY (run_id, user_id) REFERENCES ai_analysis_runs(id, user_id) ON DELETE CASCADE,
     FOREIGN KEY (run_id, run_type) REFERENCES ai_analysis_runs(id, run_type) ON DELETE CASCADE,
@@ -132,6 +145,10 @@ CREATE TABLE ai_reports (
     content_json jsonb NOT NULL CHECK (jsonb_typeof(content_json) = 'object'),
     generated_at timestamptz NOT NULL DEFAULT now(),
     read_at timestamptz,
+    -- 피드백·다음 목표
+    feedback text,
+    next_goals jsonb
+        CHECK (next_goals IS NULL OR jsonb_typeof(next_goals) IN ('object', 'array')),
     FOREIGN KEY (run_id, user_id) REFERENCES ai_analysis_runs(id, user_id) ON DELETE CASCADE,
     FOREIGN KEY (run_id, run_type) REFERENCES ai_analysis_runs(id, run_type) ON DELETE CASCADE,
     CHECK (read_at IS NULL OR read_at >= generated_at)
@@ -158,16 +175,30 @@ CREATE TABLE ai_mission_recommendations (
     created_at timestamptz NOT NULL DEFAULT now(),
     expires_at timestamptz,
     decided_at timestamptz,
+    -- 추천은 생성된 미션을 가리킬 수 있다
+    mission_id uuid,
     UNIQUE (run_id, rank_no),
     FOREIGN KEY (run_id, user_id) REFERENCES ai_analysis_runs(id, user_id) ON DELETE CASCADE,
     FOREIGN KEY (run_id, run_type) REFERENCES ai_analysis_runs(id, run_type) ON DELETE CASCADE,
-    CHECK (mission_definition_id IS NOT NULL OR suggestion_text IS NOT NULL),
-    CHECK (expires_at IS NULL OR expires_at > created_at),
-    CHECK ((status = 'shown') = (decided_at IS NULL))
+    CONSTRAINT ai_recommendation_mission_fk
+        FOREIGN KEY (mission_id, user_id)
+        REFERENCES missions(id, user_id) ON DELETE CASCADE,
+    CONSTRAINT ai_mission_recommendations_check1
+        CHECK (expires_at IS NULL OR expires_at > created_at),
+    CONSTRAINT ai_mission_recommendations_check2
+        CHECK ((status = 'shown') = (decided_at IS NULL)),
+    CONSTRAINT ai_recommendation_has_target
+        CHECK (mission_id IS NOT NULL OR mission_definition_id IS NOT NULL
+               OR suggestion_text IS NOT NULL)
 );
 
 CREATE INDEX ai_mission_recommendations_user_idx
     ON ai_mission_recommendations (user_id, created_at DESC) WHERE status = 'shown';
+CREATE INDEX ai_mission_recommendations_mission_idx
+    ON ai_mission_recommendations (mission_id) WHERE mission_id IS NOT NULL;
+CREATE INDEX ai_mission_recommendations_definition_idx
+    ON ai_mission_recommendations (mission_definition_id)
+    WHERE mission_definition_id IS NOT NULL;
 
 -- 결과는 열린 실행에만 붙일 수 있다
 CREATE FUNCTION guard_ai_result_insert() RETURNS trigger
@@ -197,16 +228,24 @@ LANGUAGE plpgsql AS $$
 DECLARE
     has_result boolean;
 BEGIN
-    IF ROW(OLD.user_id, OLD.run_type, OLD.period_start, OLD.period_end, OLD.requested_at)
+    IF ROW(OLD.user_id, OLD.run_type, OLD.period_start, OLD.period_end,
+           OLD.requested_at, OLD.generation_no)
        IS DISTINCT FROM
-       ROW(NEW.user_id, NEW.run_type, NEW.period_start, NEW.period_end, NEW.requested_at) THEN
+       ROW(NEW.user_id, NEW.run_type, NEW.period_start, NEW.period_end,
+           NEW.requested_at, NEW.generation_no) THEN
         RAISE EXCEPTION 'analysis run identity is immutable' USING ERRCODE = '23514';
     END IF;
     IF OLD.status <> 'requested' AND
-       ROW(OLD.status, OLD.engine_version, OLD.ingest_key, OLD.failure_reason, OLD.completed_at)
+       ROW(OLD.status, OLD.engine_version, OLD.ingest_key, OLD.failure_reason,
+           OLD.completed_at)
        IS DISTINCT FROM
-       ROW(NEW.status, NEW.engine_version, NEW.ingest_key, NEW.failure_reason, NEW.completed_at) THEN
+       ROW(NEW.status, NEW.engine_version, NEW.ingest_key, NEW.failure_reason,
+           NEW.completed_at) THEN
         RAISE EXCEPTION 'finished analysis run cannot change' USING ERRCODE = '23514';
+    END IF;
+    IF OLD.superseded_at IS NOT NULL AND
+       NEW.superseded_at IS DISTINCT FROM OLD.superseded_at THEN
+        RAISE EXCEPTION 'supersession is recorded once' USING ERRCODE = '23514';
     END IF;
     IF OLD.status = 'requested' AND NEW.status = 'completed' THEN
         has_result := CASE NEW.run_type
@@ -229,11 +268,7 @@ FOR EACH ROW EXECUTE FUNCTION guard_ai_run_update();
 CREATE FUNCTION guard_ai_report_update() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF ROW(OLD.run_id, OLD.run_type, OLD.user_id, OLD.title, OLD.summary,
-           OLD.content_json, OLD.generated_at)
-       IS DISTINCT FROM
-       ROW(NEW.run_id, NEW.run_type, NEW.user_id, NEW.title, NEW.summary,
-           NEW.content_json, NEW.generated_at)
+    IF to_jsonb(OLD) - 'read_at' IS DISTINCT FROM to_jsonb(NEW) - 'read_at'
        OR (OLD.read_at IS NOT NULL AND NEW.read_at IS DISTINCT FROM OLD.read_at) THEN
         RAISE EXCEPTION 'report content is immutable; read time is set once'
             USING ERRCODE = '23514';

@@ -350,4 +350,11 @@ CREATE TRIGGER point_transactions_no_change
 BEFORE UPDATE OR DELETE ON point_transactions
 FOR EACH ROW EXECUTE FUNCTION protect_point_transaction();
 
+-- 부모 행(판정·회수 청구)이 연쇄로 지워질 때 자식 테이블 전체 스캔 방지
+CREATE INDEX mission_point_awards_first_result_idx
+    ON mission_point_awards (first_approved_result_id);
+CREATE INDEX point_transactions_recovery_claim_idx
+    ON point_transactions (recovery_claim_id)
+    WHERE recovery_claim_id IS NOT NULL;
+
 COMMIT;

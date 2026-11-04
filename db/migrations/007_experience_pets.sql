@@ -480,4 +480,11 @@ END $$;
 CREATE TRIGGER experience_transactions_no_change BEFORE UPDATE OR DELETE ON experience_transactions
 FOR EACH ROW EXECUTE FUNCTION protect_experience_transaction();
 
+-- users 참조 FK 중 인덱스가 없던 곳, 없으면 탈퇴 때 전체 스캔
+CREATE INDEX experience_transactions_user_idx
+    ON experience_transactions (user_id, id);
+-- 부모 행(펫)이 연쇄로 지워질 때 자식 테이블 전체 스캔 방지
+CREATE INDEX pet_evolution_events_user_pet_idx
+    ON pet_evolution_events (user_pet_id);
+
 COMMIT;

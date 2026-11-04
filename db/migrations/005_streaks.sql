@@ -257,4 +257,12 @@ CREATE TRIGGER point_transactions_streak_source_before_insert
 BEFORE INSERT ON point_transactions
 FOR EACH ROW EXECUTE FUNCTION guard_streak_point_source();
 
+-- 부모 행(회차·판정)이 연쇄로 지워질 때 자식 테이블 전체 스캔 방지
+CREATE INDEX streak_days_qualifying_record_idx
+    ON streak_days (qualifying_record_id)
+    WHERE qualifying_record_id IS NOT NULL;
+CREATE INDEX streak_days_qualifying_result_idx
+    ON streak_days (qualifying_result_id)
+    WHERE qualifying_result_id IS NOT NULL;
+
 COMMIT;

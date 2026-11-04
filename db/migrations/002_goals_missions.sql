@@ -44,6 +44,9 @@ CREATE TABLE goals (
     deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
+    -- 하루 가용 시간(분), AI 계획 입력
+    daily_available_minutes smallint
+        CHECK (daily_available_minutes BETWEEN 5 AND 240),
     UNIQUE (id, user_id),
     CHECK (end_date >= start_date),
     CHECK ((status = 'completed') = (completed_at IS NOT NULL))
@@ -90,12 +93,18 @@ CREATE TABLE mission_definitions (
     deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
+    -- 운동 6종: push_up·burpee·squat·lunge·plank = camera, running = sensor
+
+    exercise_code varchar(20)
+        CHECK (exercise_code IN ('push_up', 'burpee', 'squat', 'lunge', 'plank', 'running')),
     CHECK ((target_value IS NULL) = (target_unit IS NULL)),
     CHECK (target_unit IS NULL OR length(btrim(target_unit)) > 0),
     CHECK (origin <> 'admin' OR created_by_user_id IS NULL),
     CHECK (origin <> 'user' OR publication_status <> 'draft'),
     CHECK (origin <> 'user' OR created_by_user_id IS NOT NULL
-        OR publication_status = 'public')
+        OR publication_status = 'public'),
+    CONSTRAINT mission_definitions_exercise_method_check
+        CHECK (exercise_code IS NULL OR (exercise_code = 'running') = (verification_method = 'sensor'))
 );
 
 CREATE INDEX mission_definitions_public_list_idx
@@ -185,6 +194,9 @@ CREATE TABLE missions (
     deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
+    -- 운동 종류 (mission_definitions.exercise_code와 같은 규칙), 수행 시작 뒤에는 변경 불가
+    exercise_code varchar(20)
+        CHECK (exercise_code IN ('push_up', 'burpee', 'squat', 'lunge', 'plank', 'running')),
     FOREIGN KEY (goal_id, user_id)
         REFERENCES goals(id, user_id) ON DELETE CASCADE,
     FOREIGN KEY (goal_step_id, goal_id)
@@ -206,7 +218,9 @@ CREATE TABLE missions (
         OR (status <> 'cancelled' AND cancelled_at IS NULL
             AND cancel_reason IS NULL)
     ),
-    CHECK (cancel_reason IS NULL OR length(btrim(cancel_reason)) > 0)
+    CHECK (cancel_reason IS NULL OR length(btrim(cancel_reason)) > 0),
+    CONSTRAINT missions_exercise_method_check
+        CHECK (exercise_code IS NULL OR (exercise_code = 'running') = (verification_method = 'sensor'))
 );
 
 CREATE INDEX missions_user_day_idx
@@ -225,7 +239,7 @@ CREATE INDEX missions_definition_idx
     ON missions (definition_id)
     WHERE definition_id IS NOT NULL;
 
--- 수행이 시작되면 실행·판정에 영향을 주는 필드는 고정한다
+-- 수행이 시작되면 실행·판정에 영향을 주는 필드는 고정
 CREATE FUNCTION lock_started_mission_rules() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -235,14 +249,14 @@ BEGIN
                OLD.category_id, OLD.difficulty_id, OLD.target_value,
                OLD.target_unit, OLD.estimated_duration_seconds,
                OLD.verification_method, OLD.scheduled_date, OLD.due_at,
-               OLD.is_required)
+               OLD.is_required, OLD.exercise_code)
            IS DISTINCT FROM
            ROW(NEW.user_id, NEW.goal_id, NEW.goal_step_id,
                NEW.source_proposal_id, NEW.source_type, NEW.title, NEW.description,
                NEW.category_id, NEW.difficulty_id, NEW.target_value,
                NEW.target_unit, NEW.estimated_duration_seconds,
                NEW.verification_method, NEW.scheduled_date, NEW.due_at,
-               NEW.is_required) THEN
+               NEW.is_required, NEW.exercise_code) THEN
             RAISE EXCEPTION 'mission rules cannot change after execution starts';
         END IF;
     END IF;
@@ -335,5 +349,11 @@ $$;
 CREATE TRIGGER users_scrub_mission_reviews_before_delete
 BEFORE DELETE ON users
 FOR EACH ROW EXECUTE FUNCTION scrub_user_mission_reviews();
+
+-- users 참조 FK 중 인덱스가 없던 곳, 없으면 탈퇴 때 전체 스캔
+CREATE INDEX ai_plan_proposals_user_idx ON ai_plan_proposals (user_id);
+CREATE INDEX mission_publication_reviews_requester_idx
+    ON mission_publication_reviews (requested_by_user_id)
+    WHERE requested_by_user_id IS NOT NULL;
 
 COMMIT;

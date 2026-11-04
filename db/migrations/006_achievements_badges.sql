@@ -255,18 +255,22 @@ CREATE TRIGGER user_achievements_guard_before_insert
 BEFORE INSERT ON user_achievements
 FOR EACH ROW EXECUTE FUNCTION guard_user_achievement();
 
+-- paid_points는 지급 시점 월 한도에 따라 awarded_points보다 작을 수 있는데, 지급 행과 포인트 지급이
+-- 서로의 id를 참조해야 해서 실제 지급액은 지급 행을 만든 뒤에만 안다. 그래서 불변 목록에서 빼고
+-- 사후 보정을 허용한다. 범위는 CHECK(paid_points <= awarded_points)가 지키고,
+-- 보정 시점 제한(활성 지급이고 회수 청구가 없을 때만)은 008의 트리거가 지킨다.
 CREATE FUNCTION lock_user_achievement_identity() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
     IF ROW(OLD.id, OLD.user_id, OLD.achievement_id,
            OLD.achievement_version_id, OLD.badge_image_id,
            OLD.source_type, OLD.source_id, OLD.first_achieved_at,
-           OLD.awarded_at, OLD.awarded_points, OLD.paid_points)
+           OLD.awarded_at, OLD.awarded_points)
        IS DISTINCT FROM
        ROW(NEW.id, NEW.user_id, NEW.achievement_id,
            NEW.achievement_version_id, NEW.badge_image_id,
            NEW.source_type, NEW.source_id, NEW.first_achieved_at,
-           NEW.awarded_at, NEW.awarded_points, NEW.paid_points) THEN
+           NEW.awarded_at, NEW.awarded_points) THEN
         RAISE EXCEPTION 'achievement grant identity and original reward are immutable'
             USING ERRCODE = '23514';
     END IF;

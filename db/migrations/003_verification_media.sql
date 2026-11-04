@@ -391,4 +391,11 @@ CREATE TRIGGER users_require_r2_cleanup_before_delete
 BEFORE DELETE ON users
 FOR EACH ROW EXECUTE FUNCTION require_r2_cleanup_before_user_delete();
 
+-- 부모 행(회차·판정)이 연쇄로 지워질 때 자식 테이블 전체 스캔 방지
+CREATE INDEX verification_appeals_record_idx
+    ON verification_appeals (record_id, filed_by_user_id);
+CREATE INDEX verification_appeals_resolution_result_idx
+    ON verification_appeals (resolution_result_id)
+    WHERE resolution_result_id IS NOT NULL;
+
 COMMIT;

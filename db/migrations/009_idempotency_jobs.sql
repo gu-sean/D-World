@@ -83,6 +83,54 @@ CREATE TRIGGER admin_idempotency_keys_guard_before_update
 BEFORE UPDATE ON admin_idempotency_keys
 FOR EACH ROW EXECUTE FUNCTION guard_admin_idempotency_key();
 
+-- 앱 API 멱등 키 (admin_idempotency_keys와 같은 규칙)
+-- 같은 user_id + idempotency_key + 같은 request_hash는 저장된 응답 재생, 다르면 오류
+CREATE TABLE user_idempotency_keys (
+    id uuid PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    idempotency_key text NOT NULL
+        CHECK (length(btrim(idempotency_key)) > 0),
+    operation varchar(80) NOT NULL CHECK (length(btrim(operation)) > 0),
+    request_hash text NOT NULL CHECK (length(request_hash) > 0),
+    status varchar(12) NOT NULL DEFAULT 'in_progress'
+        CHECK (status IN ('in_progress', 'completed', 'failed')),
+    response_status smallint CHECK (response_status BETWEEN 100 AND 599),
+    response_body jsonb,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    completed_at timestamptz,
+    UNIQUE (user_id, idempotency_key),
+    CHECK ((status = 'in_progress' AND completed_at IS NULL
+                AND response_status IS NULL)
+        OR (status <> 'in_progress' AND completed_at IS NOT NULL
+                AND completed_at >= created_at))
+);
+
+CREATE INDEX user_idempotency_keys_created_idx
+    ON user_idempotency_keys (created_at);
+
+CREATE FUNCTION guard_user_idempotency_key() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF ROW(OLD.user_id, OLD.idempotency_key, OLD.operation,
+           OLD.request_hash, OLD.created_at)
+       IS DISTINCT FROM
+       ROW(NEW.user_id, NEW.idempotency_key, NEW.operation,
+           NEW.request_hash, NEW.created_at) THEN
+        RAISE EXCEPTION 'idempotency request identity is immutable'
+            USING ERRCODE = '23514';
+    END IF;
+    IF OLD.status = 'completed' AND NEW.status <> 'completed' THEN
+        RAISE EXCEPTION 'completed idempotency key cannot reopen'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER user_idempotency_keys_guard_before_update
+BEFORE UPDATE ON user_idempotency_keys
+FOR EACH ROW EXECUTE FUNCTION guard_user_idempotency_key();
+
 -- 지급 재시도 상태, 워커는 locked_until로 행을 임대
 -- 지급 멱등성은 challenge_reward_grants와 원장 키가 보장
 CREATE TABLE challenge_reward_payment_attempts (

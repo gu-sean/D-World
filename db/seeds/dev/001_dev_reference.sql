@@ -25,8 +25,9 @@ ON CONFLICT (document_type, version) DO NOTHING;
 
 -- 카테고리와 난이도
 INSERT INTO goal_categories (id, code, name, display_order) VALUES
-    (gen_random_uuid(), 'bodyweight', '맨몸운동', 1),
-    (gen_random_uuid(), 'running',    '러닝',     2)
+    ('d0000000-0000-4000-8000-000000000011', 'exercise',  '운동',     1),
+    ('d0000000-0000-4000-8000-000000000012', 'study',     '학습',     2),
+    ('d0000000-0000-4000-8000-000000000013', 'lifestyle', '생활습관', 3)
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO difficulty_levels (id, code, name, display_order) VALUES
@@ -35,12 +36,12 @@ INSERT INTO difficulty_levels (id, code, name, display_order) VALUES
     (gen_random_uuid(), 'hard',   '어려움', 3)
 ON CONFLICT (code) DO NOTHING;
 
--- 인증 기준 v1(규칙 미정)
+-- 인증 기준 v1: 빈 규칙 = AI 서버 기본값 사용 (docs/10 §5)
 INSERT INTO verification_criteria_versions
     (id, category_id, verification_method, version_no, rules_json,
      effective_at, created_by_admin_id)
 SELECT gen_random_uuid(), c.id, m.method, 1,
-       '{"placeholder": true}'::jsonb,
+       '{}'::jsonb,
        timestamptz '2026-01-01 00:00:00+09',
        'd0000000-0000-4000-8000-000000000001'
   FROM goal_categories c

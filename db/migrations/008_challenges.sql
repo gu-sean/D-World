@@ -55,6 +55,9 @@ CREATE TABLE challenges (
         CHECK(settlement_status IN ('not_started','draft','confirmed')),
     published_at timestamptz, cancelled_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+    -- 운동 종류 (mission_definitions.exercise_code와 같은 규칙)
+    exercise_code varchar(20)
+        CHECK(exercise_code IN ('push_up','burpee','squat','lunge','plank','running')),
     CHECK((origin='admin' AND created_by_admin_id IS NOT NULL AND created_by_user_id IS NULL)
        OR (origin='user' AND created_by_admin_id IS NULL)),
     CHECK((target_value IS NULL)=(target_unit IS NULL)),
@@ -62,7 +65,9 @@ CREATE TABLE challenges (
     CHECK(end_date-start_date+1 IN (7,14,30)),
     CHECK(required_success_days<=end_date-start_date+1),
     CHECK(publication_status<>'public' OR published_at IS NOT NULL),
-    CHECK((publication_status='cancelled')=(cancelled_at IS NOT NULL))
+    CHECK((publication_status='cancelled')=(cancelled_at IS NOT NULL)),
+    CONSTRAINT challenges_exercise_method_check
+        CHECK(exercise_code IS NULL OR (exercise_code = 'running') = (verification_method = 'sensor'))
 );
 CREATE INDEX challenges_public_idx ON challenges(publication_status,start_date,category_id);
 CREATE FUNCTION guard_challenge() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -555,18 +560,51 @@ END $$;
 CREATE TRIGGER challenge_reward_grants_guard BEFORE INSERT OR UPDATE ON challenge_reward_grants
 FOR EACH ROW EXECUTE FUNCTION guard_challenge_reward_grant();
 
--- 회수 청구가 챌린지 지급도 가리킬 수 있게 한다
+-- 004의 미션 회수 청구를 챌린지 지급·스트릭 마일스톤·업적 지급도 가리키도록 확장한다
+-- (스트릭 005, 업적 006, 챌린지가 모두 만들어진 이 자리에서 한 번에)
 ALTER TABLE point_recovery_claims ALTER COLUMN mission_id DROP NOT NULL;
 ALTER TABLE point_recovery_claims
     ADD COLUMN challenge_reward_grant_id uuid,
+    ADD COLUMN streak_milestone_award_id uuid,
+    ADD COLUMN user_achievement_id uuid,
     ADD CONSTRAINT point_recovery_challenge_grant_owner_fk
         FOREIGN KEY(challenge_reward_grant_id,user_id)
         REFERENCES challenge_reward_grants(id,user_id) ON DELETE CASCADE,
-    ADD CONSTRAINT point_recovery_exactly_one_source CHECK
-        ((mission_id IS NULL) <> (challenge_reward_grant_id IS NULL));
-CREATE UNIQUE INDEX point_recovery_one_challenge_claim_uq
-    ON point_recovery_claims(challenge_reward_grant_id)
+    ADD CONSTRAINT point_recovery_streak_award_owner_fk
+        FOREIGN KEY (streak_milestone_award_id, user_id)
+        REFERENCES streak_milestone_awards(id, user_id) ON DELETE CASCADE,
+    ADD CONSTRAINT point_recovery_achievement_owner_fk
+        FOREIGN KEY (user_achievement_id, user_id)
+        REFERENCES user_achievements(id, user_id) ON DELETE CASCADE;
+
+-- 소스는 미션, 챌린지 지급, 스트릭 마일스톤, 업적 중 정확히 하나
+ALTER TABLE point_recovery_claims
+    ADD CONSTRAINT point_recovery_exactly_one_source CHECK (
+        num_nonnulls(mission_id, challenge_reward_grant_id,
+                     streak_milestone_award_id, user_achievement_id) = 1);
+
+-- 같은 지급에 대한 유효(취소되지 않은) 청구는 동시에 하나만, 복구로 취소된 뒤의 재번복은 새 청구
+CREATE UNIQUE INDEX point_recovery_one_open_challenge_claim_uq
+    ON point_recovery_claims (challenge_reward_grant_id)
+    WHERE challenge_reward_grant_id IS NOT NULL AND NOT is_cancelled;
+CREATE UNIQUE INDEX point_recovery_one_open_streak_claim_uq
+    ON point_recovery_claims (streak_milestone_award_id)
+    WHERE streak_milestone_award_id IS NOT NULL AND NOT is_cancelled;
+CREATE UNIQUE INDEX point_recovery_one_open_achievement_claim_uq
+    ON point_recovery_claims (user_achievement_id)
+    WHERE user_achievement_id IS NOT NULL AND NOT is_cancelled;
+
+-- 지급 행 삭제(탈퇴 연쇄)가 취소된 청구까지 찾을 수 있게 전체 행 인덱스
+CREATE INDEX point_recovery_claims_challenge_grant_idx
+    ON point_recovery_claims (challenge_reward_grant_id)
     WHERE challenge_reward_grant_id IS NOT NULL;
+CREATE INDEX point_recovery_claims_streak_award_idx
+    ON point_recovery_claims (streak_milestone_award_id)
+    WHERE streak_milestone_award_id IS NOT NULL;
+CREATE INDEX point_recovery_claims_achievement_idx
+    ON point_recovery_claims (user_achievement_id)
+    WHERE user_achievement_id IS NOT NULL;
+
 CREATE FUNCTION guard_challenge_point_recovery_claim() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF NEW.challenge_reward_grant_id IS NOT NULL AND NOT EXISTS(
@@ -581,6 +619,63 @@ BEGIN
 END $$;
 CREATE TRIGGER point_recovery_challenge_source BEFORE INSERT ON point_recovery_claims
 FOR EACH ROW EXECUTE FUNCTION guard_challenge_point_recovery_claim();
+
+-- 스트릭·업적 청구는 그 지급의 원 적립 거래를 가리켜야 함(챌린지는 위 트리거)
+CREATE FUNCTION guard_point_recovery_claim_source() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+    expected_source_type varchar(32);
+    expected_source_id uuid;
+BEGIN
+    IF NEW.streak_milestone_award_id IS NOT NULL THEN
+        expected_source_type := 'streak';
+        expected_source_id := NEW.streak_milestone_award_id;
+    ELSIF NEW.user_achievement_id IS NOT NULL THEN
+        expected_source_type := 'achievement';
+        expected_source_id := NEW.user_achievement_id;
+    ELSE
+        RETURN NEW;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM point_transactions pt
+         WHERE pt.id = NEW.original_award_transaction_id
+           AND pt.user_id = NEW.user_id
+           AND pt.source_type = expected_source_type
+           AND pt.source_id = expected_source_id
+           AND pt.kind = 'auto_award'
+    ) THEN
+        RAISE EXCEPTION 'recovery claim must reference its original point award'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER point_recovery_claims_streak_achievement_source
+BEFORE INSERT ON point_recovery_claims
+FOR EACH ROW EXECUTE FUNCTION guard_point_recovery_claim_source();
+
+-- 업적 paid_points는 지급 행을 만든 뒤 실제 지급액으로 보정하므로(006의 lock 함수),
+-- 활성 지급이고 회수 청구가 없을 때(지급 직후)만 바꿀 수 있다
+CREATE FUNCTION guard_user_achievement_paid_points() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.paid_points IS DISTINCT FROM OLD.paid_points AND (
+        OLD.status <> 'active'
+        OR EXISTS (SELECT 1 FROM point_recovery_claims c
+                    WHERE c.user_achievement_id = OLD.id)
+    ) THEN
+        RAISE EXCEPTION 'achievement paid points are fixed after revoke or recovery claim'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER user_achievements_paid_points_guard
+BEFORE UPDATE ON user_achievements
+FOR EACH ROW EXECUTE FUNCTION guard_user_achievement_paid_points();
 
 
 -- 다형 소스 검증 함수를 챌린지까지 확장한다
@@ -749,6 +844,9 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+-- 대표 펫이 없어 보류된 보상(recipient_pet_id NULL)은 나중에 대표 펫을 고를 때 한 번만 배정할 수 있고,
+-- 배정된 뒤에는 불변이다. 보류 배정에는 버프가 없으므로 bonus_basis_points는 0이어야 한다.
+-- (007의 가드를 챌린지 분기와 함께 교체, UPDATE 분기만 007과 다름)
 CREATE OR REPLACE FUNCTION guard_experience_award() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE expected_user_xp integer; expected_pet_xp integer;
         source_status text; source_user uuid; snapshot_pet uuid;
@@ -756,12 +854,19 @@ DECLARE expected_user_xp integer; expected_pet_xp integer;
         snapshot_species_version uuid;
 BEGIN
     IF TG_OP='UPDATE' THEN
-        IF ROW(OLD.user_id,OLD.source_type,OLD.source_id,OLD.base_user_xp,OLD.base_pet_xp,
-               OLD.bonus_pet_xp,OLD.pet_species_version_id,OLD.pet_stage_no,OLD.bonus_basis_points)
-           IS DISTINCT FROM ROW(NEW.user_id,NEW.source_type,NEW.source_id,NEW.base_user_xp,NEW.base_pet_xp,
-               NEW.bonus_pet_xp,NEW.pet_species_version_id,NEW.pet_stage_no,NEW.bonus_basis_points)
-           OR (OLD.recipient_pet_id IS NOT NULL AND OLD.recipient_pet_id IS DISTINCT FROM NEW.recipient_pet_id) THEN
+        IF ROW(OLD.user_id,OLD.source_type,OLD.source_id,OLD.base_user_xp,OLD.base_pet_xp,OLD.bonus_pet_xp)
+           IS DISTINCT FROM ROW(NEW.user_id,NEW.source_type,NEW.source_id,NEW.base_user_xp,NEW.base_pet_xp,NEW.bonus_pet_xp)
+        THEN
             RAISE EXCEPTION 'XP award source and amount are fixed' USING ERRCODE='23514';
+        END IF;
+        IF OLD.recipient_pet_id IS NOT NULL THEN
+            IF ROW(OLD.recipient_pet_id,OLD.pet_species_version_id,OLD.pet_stage_no,OLD.bonus_basis_points)
+               IS DISTINCT FROM ROW(NEW.recipient_pet_id,NEW.pet_species_version_id,NEW.pet_stage_no,NEW.bonus_basis_points)
+            THEN
+                RAISE EXCEPTION 'XP award recipient is fixed once assigned' USING ERRCODE='23514';
+            END IF;
+        ELSIF NEW.recipient_pet_id IS NOT NULL AND NEW.bonus_basis_points<>0 THEN
+            RAISE EXCEPTION 'pending XP assignment cannot carry a buff' USING ERRCODE='23514';
         END IF;
         RETURN NEW;
     END IF;
@@ -838,5 +943,38 @@ BEGIN
 END $$;
 CREATE TRIGGER point_transactions_challenge_source BEFORE INSERT ON point_transactions
 FOR EACH ROW EXECUTE FUNCTION guard_challenge_point_source();
+
+-- users 참조 FK 중 인덱스가 없던 곳, 없으면 탈퇴 때 전체 스캔
+CREATE INDEX challenge_participations_user_idx ON challenge_participations (user_id);
+CREATE INDEX challenge_publication_reviews_requester_idx
+    ON challenge_publication_reviews (requested_by_user_id)
+    WHERE requested_by_user_id IS NOT NULL;
+CREATE INDEX challenge_rule_events_requester_idx
+    ON challenge_rule_events (requested_by_user_id)
+    WHERE requested_by_user_id IS NOT NULL;
+CREATE INDEX challenges_creator_idx
+    ON challenges (created_by_user_id) WHERE created_by_user_id IS NOT NULL;
+
+-- 부모 행(챌린지·참여·일별 미션·판정)이 연쇄로 지워질 때 자식 테이블 전체 스캔 방지
+CREATE INDEX challenge_publication_reviews_challenge_idx
+    ON challenge_publication_reviews (challenge_id);
+CREATE INDEX challenge_rule_events_challenge_idx
+    ON challenge_rule_events (challenge_id);
+CREATE INDEX challenge_daily_missions_qualifying_result_idx
+    ON challenge_daily_missions (qualifying_result_id)
+    WHERE qualifying_result_id IS NOT NULL;
+CREATE INDEX challenge_moderation_actions_participation_idx
+    ON challenge_moderation_actions (participation_id);
+CREATE INDEX challenge_moderation_actions_daily_mission_idx
+    ON challenge_moderation_actions (daily_mission_id)
+    WHERE daily_mission_id IS NOT NULL;
+CREATE INDEX challenge_moderation_actions_evidence_idx
+    ON challenge_moderation_actions (evidence_result_id)
+    WHERE evidence_result_id IS NOT NULL;
+CREATE INDEX challenge_settlement_entries_participation_idx
+    ON challenge_settlement_entries (participation_id, challenge_id);
+CREATE INDEX challenge_final_rankings_participation_idx
+    ON challenge_final_rankings (participation_id)
+    WHERE participation_id IS NOT NULL;
 
 COMMIT;

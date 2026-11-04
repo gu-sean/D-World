@@ -260,3 +260,140 @@ END;
 $$;
 
 ROLLBACK;
+
+-- smoke: 운동 종류·목표 가용 시간·앱 멱등 키 (샘플 데이터는 롤백)
+BEGIN;
+
+INSERT INTO users (id) VALUES ('00000000-0000-0000-0000-000000001601');
+
+INSERT INTO goal_categories (id, code, name, display_order) VALUES
+    ('00000000-0000-0000-0000-000000001602', 'exercise', '운동', 1);
+
+INSERT INTO difficulty_levels (id, code, name, display_order) VALUES
+    ('00000000-0000-0000-0000-000000001603', 'normal', '보통', 1);
+
+INSERT INTO goals
+    (id, user_id, category_id, difficulty_id, title, start_date, end_date,
+     daily_available_minutes)
+VALUES
+    ('00000000-0000-0000-0000-000000001604',
+     '00000000-0000-0000-0000-000000001601',
+     '00000000-0000-0000-0000-000000001602',
+     '00000000-0000-0000-0000-000000001603',
+     '운동 목표', DATE '2026-11-01', DATE '2026-11-30', 30);
+
+INSERT INTO missions
+    (id, user_id, goal_id, source_type, title, category_id, difficulty_id,
+     target_value, target_unit, verification_method, exercise_code, scheduled_date)
+VALUES
+    ('00000000-0000-0000-0000-000000001605',
+     '00000000-0000-0000-0000-000000001601',
+     '00000000-0000-0000-0000-000000001604', 'user', '스쿼트 20회',
+     '00000000-0000-0000-0000-000000001602',
+     '00000000-0000-0000-0000-000000001603',
+     20, 'reps', 'camera', 'squat', DATE '2026-11-10'),
+    ('00000000-0000-0000-0000-000000001606',
+     '00000000-0000-0000-0000-000000001601',
+     '00000000-0000-0000-0000-000000001604', 'user', '러닝 2km',
+     '00000000-0000-0000-0000-000000001602',
+     '00000000-0000-0000-0000-000000001603',
+     2000, 'meters', 'sensor', 'running', DATE '2026-11-10');
+
+DO $$
+BEGIN
+    BEGIN
+        INSERT INTO missions
+            (id, user_id, source_type, title, category_id, difficulty_id,
+             verification_method, exercise_code, scheduled_date)
+        VALUES
+            ('00000000-0000-0000-0000-000000001607',
+             '00000000-0000-0000-0000-000000001601', 'user', '센서 스쿼트',
+             '00000000-0000-0000-0000-000000001602',
+             '00000000-0000-0000-0000-000000001603',
+             'sensor', 'squat', DATE '2026-11-10');
+        RAISE EXCEPTION 'squat with sensor method was accepted';
+    EXCEPTION WHEN check_violation THEN
+        NULL;
+    END;
+
+    BEGIN
+        INSERT INTO missions
+            (id, user_id, source_type, title, category_id, difficulty_id,
+             verification_method, exercise_code, scheduled_date)
+        VALUES
+            ('00000000-0000-0000-0000-000000001608',
+             '00000000-0000-0000-0000-000000001601', 'user', '카메라 러닝',
+             '00000000-0000-0000-0000-000000001602',
+             '00000000-0000-0000-0000-000000001603',
+             'camera', 'running', DATE '2026-11-10');
+        RAISE EXCEPTION 'running with camera method was accepted';
+    EXCEPTION WHEN check_violation THEN
+        NULL;
+    END;
+
+    BEGIN
+        INSERT INTO missions
+            (id, user_id, source_type, title, category_id, difficulty_id,
+             verification_method, exercise_code, scheduled_date)
+        VALUES
+            ('00000000-0000-0000-0000-000000001609',
+             '00000000-0000-0000-0000-000000001601', 'user', '없는 운동',
+             '00000000-0000-0000-0000-000000001602',
+             '00000000-0000-0000-0000-000000001603',
+             'camera', 'jumping_jack', DATE '2026-11-10');
+        RAISE EXCEPTION 'unknown exercise code was accepted';
+    EXCEPTION WHEN check_violation THEN
+        NULL;
+    END;
+
+    BEGIN
+        UPDATE goals SET daily_available_minutes = 241
+         WHERE id = '00000000-0000-0000-0000-000000001604';
+        RAISE EXCEPTION 'daily minutes over 240 was accepted';
+    EXCEPTION WHEN check_violation THEN
+        NULL;
+    END;
+
+    -- 시작 전에는 운동 종류를 바꿀 수 있다
+    UPDATE missions SET exercise_code = 'lunge', title = '런지 20회'
+     WHERE id = '00000000-0000-0000-0000-000000001605';
+
+    -- 시작 후에는 바꿀 수 없다
+    UPDATE missions SET status = 'in_progress'
+     WHERE id = '00000000-0000-0000-0000-000000001605';
+    BEGIN
+        UPDATE missions SET exercise_code = 'squat'
+         WHERE id = '00000000-0000-0000-0000-000000001605';
+        RAISE EXCEPTION 'exercise code changed after start';
+    EXCEPTION WHEN raise_exception THEN
+        IF SQLERRM <> 'mission rules cannot change after execution starts' THEN
+            RAISE;
+        END IF;
+    END;
+
+    -- 멱등 키: 같은 사용자·같은 키는 한 번만
+    INSERT INTO user_idempotency_keys (id, user_id, idempotency_key, operation, request_hash)
+    VALUES ('00000000-0000-0000-0000-000000001610',
+            '00000000-0000-0000-0000-000000001601', 'key-1', 'A40', 'hash-1');
+    BEGIN
+        INSERT INTO user_idempotency_keys (id, user_id, idempotency_key, operation, request_hash)
+        VALUES ('00000000-0000-0000-0000-000000001611',
+                '00000000-0000-0000-0000-000000001601', 'key-1', 'A40', 'hash-2');
+        RAISE EXCEPTION 'duplicate idempotency key was accepted';
+    EXCEPTION WHEN unique_violation THEN
+        NULL;
+    END;
+    UPDATE user_idempotency_keys
+       SET status = 'completed', response_status = 201, response_body = '{}', completed_at = now()
+     WHERE id = '00000000-0000-0000-0000-000000001610';
+    BEGIN
+        UPDATE user_idempotency_keys SET request_hash = 'changed'
+         WHERE id = '00000000-0000-0000-0000-000000001610';
+        RAISE EXCEPTION 'idempotency identity changed';
+    EXCEPTION WHEN check_violation THEN
+        NULL;
+    END;
+END;
+$$;
+
+ROLLBACK;

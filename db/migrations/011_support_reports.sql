@@ -248,4 +248,15 @@ CREATE TRIGGER users_delete_inquiries_before_delete
 BEFORE DELETE ON users
 FOR EACH ROW EXECUTE FUNCTION delete_user_inquiries();
 
+-- 부모 행(챌린지·미션 원형·계정 조치)이 지워질 때 자식 테이블 전체 스캔 방지
+CREATE INDEX support_tickets_target_challenge_idx
+    ON support_tickets (target_challenge_id)
+    WHERE target_challenge_id IS NOT NULL;
+CREATE INDEX support_tickets_target_mission_definition_idx
+    ON support_tickets (target_mission_definition_id)
+    WHERE target_mission_definition_id IS NOT NULL;
+CREATE INDEX support_ticket_resolutions_account_action_idx
+    ON support_ticket_resolutions (account_action_id)
+    WHERE account_action_id IS NOT NULL;
+
 COMMIT;
