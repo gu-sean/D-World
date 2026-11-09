@@ -20,6 +20,9 @@ const TABLES = {
   },
 };
 
+/** 관리자 세션(쿠키 Max-Age와 같은 값) */
+export const ADMIN_REFRESH_TTL_SEC = 12 * 3600;
+
 const invalidRefresh = () =>
   new AppException(
     HttpStatus.UNAUTHORIZED,
@@ -35,8 +38,11 @@ export class SessionsService {
     this.config = config;
   }
 
-  get refreshTtlDays() {
-    return this.config.get('REFRESH_TOKEN_TTL_DAYS');
+  /** refresh 수명(초): 사용자는 REFRESH_TOKEN_TTL_DAYS, 관리자는 12시간 고정 (팀 문서 09 M01) */
+  refreshTtlSec(kind) {
+    return kind === SessionKind.Admin
+      ? ADMIN_REFRESH_TTL_SEC
+      : this.config.get('REFRESH_TOKEN_TTL_DAYS') * 86_400;
   }
 
   /** 세션 생성, refresh token 원문은 이 응답에서만 노출되고 해시만 저장 */
@@ -46,9 +52,9 @@ export class SessionsService {
     const refreshToken = randomToken();
     const { rows } = await tx.query(
       `INSERT INTO ${sessions} (id, ${ownerColumn}, refresh_token_hash, expires_at)
-       VALUES ($1, $2, $3, now() + make_interval(days => $4))
+       VALUES ($1, $2, $3, now() + make_interval(secs => $4))
        RETURNING expires_at`,
-      [sessionId, ownerId, sha256Hex(refreshToken), this.refreshTtlDays],
+      [sessionId, ownerId, sha256Hex(refreshToken), this.refreshTtlSec(kind)],
     );
     return { sessionId, refreshToken, refreshExpiresAt: rows[0].expires_at };
   }
@@ -78,10 +84,10 @@ export class SessionsService {
       const updated = await tx.query(
         `UPDATE ${sessions}
             SET refresh_token_hash = $2,
-                expires_at = now() + make_interval(days => $3)
+                expires_at = now() + make_interval(secs => $3)
           WHERE id = $1
           RETURNING expires_at`,
-        [session.id, sha256Hex(next), this.refreshTtlDays],
+        [session.id, sha256Hex(next), this.refreshTtlSec(kind)],
       );
       return {
         sessionId: session.id,
@@ -114,6 +120,16 @@ export class SessionsService {
       `UPDATE ${sessions} SET revoked_at = now()
         WHERE id = $1 AND ${ownerColumn} = $2 AND revoked_at IS NULL`,
       [sessionId, ownerId],
+    );
+  }
+
+  /** refresh token으로 세션 폐기, 없거나 이미 폐기여도 조용히 끝남(로그아웃은 항상 성공) */
+  async revokeByRefreshToken(db, kind, refreshToken) {
+    const { sessions } = TABLES[kind];
+    await db.query(
+      `UPDATE ${sessions} SET revoked_at = now()
+        WHERE refresh_token_hash = $1 AND revoked_at IS NULL`,
+      [sha256Hex(refreshToken)],
     );
   }
 

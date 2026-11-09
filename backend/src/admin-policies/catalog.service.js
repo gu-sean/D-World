@@ -10,9 +10,17 @@ import {
 import { DatabaseService } from '../database/database.service.js';
 
 /** 기준 데이터(카테고리·난이도) 테이블, 쿼리에 들어가므로 고정 목록만 사용 */
-export const CATALOGS = {
-  categories: { table: 'goal_categories', label: '카테고리' },
-  difficulties: { table: 'difficulty_levels', label: '난이도' },
+const CATALOGS = {
+  categories: {
+    table: 'goal_categories',
+    label: '카테고리',
+    audit: 'category',
+  },
+  difficulties: {
+    table: 'difficulty_levels',
+    label: '난이도',
+    audit: 'difficulty',
+  },
 };
 
 const catalogView = (row) => ({
@@ -39,15 +47,16 @@ export class CatalogService {
       `SELECT id, code, name, display_order, is_active FROM ${CATALOGS[kind].table}
         ORDER BY display_order, code`,
     );
-    return { items: rows.map(catalogView) };
+    return rows.map(catalogView);
   }
 
-  createCatalog(adminId, kind, input, key) {
-    const { table, label } = CATALOGS[kind];
+  createCatalog(adminId, kind, input, key, reason) {
+    const { table, label, audit } = CATALOGS[kind];
     return this.mutation.run(adminId, {
       key,
-      operation: `catalog.${kind}.create`,
-      payload: input,
+      operation: `${audit}.create`,
+      payload: { ...input, reason },
+      reason,
       run: async (tx) => {
         const id = randomUUID();
         try {
@@ -55,8 +64,8 @@ export class CatalogService {
             `INSERT INTO ${table} (id, code, name, display_order) VALUES ($1,$2,$3,$4)`,
             [id, input.code, input.name, input.displayOrder],
           );
-        } catch (err) {
-          rethrowConstraint(err, {
+        } catch (error) {
+          rethrowConstraint(error, {
             [`${table}_code_key`]: () =>
               conflict('code_taken', `이미 쓰는 ${label} 코드`),
             [`${table}_name_key`]: () =>
@@ -76,12 +85,13 @@ export class CatalogService {
     });
   }
 
-  updateCatalog(adminId, kind, id, patch, key) {
-    const { table, label } = CATALOGS[kind];
+  updateCatalog(adminId, kind, id, patch, key, reason) {
+    const { table, label, audit } = CATALOGS[kind];
     return this.mutation.run(adminId, {
       key,
-      operation: `catalog.${kind}.update`,
-      payload: { id, ...patch },
+      operation: `${audit}.update`,
+      payload: { id, ...patch, reason },
+      reason,
       run: async (tx) => {
         const { rows: current } = await tx.query(
           `SELECT id, code, name, display_order, is_active FROM ${table} WHERE id = $1 FOR UPDATE`,
@@ -89,6 +99,22 @@ export class CatalogService {
         );
         if (!current[0]) {
           throw notFound('catalog_not_found', `${label}를 찾을 수 없음`);
+        }
+        // 공개 미션 틀이 쓰는 값은 끌 수 없음
+        if (patch.isActive === false && current[0].is_active) {
+          const column =
+            kind === 'categories' ? 'category_id' : 'difficulty_id';
+          const { rowCount } = await tx.query(
+            `SELECT 1 FROM mission_definitions
+              WHERE ${column} = $1 AND publication_status = 'public' AND deleted_at IS NULL LIMIT 1`,
+            [id],
+          );
+          if (rowCount > 0) {
+            throw conflict(
+              'catalog_in_use',
+              `사용 중인 ${label}는 비활성화할 수 없음`,
+            );
+          }
         }
         try {
           await tx.query(
@@ -105,8 +131,8 @@ export class CatalogService {
               patch.isActive ?? null,
             ],
           );
-        } catch (err) {
-          rethrowConstraint(err, {
+        } catch (error) {
+          rethrowConstraint(error, {
             [`${table}_name_key`]: () =>
               conflict('name_taken', `이미 쓰는 ${label} 이름`),
           });

@@ -46,6 +46,16 @@ function build(status, legacyCode, message, details) {
   };
 }
 
+/** Express body-parser가 던지는 요청 본문 오류(너무 큼 413, JSON 형식 오류 400 등) */
+export function isBodyParserError(exception) {
+  return (
+    typeof exception?.type === 'string' &&
+    Number.isInteger(exception.status) &&
+    exception.status >= 400 &&
+    exception.status < 500
+  );
+}
+
 export function toErrorBody(exception) {
   if (exception instanceof HttpException) {
     const status = exception.getStatus();
@@ -62,15 +72,24 @@ export function toErrorBody(exception) {
     if (Array.isArray(raw)) {
       // 입력 검사 실패, 관리자 변경 요청의 reason 누락은 전용 코드(05 §5.2)
       const fields = toFields(raw);
+      // reason의 누락·빈 값·길이 오류는 전용 코드로 안내
       const code =
-        fields.reason === '값이 필요함'
-          ? 'admin_reason_required'
-          : 'bad_request';
+        fields.reason !== undefined ? 'admin_reason_required' : 'bad_request';
       return build(status, code, null, { fields });
     }
     // 코드가 없는 프레임워크 예외(404 경로 없음, 429 등)는 상태별 공통 코드, 문구는 표 기준
     const hasCode = typeof object.code === 'string';
     return build(status, object.code, hasCode ? raw : null, details);
+  }
+
+  if (isBodyParserError(exception)) {
+    const tooLarge = exception.status === HttpStatus.PAYLOAD_TOO_LARGE;
+    return build(
+      exception.status,
+      'bad_request',
+      tooLarge ? '요청 본문이 너무 큼' : '요청 본문을 읽을 수 없음',
+      null,
+    );
   }
 
   if (exception instanceof pg.DatabaseError && exception.code) {

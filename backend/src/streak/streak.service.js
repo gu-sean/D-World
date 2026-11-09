@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { Dependencies, Injectable } from '@nestjs/common';
+import { Dependencies, Injectable, Logger } from '@nestjs/common';
 import { AchievementsService } from '../achievements/achievements.service.js';
 import { DatabaseService } from '../database/database.service.js';
+import { ExperienceService } from '../experience-pets/experience.service.js';
 import { PointsService } from '../points/points.service.js';
-import { MILESTONES } from './streak.constants.js';
+import { MILESTONES, UNRESOLVED_LOOKBACK_DAYS } from './streak.constants.js';
 import { TODAY_SQL } from '../common/time/kst-sql.js';
 
 /**
@@ -14,9 +15,17 @@ import { TODAY_SQL } from '../common/time/kst-sql.js';
  * 판정 반영과 같은 트랜잭션에서 호출, 잠금 순서: 지갑 → 사용자별 스트릭 잠금 → 월간 사용량
  */
 @Injectable()
-@Dependencies(DatabaseService, PointsService, AchievementsService)
+@Dependencies(
+  DatabaseService,
+  PointsService,
+  AchievementsService,
+  ExperienceService,
+)
 export class StreakService {
-  constructor(database, points, achievements) {
+  logger = new Logger(StreakService.name);
+
+  constructor(database, points, achievements, experience) {
+    this.experience = experience;
     this.database = database;
     this.points = points;
     this.achievements = achievements;
@@ -226,13 +235,14 @@ export class StreakService {
   async reconcileMilestones(tx, userId, achieved) {
     let revoked = false;
     let granted = false;
+    const { rows: awards } = await tx.query(
+      `SELECT id, status, target_success_days FROM streak_milestone_awards
+        WHERE user_id = $1 AND target_success_days = ANY($2::int[])`,
+      [userId, MILESTONES],
+    );
+    const awardOf = new Map(awards.map((a) => [a.target_success_days, a]));
     for (const target of MILESTONES) {
-      const { rows } = await tx.query(
-        `SELECT id, status FROM streak_milestone_awards
-          WHERE user_id = $1 AND target_success_days = $2`,
-        [userId, target],
-      );
-      const award = rows[0];
+      const award = awardOf.get(target);
       const date = achieved[target];
 
       if (date !== undefined) {
@@ -249,6 +259,7 @@ export class StreakService {
             sourceId: award.id,
             resultId: randomUUID(),
           });
+          await this.reinstateExperience(tx, userId, award.id);
           granted = true;
         }
       } else if (award?.status === 'active') {
@@ -262,6 +273,7 @@ export class StreakService {
           sourceId: award.id,
           resultId: randomUUID(),
         });
+        await this.revokeExperience(tx, userId, award.id);
         revoked = true;
       }
     }
@@ -280,7 +292,7 @@ export class StreakService {
   /** 달성일 기준으로 시행 중이던 금액 버전을 고정해 지급, 설정된 버전이 없으면 지급하지 않음(소급 안 함) */
   async grant(tx, userId, target, date) {
     const { rows } = await tx.query(
-      `SELECT id, points FROM streak_milestone_policy_versions
+      `SELECT id, points, user_xp, pet_xp FROM streak_milestone_policy_versions
         WHERE target_success_days = $1
           AND effective_at <= now()
           AND (effective_at AT TIME ZONE 'Asia/Seoul')::date <= $2
@@ -312,10 +324,53 @@ export class StreakService {
         key: `streak:award:${userId}:${target}`,
       });
     }
+    const userXp = Number(policy.user_xp);
+    const petXp = Number(policy.pet_xp);
+    if (userXp > 0 || petXp > 0) {
+      // 펫 보너스는 미션 지급에만 적용, 대표 펫이 없으면 펫 XP는 보류
+      await this.experience.awardExperience(tx, {
+        userId,
+        sourceType: 'streak',
+        sourceId: id,
+        userXp,
+        basePetXp: petXp,
+        recipient: await this.achievements.representativePet(tx, userId),
+      });
+    }
     return true;
   }
 
-  /** 끝난 날짜가 아직 확정되지 않은 사용자(자정 이후 작업 대상) */
+  async revokeExperience(tx, userId, awardRowId) {
+    const awardId = await this.experience.findAwardId(
+      tx,
+      userId,
+      'streak',
+      awardRowId,
+    );
+    if (awardId) {
+      await this.experience.revokeExperience(tx, {
+        awardId,
+        resultId: randomUUID(),
+      });
+    }
+  }
+
+  async reinstateExperience(tx, userId, awardRowId) {
+    const awardId = await this.experience.findAwardId(
+      tx,
+      userId,
+      'streak',
+      awardRowId,
+    );
+    if (awardId) {
+      await this.experience.reinstateExperience(tx, {
+        awardId,
+        resultId: randomUUID(),
+      });
+    }
+  }
+
+  /** 끝난 날짜가 아직 확정되지 않은 사용자(자정 이후 작업 대상), 오래된 이력 전체 스캔을 피하려 최근 일수만 봄 */
   async usersWithUnresolvedDays(limit = 100) {
     const { rows } = await this.database.query(
       `SELECT DISTINCT m.user_id
@@ -324,9 +379,10 @@ export class StreakService {
            ON s.user_id = m.user_id AND s.streak_date = m.scheduled_date
         WHERE m.status <> 'cancelled' AND m.source_type <> 'challenge'
           AND m.scheduled_date < ${TODAY_SQL}
+          AND m.scheduled_date >= ${TODAY_SQL} - $2::int
           AND s.user_id IS NULL
         LIMIT $1`,
-      [limit],
+      [limit, UNRESOLVED_LOOKBACK_DAYS],
     );
     return rows.map((row) => row.user_id);
   }
@@ -335,11 +391,20 @@ export class StreakService {
   async settleDays({ limit = 100 } = {}) {
     const users = await this.usersWithUnresolvedDays(limit);
     let settled = 0;
+    let failed = 0;
     for (const userId of users) {
-      await this.database.withTransaction((tx) => this.recalculate(tx, userId));
-      settled += 1;
+      // 한 사용자의 실패가 나머지 사용자 확정을 막지 않도록 건별로 격리
+      try {
+        await this.database.withTransaction((tx) =>
+          this.recalculate(tx, userId),
+        );
+        settled += 1;
+      } catch (error) {
+        failed += 1;
+        this.logger.error(`스트릭 확정 실패 user=${userId}: ${error.message}`);
+      }
     }
-    return { settled };
+    return { settled, failed };
   }
 
   // ───────── 조회 ─────────
@@ -366,6 +431,7 @@ export class StreakService {
       ),
     ]);
     const row = state.rows[0];
+    const recent = await this.recentStatuses(userId);
     const byTarget = new Map(
       awards.rows.map((a) => [a.target_success_days, a]),
     );
@@ -377,6 +443,19 @@ export class StreakService {
       longestSuccessDays: row?.longest_success_days ?? 0,
       lastSuccessDate: row?.last_success_date ?? null,
       hasPendingDays: row?.has_pending_days ?? false,
+      // 모바일 클라이언트(08 StreakStatus) 키
+      bestSuccessDays: row?.longest_success_days ?? 0,
+      todayStatus: recent.todayStatus,
+      recentDays: recent.days,
+      nextMilestone:
+        MILESTONES.filter((target) => target > (row?.current_success_days ?? 0))
+          .map((target) => ({
+            targetSuccessDays: target,
+            points: pointsByTarget.get(target) ?? 0,
+            userXp: null,
+            petXp: null,
+          }))
+          .at(0) ?? null,
       milestones: MILESTONES.map((target) => {
         const award = byTarget.get(target);
         return {
@@ -389,6 +468,22 @@ export class StreakService {
           firstAchievedDate: award?.first_achieved_date ?? null,
         };
       }),
+    };
+  }
+
+  /** 최근 7일(오늘 포함)의 날짜별 상태, 기록이 없는 날은 오늘이면 pending 아니면 failed */
+  async recentStatuses(userId) {
+    const { rows } = await this.database.query(
+      `SELECT d::date::text AS date,
+              coalesce(s.status, CASE WHEN d::date = ${TODAY_SQL} THEN 'pending' ELSE 'failed' END) AS status
+         FROM generate_series(${TODAY_SQL} - 6, ${TODAY_SQL}, interval '1 day') d
+         LEFT JOIN streak_days s ON s.user_id = $1 AND s.streak_date = d::date
+        ORDER BY d`,
+      [userId],
+    );
+    return {
+      days: rows.map((r) => ({ date: r.date, status: r.status })),
+      todayStatus: rows.at(-1)?.status ?? 'pending',
     };
   }
 

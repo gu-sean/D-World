@@ -35,7 +35,7 @@ export class AccountsService {
   }
 
   async getMe(userId) {
-    const [account, phone, identities, restriction, pending] =
+    const [account, phone, identities, restriction, pending, extras] =
       await Promise.all([
         this.database.query(
           `SELECT u.id, u.status, p.nickname, p.notification_enabled, u.created_at
@@ -53,6 +53,7 @@ export class AccountsService {
         ),
         this.restrictions.activeRestriction(userId),
         this.consents.pendingReconsent(userId),
+        this.mobileExtras(userId),
       ]);
     const row = account.rows[0];
     if (!row) {
@@ -70,8 +71,90 @@ export class AccountsService {
       createdAt: row.created_at,
       phone: phone.rows[0] ? maskPhone(phone.rows[0].phone_e164) : null,
       identities: identities.rows.map((r) => r.provider),
-      restriction: restriction ? { until: restriction.ends_at } : null,
+      restriction: restriction
+        ? { until: restriction.ends_at, endsAt: restriction.ends_at }
+        : null,
       reconsentRequired: pending,
+      // 모바일 클라이언트(08 Me) 키
+      phoneLinked: Boolean(phone.rows[0]),
+      providers: identities.rows.map((r) => r.provider),
+      pendingConsents:
+        Array.isArray(pending) && pending.length > 0
+          ? (await this.listCurrentPolicies())
+              .filter((p) => pending.includes(p.documentType))
+              .map((p) => ({ ...p, isRequired: true }))
+          : [],
+      ...extras,
+    };
+  }
+
+  /** 07 Me의 레벨·포인트·연속 달성·대표 펫·대표 배지 */
+  async mobileExtras(userId) {
+    const [xp, wallet, streak, pet, badge] = await Promise.all([
+      this.database.query(
+        `SELECT e.total_xp, e.level_no,
+                (SELECT t.min_total_xp FROM user_level_thresholds t
+                  WHERE t.policy_version_id = e.level_policy_version_id
+                    AND t.level_no = e.level_no + 1) AS next_level_xp
+           FROM user_experience e WHERE e.user_id = $1`,
+        [userId],
+      ),
+      this.database.query(
+        'SELECT available_points FROM point_wallets WHERE user_id = $1',
+        [userId],
+      ),
+      this.database.query(
+        'SELECT current_success_days FROM streak_states WHERE user_id = $1',
+        [userId],
+      ),
+      this.database.query(
+        `SELECT p.id, p.nickname, sv.stage_code
+           FROM profiles pr
+           JOIN user_pets p ON p.id = pr.representative_pet_id
+           JOIN pet_stage_versions sv
+             ON sv.species_version_id = p.species_version_id AND sv.stage_no = p.stage_no
+          WHERE pr.user_id = $1`,
+        [userId],
+      ),
+      this.database.query(
+        `SELECT a.id AS achievement_id, v.title, v.rarity
+           FROM profiles pr
+           JOIN achievement_definitions a ON a.id = pr.representative_achievement_id
+           JOIN user_achievements ua
+             ON ua.achievement_id = a.id AND ua.user_id = pr.user_id AND ua.status = 'active'
+           JOIN achievement_versions v ON v.id = ua.achievement_version_id
+          WHERE pr.user_id = $1`,
+        [userId],
+      ),
+    ]);
+    const level = xp.rows[0];
+    const representativePet = pet.rows[0];
+    const representativeBadge = badge.rows[0];
+    return {
+      levelNo: level?.level_no ?? 1,
+      totalXp: Number(level?.total_xp ?? 0),
+      nextLevelXp:
+        level?.next_level_xp === null || level?.next_level_xp === undefined
+          ? null
+          : Number(level.next_level_xp),
+      availablePoints: Number(wallet.rows[0]?.available_points ?? 0),
+      streakDays: streak.rows[0]?.current_success_days ?? 0,
+      representativePet: representativePet
+        ? {
+            id: representativePet.id,
+            nickname: representativePet.nickname,
+            stageCode: representativePet.stage_code,
+            imageUrl: null,
+          }
+        : null,
+      representativeBadge: representativeBadge
+        ? {
+            achievementId: representativeBadge.achievement_id,
+            title: representativeBadge.title,
+            rarity: representativeBadge.rarity,
+            badgeImageUrl: null,
+          }
+        : null,
     };
   }
 
@@ -92,8 +175,8 @@ export class AccountsService {
           WHERE user_id = $1`,
         [userId, nickname ?? null, notificationEnabled ?? null],
       );
-    } catch (err) {
-      rethrowConstraint(err, { profiles_nickname_ci_uq: nicknameTaken });
+    } catch (error) {
+      rethrowConstraint(error, { profiles_nickname_ci_uq: nicknameTaken });
     }
     return this.getMe(userId);
   }

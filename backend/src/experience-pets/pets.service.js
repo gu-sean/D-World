@@ -18,7 +18,7 @@ const petOwned = conflict('pet_already_owned', '이미 보유한 종류의 펫')
 const nicknameTaken = conflict('pet_nickname_taken', '이미 사용 중인 펫 이름');
 
 /**
- * 펫 선택·이름·대표 설정 (3-A-4)
+ * 펫 선택·이름·대표 설정
  * 종류 정보는 관리자가 버전으로 관리하고, 알을 선택할 때 그 시점의 최신 유효 버전을 펫에 고정
  * 해금 조건은 DB 트리거(guard_user_pet)가 최종 검증하며, 여기서는 사용자에게 보여 줄 진행도와 오류를 만듦
  */
@@ -229,8 +229,8 @@ export class PetsService {
           assignedPending: assigned,
         };
       });
-    } catch (err) {
-      rethrowConstraint(err, {
+    } catch (error) {
+      rethrowConstraint(error, {
         user_pets_user_id_species_id_key: petOwned,
         user_pets_nickname_ci_uq: nicknameTaken,
       });
@@ -252,7 +252,11 @@ export class PetsService {
     const { rows } = await db.query(
       `SELECT p.id, p.species_id, s.code, v.name AS species_name, p.nickname,
               p.total_xp, p.level_no, p.stage_no, p.selected_at,
-              v.hatch_mission_count, sv.stage_code,
+              v.hatch_mission_count, sv.stage_code, sv.bonus_basis_points,
+              ARRAY(SELECT d.text_content FROM pet_stage_dialogues d
+                     WHERE d.species_version_id = p.species_version_id
+                       AND d.stage_no = p.stage_no
+                     ORDER BY d.display_order, d.dialogue_no LIMIT 5) AS dialogues,
               (p.id = pr.representative_pet_id) AS representative,
               (SELECT n.min_total_xp FROM pet_stage_versions n
                 WHERE n.species_version_id = p.species_version_id
@@ -295,6 +299,12 @@ export class PetsService {
       },
       representative: Boolean(r.representative),
       selectedAt: r.selected_at,
+      // 모바일 클라이언트(07 Pet) 키
+      bonusRate: (r.bonus_basis_points ?? 0) / 10_000,
+      isRepresentative: Boolean(r.representative),
+      imageUrl: null,
+      dialogues: r.dialogues ?? [],
+      hatchedAt: r.selected_at,
     }));
   }
 
@@ -306,8 +316,8 @@ export class PetsService {
         [petId, userId, nickname],
       );
       if (rowCount === 0) throw petNotFound();
-    } catch (err) {
-      rethrowConstraint(err, { user_pets_nickname_ci_uq: nicknameTaken });
+    } catch (error) {
+      rethrowConstraint(error, { user_pets_nickname_ci_uq: nicknameTaken });
     }
     return this.getPet(this.database, userId, petId);
   }

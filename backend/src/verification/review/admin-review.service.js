@@ -1,5 +1,6 @@
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../../admin-auth/audit.service.js';
+import { adminPage } from '../../common/pagination/admin-page.js';
 import { AppException } from '../../common/errors/app-exception.js';
 import { AdminIdempotencyService } from '../../common/idempotency/admin-idempotency.service.js';
 import { DatabaseService } from '../../database/database.service.js';
@@ -16,7 +17,7 @@ const recordNotFound = () =>
   );
 
 /**
- * 관리자 보류 검수 (3-C-3)
+ * 관리자 보류 검수
  * AI 보류(review_required) 회차를 원본·조건을 보고 승인·거절
  * 판정 반영·감사 로그·멱등 기록이 한 트랜잭션
  */
@@ -37,73 +38,74 @@ export class AdminReviewService {
     this.media = media;
   }
 
-  /** 검수 대기열: 오래 기다린 순서, 미션 조건과 AI 의견을 함께 보여 줌 */
-  async listQueue({ cursor, limit }) {
-    let after = null;
-    if (cursor) {
-      try {
-        after = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-        if (typeof after.t !== 'string' || typeof after.id !== 'string')
-          throw new Error();
-      } catch {
-        throw new AppException(
-          HttpStatus.BAD_REQUEST,
-          'bad_request',
-          '잘못된 cursor',
-        );
-      }
-    }
-    const { rows } = await this.database.query(
-      `SELECT r.id, r.mission_id, r.user_id, r.attempt_no, r.submission_no, r.evidence_kind,
-              r.submitted_at, r.submitted_at::text AS submitted_at_raw, r.metrics AS record_metrics,
-              m.title, m.description, m.verification_method, m.target_value, m.target_unit,
-              m.category_id, m.scheduled_date,
-              vr.engine_version, vr.confidence, vr.reason AS ai_reason, vr.metrics AS ai_metrics,
-              vr.decided_at
-         FROM mission_records r
-         JOIN missions m ON m.id = r.mission_id
-         LEFT JOIN verification_results vr ON vr.record_id = r.id AND vr.is_current
-        WHERE r.status = 'review_required'
-          AND ($1::timestamptz IS NULL OR (r.submitted_at, r.id) > ($1::timestamptz, $2::uuid))
-        ORDER BY r.submitted_at, r.id
-        LIMIT $3`,
-      [after?.t ?? null, after?.id ?? null, limit + 1],
-    );
-    const page = rows.slice(0, limit);
-    const last = page[page.length - 1];
+  /**
+   * M30 인증 검수 목록(AdminPage): 상태·방식·사용자 필터, 기본은 보류(review_required)
+   * 미션 조건과 AI 의견을 함께 보여 줌
+   */
+  async list({ status, method, userId, paging }) {
+    const params = [status, method ?? null, userId ?? null];
+    const where = `r.status = $1
+          AND ($2::text IS NULL OR m.verification_method = $2)
+          AND ($3::uuid IS NULL OR r.user_id = $3)`;
+    const [{ rows }, count, completed] = await Promise.all([
+      this.database.query(
+        `SELECT r.id, r.mission_id, r.user_id, r.attempt_no, r.submission_no, r.evidence_kind,
+                r.submitted_at, r.metrics AS record_metrics, r.status,
+                m.title, m.description, m.verification_method, m.target_value, m.target_unit,
+                m.category_id, m.scheduled_date,
+                vr.engine_version, vr.confidence, vr.reason AS ai_reason, vr.metrics AS ai_metrics,
+                vr.decided_at
+           FROM mission_records r
+           JOIN missions m ON m.id = r.mission_id
+           LEFT JOIN verification_results vr ON vr.record_id = r.id AND vr.is_current
+          WHERE ${where}
+          ORDER BY ${paging.orderBy}
+          LIMIT $4 OFFSET $5`,
+        [...params, paging.size, paging.offset],
+      ),
+      this.database.query(
+        `SELECT count(*) AS n FROM mission_records r JOIN missions m ON m.id = r.mission_id WHERE ${where}`,
+        params,
+      ),
+      this.database.query(
+        `SELECT count(*) AS n FROM verification_results
+          WHERE source = 'admin' AND decided_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul'`,
+      ),
+    ]);
     return {
-      items: page.map((row) => ({
-        recordId: row.id,
-        missionId: row.mission_id,
-        userId: row.user_id,
-        attemptNo: row.attempt_no,
-        submissionNo: row.submission_no,
-        evidenceKind: row.evidence_kind,
-        submittedAt: row.submitted_at,
-        recordMetrics: row.record_metrics,
-        mission: {
-          title: row.title,
-          description: row.description,
-          verificationMethod: row.verification_method,
-          targetValue: row.target_value === null ? null : num(row.target_value),
-          targetUnit: row.target_unit,
-          categoryId: row.category_id,
-          scheduledDate: row.scheduled_date,
-        },
-        ai: {
-          engineVersion: row.engine_version,
-          confidence: row.confidence === null ? null : num(row.confidence),
-          reason: row.ai_reason,
-          metrics: row.ai_metrics,
-          decidedAt: row.decided_at,
-        },
-      })),
-      nextCursor:
-        rows.length > limit
-          ? Buffer.from(
-              JSON.stringify({ t: last.submitted_at_raw, id: last.id }),
-            ).toString('base64url')
-          : null,
+      completedToday: num(completed.rows[0].n),
+      page: adminPage(
+        rows.map((row) => ({
+          recordId: row.id,
+          missionId: row.mission_id,
+          userId: row.user_id,
+          status: row.status,
+          attemptNo: row.attempt_no,
+          submissionNo: row.submission_no,
+          evidenceKind: row.evidence_kind,
+          submittedAt: row.submitted_at,
+          recordMetrics: row.record_metrics,
+          mission: {
+            title: row.title,
+            description: row.description,
+            verificationMethod: row.verification_method,
+            targetValue:
+              row.target_value === null ? null : num(row.target_value),
+            targetUnit: row.target_unit,
+            categoryId: row.category_id,
+            scheduledDate: row.scheduled_date,
+          },
+          ai: {
+            engineVersion: row.engine_version,
+            confidence: row.confidence === null ? null : num(row.confidence),
+            reason: row.ai_reason,
+            metrics: row.ai_metrics,
+            decidedAt: row.decided_at,
+          },
+        })),
+        paging,
+        count.rows[0].n,
+      ),
     };
   }
 

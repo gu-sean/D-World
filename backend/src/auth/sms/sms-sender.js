@@ -4,7 +4,7 @@ import { Logger } from '@nestjs/common';
 export const SMS_SENDER = Symbol('SMS_SENDER');
 
 /** 개발 전용: 발송 대신 로그에 출력, 운영에서는 환경 변수 검증이 막음 */
-export class ConsoleSmsSender {
+class ConsoleSmsSender {
   logger = new Logger('ConsoleSmsSender');
 
   async send(phoneE164, message) {
@@ -13,7 +13,7 @@ export class ConsoleSmsSender {
 }
 
 export function createSmsSender(config) {
-  const provider = config.get('SMS_PROVIDER');
+  const provider = config.get('SMS_DRIVER');
   if (provider === 'console') return new ConsoleSmsSender();
-  throw new Error(`지원하지 않는 SMS_PROVIDER: ${provider}`);
+  throw new Error(`지원하지 않는 SMS_DRIVER: ${provider}`);
 }

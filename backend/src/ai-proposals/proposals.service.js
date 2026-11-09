@@ -31,7 +31,7 @@ const notOpen = (status) =>
 const defaultDueAt = (date) => kstDayStart(addDays(date, 1)).toISOString();
 
 /**
- * AI 계획 제안 수락·거절·만료 (3-B-4)
+ * AI 계획 제안 수락·거절·만료
  * 제안 생성은 AI 쪽(AiResultsModule)이 ai_plan_proposals에 draft로 넣고, 여기서는 사용자가 확인·수정한
  * 계획을 받아 단계·미션 생성. 원안(proposal_json) 보존, 확정안은 accepted_plan_json에 저장
  */
@@ -233,7 +233,9 @@ export class ProposalsService {
       );
 
       // 재생성: 계획에 나온 날짜의 시작 전 AI 미션만 취소
-      const dates = [...new Set(entries.map((e) => e.mission.scheduledDate))];
+      const dates = [
+        ...new Set(entries.map((entry) => entry.mission.scheduledDate)),
+      ];
       const { rows: cancelled } = await tx.query(
         `UPDATE missions
             SET status = 'cancelled', cancel_reason = 'ai_regenerated',
@@ -300,6 +302,7 @@ export class ProposalsService {
             targetUnit: mission.targetUnit,
             estimatedDurationSeconds: mission.estimatedDurationSeconds,
             verificationMethod: mission.verificationMethod,
+            exerciseCode: mission.exerciseCode ?? null,
             scheduledDate: mission.scheduledDate,
             dueAt: mission.dueAt ?? defaultDueAt(mission.scheduledDate),
             isRequired: mission.isRequired ?? true,

@@ -12,8 +12,13 @@ import {
   Post,
   Query,
   Req,
+  UseInterceptors,
 } from '@nestjs/common';
 import { RequireActive } from '../accounts/active-account.guard.js';
+import {
+  Idempotent,
+  UserIdempotencyInterceptor,
+} from '../common/idempotency/user-idempotency.interceptor.js';
 import {
   array,
   boolean,
@@ -34,6 +39,15 @@ import {
   VERIFICATION_METHODS,
 } from './missions.constants.js';
 import { MissionsService } from './missions.service.js';
+
+const EXERCISE_CODES = [
+  'push_up',
+  'burpee',
+  'squat',
+  'lunge',
+  'plank',
+  'running',
+];
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -63,17 +77,38 @@ const CREATE_COMMON = {
 };
 
 @Controller('missions')
+@UseInterceptors(UserIdempotencyInterceptor)
 @Dependencies(MissionsService)
 export class MissionsController {
   constructor(missions) {
     this.missions = missions;
   }
 
-  /** definitionId가 있으면 원형 복사(템플릿), 없으면 직접 생성 */
+  /**
+   * Idempotency-Key가 있으면 같은 키의 재시도는 같은 결과를 돌려준다(없어도 동작)
+   * definitionId가 있으면 원형 복사(템플릿), 없으면 직접 생성
+   * - scheduledDates(여러 날짜) → { items } (기존 API)
+   * - scheduledDate(한 날짜) → Mission 하나 (모바일 08 A31)
+   */
   @Post()
+  @Idempotent({ optional: true })
   @RequireActive()
   @Bind(Req(), Body())
-  async create(req, body) {
+  async create(request, rawBody) {
+    let body = rawBody;
+    const single =
+      body &&
+      typeof body === 'object' &&
+      body.scheduledDate !== undefined &&
+      body.scheduledDates === undefined;
+    if (body && typeof body === 'object') {
+      const { scheduledDate, goalStepId, ...rest } = body;
+      body = { ...rest };
+      if (single) body.scheduledDates = [scheduledDate];
+      if (goalStepId !== undefined && rest.stepId === undefined) {
+        body.stepId = goalStepId;
+      }
+    }
     const input =
       body && typeof body === 'object' && body.definitionId !== undefined
         ? validateBody(body, { definitionId: uuid(), ...CREATE_COMMON })
@@ -82,6 +117,7 @@ export class MissionsController {
             description: text(2000),
             categoryId: uuid({ optional: true }),
             difficultyId: uuid({ optional: true }),
+            exerciseCode: oneOf(EXERCISE_CODES, { optional: true }),
             verificationMethod: oneOf(VERIFICATION_METHODS),
             targetValue: targetValue({ optional: true }),
             targetUnit: targetUnit({ optional: true }),
@@ -89,23 +125,41 @@ export class MissionsController {
             dueAt: timestamp({ optional: true }),
             ...CREATE_COMMON,
           });
-    return {
-      items: await this.missions.createMissions(req.auth.userId, input),
-    };
+    const items = await this.missions.createMissions(
+      request.auth.userId,
+      input,
+    );
+    if (single) {
+      await this.missions.attachChallengeIds(items);
+      return items[0];
+    }
+    return { items };
   }
 
   @Get()
   @Bind(Req(), Query())
-  list(req, query) {
+  async list(request, query) {
     const filters = validateBody(query, {
       date: dateString({ optional: true }),
       from: dateString({ optional: true }),
       to: dateString({ optional: true }),
       goalId: uuid({ optional: true }),
       stepId: uuid({ optional: true }),
-      status: oneOf(MISSION_STATUSES, { optional: true }),
+      categoryId: uuid({ optional: true }),
+      status: string({ min: 1, max: 100, optional: true }),
       cursor: string({ min: 1, max: 500, optional: true }),
     });
+    // 여러 값 필터 `?status=a,b` (05 §6)
+    if (filters.status !== undefined) {
+      const statuses = filters.status.split(',').map((value) => value.trim());
+      if (statuses.some((value) => !MISSION_STATUSES.includes(value))) {
+        throw new BadRequestException([
+          `status: ${MISSION_STATUSES.join(', ')} 중 하나 이상이어야 함`,
+        ]);
+      }
+      filters.statuses = statuses;
+      delete filters.status;
+    }
     if ((filters.from === undefined) !== (filters.to === undefined)) {
       throw new BadRequestException(['from과 to는 함께 지정해야 함']);
     }
@@ -127,22 +181,28 @@ export class MissionsController {
         throw new BadRequestException([`limit: 1~${MAX_LIMIT} 정수여야 함`]);
       }
     }
-    return this.missions.listMissions(req.auth.userId, { ...filters, limit });
+    const page = await this.missions.listMissions(request.auth.userId, {
+      ...filters,
+      limit,
+    });
+    await this.missions.attachChallengeIds(page.items);
+    return page;
   }
 
   @Get(':id')
   @Bind(Req(), Param('id'))
-  get(req, id) {
-    return this.missions.getMission(
-      req.auth.userId,
+  get(request, id) {
+    return this.missions.getDetail(
+      request.auth.userId,
       validateBody({ id }, { id: uuid() }).id,
     );
   }
 
   /** 시작 전에는 전체 필드, 시작 후에는 memo만(서비스가 판단). stepId: null이면 단계 연결 해제 */
   @Patch(':id')
+  @Idempotent({ optional: true })
   @Bind(Req(), Param('id'), Body())
-  update(req, id, body) {
+  async update(request, id, body) {
     if (
       body &&
       (body.categoryId !== undefined || body.difficultyId !== undefined)
@@ -166,29 +226,32 @@ export class MissionsController {
       memo: text(1000),
     });
     if (clearStep) patch.stepId = null;
-    return this.missions.updateMission(
-      req.auth.userId,
+    const view = await this.missions.updateMission(
+      request.auth.userId,
       validateBody({ id }, { id: uuid() }).id,
       patch,
     );
+    return this.missions.toDetail(view);
   }
 
   @Post(':id/cancel')
   @HttpCode(200)
+  @Idempotent({ optional: true })
   @Bind(Req(), Param('id'))
-  cancel(req, id) {
-    return this.missions.cancelMission(
-      req.auth.userId,
+  async cancel(request, id) {
+    const view = await this.missions.cancelMission(
+      request.auth.userId,
       validateBody({ id }, { id: uuid() }).id,
     );
+    return this.missions.attachChallengeIds(view);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @Bind(Req(), Param('id'))
-  async remove(req, id) {
+  async remove(request, id) {
     await this.missions.deleteMission(
-      req.auth.userId,
+      request.auth.userId,
       validateBody({ id }, { id: uuid() }).id,
     );
   }

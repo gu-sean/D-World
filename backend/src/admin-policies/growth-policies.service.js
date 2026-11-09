@@ -11,7 +11,7 @@ import {
 } from './policy-support.js';
 
 /** 사용자·펫 레벨 정책 테이블 쌍 */
-export const LEVEL_POLICIES = {
+const LEVEL_POLICIES = {
   'user-levels': {
     policies: 'user_level_policy_versions',
     thresholds: 'user_level_thresholds',
@@ -37,16 +37,18 @@ export class GrowthPoliciesService {
 
   async listStreakMilestones() {
     const { rows } = await this.database.query(
-      `SELECT id, target_success_days, version_no, points, effective_at
+      `SELECT id, target_success_days, version_no, points, user_xp, pet_xp, effective_at
          FROM streak_milestone_policy_versions
         ORDER BY target_success_days, effective_at DESC, version_no DESC`,
     );
     return {
       items: rows.map((row) => ({
         id: row.id,
-        targetDays: row.target_success_days,
+        targetSuccessDays: row.target_success_days,
         versionNo: row.version_no,
         points: row.points,
+        userXp: row.user_xp,
+        petXp: row.pet_xp,
         effectiveAt: row.effective_at,
       })),
     };
@@ -55,8 +57,9 @@ export class GrowthPoliciesService {
   createStreakMilestone(adminId, input, key) {
     return this.mutation.run(adminId, {
       key,
-      operation: 'policy.streak_milestone.create',
+      operation: 'streak_policy.create',
       payload: input,
+      reason: input.reason,
       run: async (tx) => {
         await lockScope(tx, `streak:${input.targetDays}`);
         const effectiveAt = await resolveEffectiveAt(tx, input.effectiveAt);
@@ -69,16 +72,28 @@ export class GrowthPoliciesService {
         const id = randomUUID();
         await tx.query(
           `INSERT INTO streak_milestone_policy_versions
-                  (id, target_success_days, version_no, points, effective_at, created_by_admin_id)
-           VALUES ($1,$2,$3,$4,$5,$6)`,
-          [id, input.targetDays, versionNo, input.points, effectiveAt, adminId],
+                  (id, target_success_days, version_no, points, user_xp, pet_xp,
+                   effective_at, created_by_admin_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [
+            id,
+            input.targetDays,
+            versionNo,
+            input.points,
+            input.userXp,
+            input.petXp,
+            effectiveAt,
+            adminId,
+          ],
         );
         return {
           result: {
             id,
-            targetDays: input.targetDays,
+            targetSuccessDays: input.targetDays,
             versionNo,
             points: input.points,
+            userXp: input.userXp,
+            petXp: input.petXp,
             effectiveAt,
           },
         };
@@ -97,7 +112,7 @@ export class GrowthPoliciesService {
       items: rows.map((row) => ({
         id: row.id,
         effectiveMonth: row.effective_month,
-        limitPoints: row.monthly_limit_points,
+        monthlyLimitPoints: row.monthly_limit_points,
       })),
     };
   }
@@ -105,8 +120,9 @@ export class GrowthPoliciesService {
   createMonthlyCap(adminId, input, key) {
     return this.mutation.run(adminId, {
       key,
-      operation: 'policy.monthly_cap.create',
+      operation: 'point_cap.create',
       payload: input,
+      reason: input.reason,
       run: async (tx) => {
         await lockScope(tx, 'monthly-cap');
         const { rows: month } = await tx.query(
@@ -127,8 +143,8 @@ export class GrowthPoliciesService {
              VALUES ($1,$2,$3,$4)`,
             [id, input.effectiveMonth, input.limitPoints, adminId],
           );
-        } catch (err) {
-          rethrowConstraint(err, {
+        } catch (error) {
+          rethrowConstraint(error, {
             point_monthly_cap_policies_effective_month_key: () =>
               conflict('policy_exists', '그 달에 이미 시행 예정인 한도가 있음'),
           });
@@ -137,7 +153,7 @@ export class GrowthPoliciesService {
           result: {
             id,
             effectiveMonth: input.effectiveMonth,
-            limitPoints: input.limitPoints,
+            monthlyLimitPoints: input.limitPoints,
           },
         };
       },

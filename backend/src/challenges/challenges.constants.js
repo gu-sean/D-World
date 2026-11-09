@@ -1,8 +1,6 @@
 /** 챌린지 기간(일), DB CHECK과 같음 */
 export const DURATIONS = [7, 14, 30];
 
-export const VERIFICATION_METHODS = ['camera', 'sensor'];
-
 /** DB의 exercise_code CHECK과 같은 목록, running만 센서 인증 */
 export const EXERCISE_CODES = [
   'push_up',

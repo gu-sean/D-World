@@ -30,7 +30,7 @@ const RECORD_STATUS_BY_DECISION = {
 };
 
 /**
- * 판정 반영 (3-C-3)
+ * 판정 반영
  * 모든 판정(AI, 관리자 보류 검수, 이의 제기 처리)이 이 함수를 거치며, 현재 판정 교체·회차와 미션 상태·
  * 포인트·XP·업적·단계 재평가가 호출자가 연 하나의 트랜잭션 안에서 반영
  * 잠금 순서: 미션 → 회차 → (포인트 지급 행 → 지갑 → 월간 사용량) → 사용자 XP → 펫 → 업적
@@ -65,6 +65,92 @@ export class DecisionService {
   }
 
   /** 미션 전체에서 현재 판정이 승인인 회차가 있는지 */
+  /** 레벨·펫 단계의 현재 값 (보상 요약의 레벨업·진화 판단용) */
+  async progressSnapshot(tx, userId, petId) {
+    const [level, pet] = await Promise.all([
+      tx.query('SELECT level_no FROM user_experience WHERE user_id = $1', [
+        userId,
+      ]),
+      petId
+        ? tx.query('SELECT stage_no FROM user_pets WHERE id = $1', [petId])
+        : { rows: [] },
+    ]);
+    return {
+      levelNo: level.rows[0]?.level_no ?? 1,
+      stageNo: pet.rows[0]?.stage_no ?? null,
+    };
+  }
+
+  /**
+   * 승인으로 지급한 보상을 mission_records.metrics.rewards에 저장 (07 GrantedRewards)
+   * 앱의 회차 조회(A41)가 그대로 돌려준다. 클라이언트가 보낸 같은 이름의 값은 덮어쓴다.
+   */
+  async storeGrantedRewards(tx, { mission, record, before }) {
+    const userId = mission.user_id;
+    const [points, xp, streak, level, pet, badges] = await Promise.all([
+      tx.query(
+        `SELECT original_points, paid_points FROM mission_point_awards
+          WHERE mission_id = $1 AND user_id = $2 AND status = 'active'`,
+        [mission.id, userId],
+      ),
+      tx.query(
+        `SELECT recipient_pet_id, base_user_xp, base_pet_xp, bonus_pet_xp
+           FROM experience_awards
+          WHERE user_id = $1 AND source_type = 'mission' AND source_id = $2
+            AND status = 'active'`,
+        [userId, mission.id],
+      ),
+      tx.query(
+        'SELECT current_success_days FROM streak_states WHERE user_id = $1',
+        [userId],
+      ),
+      tx.query('SELECT level_no FROM user_experience WHERE user_id = $1', [
+        userId,
+      ]),
+      record.reward_pet_id
+        ? tx.query('SELECT stage_no FROM user_pets WHERE id = $1', [
+            record.reward_pet_id,
+          ])
+        : { rows: [] },
+      tx.query(
+        `SELECT ua.achievement_id, v.title, v.rarity
+           FROM user_achievements ua
+           JOIN achievement_versions v ON v.id = ua.achievement_version_id
+          WHERE ua.user_id = $1 AND ua.status = 'active' AND ua.awarded_at = now()`,
+        [userId],
+      ),
+    ]);
+    const point = points.rows[0];
+    const award = xp.rows[0];
+    const levelNo = level.rows[0]?.level_no ?? 1;
+    const stageNo = pet.rows[0]?.stage_no ?? null;
+    const rewards = {
+      points: point ? point.paid_points : 0,
+      pointsCapped: point ? point.paid_points < point.original_points : false,
+      userXp: award ? award.base_user_xp : 0,
+      petXp: award ? award.base_pet_xp + award.bonus_pet_xp : 0,
+      petId: award?.recipient_pet_id ?? null,
+      levelUp: levelNo > before.levelNo,
+      newLevelNo: levelNo > before.levelNo ? levelNo : null,
+      petEvolved:
+        stageNo !== null && before.stageNo !== null && stageNo > before.stageNo,
+      streakDays: streak.rows[0]?.current_success_days ?? 0,
+      newBadges: badges.rows.map((badge) => ({
+        achievementId: badge.achievement_id,
+        title: badge.title,
+        rarity: badge.rarity,
+        badgeImageUrl: null,
+      })),
+    };
+    await tx.query(
+      `UPDATE mission_records
+          SET metrics = COALESCE(metrics, '{}'::jsonb)
+                        || jsonb_build_object('rewards', $2::jsonb)
+        WHERE id = $1`,
+      [record.id, JSON.stringify(rewards)],
+    );
+  }
+
   async hasValidApproval(tx, missionId) {
     const { rows } = await tx.query(
       `SELECT EXISTS (
@@ -125,7 +211,7 @@ export class DecisionService {
     );
     if (!probe[0]) throw recordNotFound();
     const { rows: missions } = await tx.query(
-      `SELECT id, user_id, status, source_type, verification_method, category_id, goal_step_id,
+      `SELECT id, user_id, title, status, source_type, verification_method, category_id, goal_step_id,
               scheduled_date, due_at, reward_points, reward_user_xp, reward_pet_xp
          FROM missions WHERE id = $1 FOR UPDATE`,
       [probe[0].mission_id],
@@ -182,6 +268,11 @@ export class DecisionService {
       input.criteriaVersionId,
     );
     const wasValid = await this.hasValidApproval(tx, mission.id);
+    // 보상 요약(레벨업·진화 여부)을 만들려고 승인 직전 상태를 기억
+    const before =
+      !wasValid && mission.source_type !== 'challenge'
+        ? await this.progressSnapshot(tx, mission.user_id, record.reward_pet_id)
+        : null;
 
     // 4) 현재 판정 교체: 이전 판정의 is_current를 먼저 내리고 새 판정을 넣음(회차당 현재 판정 1건)
     const { rows: previous } = await tx.query(
@@ -227,6 +318,8 @@ export class DecisionService {
       [recordId, RECORD_STATUS_BY_DECISION[decision], decision],
     );
 
+    await this.notifyVerdict(tx, mission, resultId, decision);
+
     const isValid = await this.hasValidApproval(tx, mission.id);
     const result = {
       outcome: 'applied',
@@ -270,6 +363,10 @@ export class DecisionService {
       userId: mission.user_id,
       scheduledDate: mission.scheduled_date,
     });
+    // 새로 승인된 회차에는 지급한 보상을 기록해 둔다(스트릭 갱신 뒤라 연속 일수가 맞음)
+    if (result.transition === 'completed' && before) {
+      await this.storeGrantedRewards(tx, { mission, record, before });
+    }
 
     const { rows: after } = await tx.query(
       'SELECT status FROM missions WHERE id = $1',
@@ -277,6 +374,35 @@ export class DecisionService {
     );
     result.missionStatus = after[0].status;
     return result;
+  }
+
+  /**
+   * 회원에게 판정 결과 알림(알림함, 알림을 켠 회원은 푸시 대기)
+   * 보류(review_required)는 회원에게 알리지 않는 판정이라 제외(notified_at도 비어 있음)
+   * 판정마다 한 번: event_key = verification_result:{판정 id}
+   */
+  async notifyVerdict(tx, mission, resultId, decision) {
+    if (decision !== 'approved' && decision !== 'rejected') return;
+    const approved = decision === 'approved';
+    await tx.query(
+      `INSERT INTO user_notifications
+         (id, user_id, kind, event_key, title, body, push_status)
+       SELECT $1, $2, 'system', $3, $4, $5,
+              CASE WHEN COALESCE(p.notification_enabled, false)
+                   THEN 'pending' ELSE 'none' END
+         FROM users u LEFT JOIN profiles p ON p.user_id = u.id
+        WHERE u.id = $2
+       ON CONFLICT (user_id, event_key) DO NOTHING`,
+      [
+        randomUUID(),
+        mission.user_id,
+        `verification_result:${resultId}`,
+        approved ? '인증이 승인됐어요' : '인증이 반려됐어요',
+        approved
+          ? `「${mission.title}」 미션 인증이 승인됐어요.`
+          : `「${mission.title}」 미션 인증이 반려됐어요. 사유를 확인해 주세요.`,
+      ],
+    );
   }
 
   /** 유효한 승인이 처음(또는 번복 뒤 다시) 생김: 미션 완료, 다른 회차 종료, 보상 지급·복구, 업적 */

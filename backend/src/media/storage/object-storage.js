@@ -1,6 +1,8 @@
 import {
+  CreateBucketCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -21,7 +23,7 @@ const hexToBase64 = (hex) => Buffer.from(hex, 'hex').toString('base64');
 const base64ToHex = (value) => Buffer.from(value, 'base64').toString('hex');
 
 /** Cloudflare R2(S3 호환) */
-export class R2ObjectStorage {
+class R2ObjectStorage {
   constructor({ accountId, accessKeyId, secretAccessKey, bucket, endpoint }) {
     this.bucket = bucket;
     this.client = new S3Client({
@@ -31,6 +33,15 @@ export class R2ObjectStorage {
       forcePathStyle: true,
       credentials: { accessKeyId, secretAccessKey },
     });
+  }
+
+  /** 버킷이 없으면 생성 (로컬 MinIO 전용, R2_CREATE_BUCKET=true) */
+  async ensureBucket() {
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+    } catch {
+      await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+    }
   }
 
   async presignPut({
@@ -70,7 +81,7 @@ export class R2ObjectStorage {
 
   async head(key) {
     try {
-      const res = await this.client.send(
+      const response = await this.client.send(
         new HeadObjectCommand({
           Bucket: this.bucket,
           Key: key,
@@ -78,16 +89,19 @@ export class R2ObjectStorage {
         }),
       );
       return {
-        size: Number(res.ContentLength),
-        contentType: res.ContentType ?? null,
-        checksumSha256: res.ChecksumSHA256
-          ? base64ToHex(res.ChecksumSHA256)
+        size: Number(response.ContentLength),
+        contentType: response.ContentType ?? null,
+        checksumSha256: response.ChecksumSHA256
+          ? base64ToHex(response.ChecksumSHA256)
           : null,
       };
-    } catch (err) {
-      if (err?.name === 'NotFound' || err?.$metadata?.httpStatusCode === 404)
+    } catch (error) {
+      if (
+        error?.name === 'NotFound' ||
+        error?.$metadata?.httpStatusCode === 404
+      )
         return null;
-      throw err;
+      throw error;
     }
   }
 
@@ -112,7 +126,7 @@ export class R2ObjectStorage {
  * 개발·테스트용 메모리 저장소, 운영에서는 환경 변수 검증이 막음
  * 테스트는 simulateUpload로 클라이언트 업로드를 모사
  */
-export class MemoryObjectStorage {
+class MemoryObjectStorage {
   objects = new Map();
 
   async presignPut({ key, contentType, contentLength, expiresInSec }) {
@@ -145,7 +159,7 @@ export class MemoryObjectStorage {
 }
 
 export function createObjectStorage(config) {
-  if (config.get('STORAGE_PROVIDER') === 'r2') {
+  if (config.get('STORAGE_DRIVER') === 'r2') {
     return new R2ObjectStorage({
       accountId: config.get('R2_ACCOUNT_ID'),
       accessKeyId: config.get('R2_ACCESS_KEY_ID'),

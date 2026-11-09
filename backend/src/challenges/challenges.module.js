@@ -7,6 +7,8 @@ import {
   ChallengesController,
   MyChallengesController,
 } from './challenges.controller.js';
+import { MobileChallengesController } from './mobile-challenges.controller.js';
+import { MobileChallengesService } from './mobile-challenges.service.js';
 import { ParticipationService } from './participation.service.js';
 import { ChallengesService } from './challenges.service.js';
 import { RewardPayoutService } from './reward-payout.service.js';
@@ -21,8 +23,10 @@ import { SettlementService } from './settlement.service.js';
     ChallengesController,
     MyChallengesController,
     AdminChallengesController,
+    MobileChallengesController,
   ],
   providers: [
+    MobileChallengesService,
     ChallengesService,
     ParticipationService,
     ScoringService,

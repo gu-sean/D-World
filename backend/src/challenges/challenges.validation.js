@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { parseLimit } from '../common/pagination/limit.js';
 import {
   dateString,
   integer,
@@ -12,18 +12,11 @@ import {
   DEFAULT_LIMIT,
   EXERCISE_CODES,
   MAX_LIMIT,
-  VERIFICATION_METHODS,
 } from './challenges.constants.js';
+import { VERIFICATION_METHODS } from '../missions/missions.constants.js';
 
 /** 챌린지 컨트롤러 공용 입력 규칙(사용자·관리자 공통) */
-export const limitOf = (query) => {
-  if (query.limit === undefined) return DEFAULT_LIMIT;
-  const limit = Number(query.limit);
-  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-    throw new BadRequestException([`limit: 1~${MAX_LIMIT} 정수여야 함`]);
-  }
-  return limit;
-};
+export const limitOf = (query) => parseLimit(query, DEFAULT_LIMIT, MAX_LIMIT);
 export const text = (max, optional = false) =>
   string({
     min: 1,
@@ -33,7 +26,7 @@ export const text = (max, optional = false) =>
     optional,
   });
 
-export const rewardRule = (optional = false) =>
+const rewardRule = (optional = false) =>
   object(
     {
       points: integer({ min: 0, max: 1_000_000 }),

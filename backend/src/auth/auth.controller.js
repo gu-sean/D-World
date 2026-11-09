@@ -9,6 +9,9 @@ import {
   Req,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { AccessTokenService } from '../common/auth/access-token.service.js';
+import { SessionKind } from '../common/auth/auth.constants.js';
+import { bearerToken } from '../common/auth/user-auth.guard.js';
 import { Public } from '../common/auth/public.decorator.js';
 import {
   array,
@@ -23,6 +26,7 @@ import {
   validateBody,
 } from '../common/validation.js';
 import { AuthService } from './auth.service.js';
+import { MobileAuthService } from './mobile-auth.service.js';
 import { SOCIAL_PROVIDERS } from './social/social-verifier.service.js';
 
 // 계정 열거·무차별 대입 방지용 IP 제한(번호·계정 단위 제한은 서비스가 DB로 처리)
@@ -35,10 +39,12 @@ const consents = () =>
   array(object({ documentVersionId: uuid(), granted: boolean() }), { max: 10 });
 
 @Controller()
-@Dependencies(AuthService)
+@Dependencies(AuthService, AccessTokenService, MobileAuthService)
 export class AuthController {
-  constructor(auth) {
+  constructor(auth, tokens, mobileAuth) {
     this.auth = auth;
+    this.tokens = tokens;
+    this.mobileAuth = mobileAuth;
   }
 
   @Public()
@@ -118,18 +124,32 @@ export class AuthController {
     );
   }
 
+  /**
+   * 로그아웃
+   * - 본문에 refreshToken이 있으면 그 세션을 폐기(모바일 A10, 토큰이 없거나 이미 폐기여도 204)
+   * - 없으면 Authorization Bearer의 세션을 폐기
+   */
+  @Public()
   @Post('auth/logout')
   @HttpCode(204)
-  @Bind(Req())
-  async logout(req) {
-    await this.auth.logout(req.auth.userId, req.auth.sessionId);
+  @Bind(Req(), Body())
+  async logout(request, body) {
+    if (typeof body?.refreshToken === 'string') {
+      await this.mobileAuth.logout(body.refreshToken);
+      return;
+    }
+    const { ownerId, sessionId } = await this.tokens.verify(
+      SessionKind.User,
+      bearerToken(request),
+    );
+    await this.auth.logout(ownerId, sessionId);
   }
 
   @Post('auth/logout-all')
   @HttpCode(204)
   @Bind(Req())
-  async logoutAll(req) {
-    await this.auth.logoutAll(req.auth.userId);
+  async logoutAll(request) {
+    await this.auth.logoutAll(request.auth.userId);
   }
 
   @Public()
@@ -151,17 +171,17 @@ export class AuthController {
   @Post('me/phone/codes')
   @HttpCode(204)
   @Bind(Req(), Body())
-  async sendLinkCode(req, body) {
+  async sendLinkCode(request, body) {
     const data = validateBody(body, { phone: phone() });
-    await this.auth.sendCode(data.phone, 'link_phone', req.auth.userId);
+    await this.auth.sendCode(data.phone, 'link_phone', request.auth.userId);
   }
 
   @Post('me/phone')
   @HttpCode(204)
   @Bind(Req(), Body())
-  async linkPhone(req, body) {
+  async linkPhone(request, body) {
     await this.auth.linkPhone(
-      req.auth.userId,
+      request.auth.userId,
       validateBody(body, {
         phone: phone(),
         code: code(),
@@ -173,11 +193,11 @@ export class AuthController {
   @Post('me/identities/:provider')
   @HttpCode(204)
   @Bind(Req(), Param('provider'), Body())
-  async linkIdentity(req, providerName, body) {
+  async linkIdentity(request, providerName, body) {
     const data = validateBody(
       { ...body, provider: providerName },
       { provider: provider(), token: socialToken() },
     );
-    await this.auth.linkIdentity(req.auth.userId, data);
+    await this.auth.linkIdentity(request.auth.userId, data);
   }
 }

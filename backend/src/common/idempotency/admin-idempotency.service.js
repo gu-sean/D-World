@@ -68,9 +68,9 @@ export class AdminIdempotencyService {
         );
         return body;
       });
-    } catch (err) {
-      await this.markFailed(started.id, err);
-      throw err;
+    } catch (error) {
+      await this.markFailed(started.id, error);
+      throw error;
     }
   }
 
@@ -154,8 +154,8 @@ export class AdminIdempotencyService {
     return { id: existing.id };
   }
 
-  async markFailed(id, err) {
-    const body = toErrorBody(err);
+  async markFailed(id, error) {
+    const body = toErrorBody(error);
     try {
       await this.database.query(
         `UPDATE admin_idempotency_keys

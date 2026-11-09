@@ -1,4 +1,4 @@
-// 남용 방지 상한 (설계서에 숫자가 없어 3-B-2의 상한과 비슷한 규모로 둔 제안값)
+// 남용 방지 상한 (설계서에 숫자가 없어 둔 제안값)
 export const MAX_DEFINITIONS_PER_USER = 100; // 삭제하지 않은 내 원형 수
 
 export const PUBLICATION_STATUSES = [

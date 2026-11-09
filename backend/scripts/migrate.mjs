@@ -1,17 +1,22 @@
 // SQL 마이그레이션 적용기: order.txt 순서(없으면 파일명 순) 실행, schema_migrations에 파일명·체크섬 기록
 // 사용: node scripts/migrate.mjs [디렉터리]   (기본 MIGRATIONS_DIR 또는 ../db/migrations)
+//       node scripts/migrate.mjs reset [--db 이름] [디렉터리]
+//         reset: 대상 DB를 비우고(public 스키마 삭제 후 재생성) 처음부터 다시 적용, 개발·테스트 전용
+//         --db: DATABASE_URL의 DB 이름을 바꿔서 사용(없으면 생성)
 // 대상 DB는 DATABASE_URL, 각 파일은 자체 BEGIN/COMMIT 포함 전제
-//
-// 이 파일은 backend/scripts/migrate.mjs의 교체본이다 (원본 대비 변경: listMigrations 추가,
-// 파일 목록을 파일명 정렬 대신 order.txt 순서로 읽음). 백엔드 브랜치에서 교체해서 사용한다.
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import pg from 'pg';
 
+const args = process.argv.slice(2);
+const isReset = args[0] === 'reset';
+if (isReset) args.shift();
+const dbFlag = args.indexOf('--db');
+const dbName = dbFlag >= 0 ? args.splice(dbFlag, 2)[1] : undefined;
 const dir = resolve(
-  process.argv[2] ?? process.env.MIGRATIONS_DIR ?? '../db/migrations',
+  args[0] ?? process.env.MIGRATIONS_DIR ?? '../db/migrations',
 );
 if (!existsSync(dir)) {
   console.error(`마이그레이션 디렉터리 없음: ${dir}`);
@@ -45,10 +50,39 @@ async function listMigrations(directory) {
   return listed;
 }
 
-const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+if (isReset && process.env.NODE_ENV === 'production') {
+  console.error('운영 환경에서는 reset을 실행할 수 없음');
+  process.exit(1);
+}
+
+const targetUrl = new URL(process.env.DATABASE_URL);
+if (dbName) {
+  // 지정한 DB가 없으면 만든 뒤 그 DB를 대상으로 사용
+  const adminUrl = new URL(targetUrl);
+  adminUrl.pathname = '/postgres';
+  const admin = new pg.Client({ connectionString: adminUrl.href });
+  await admin.connect();
+  try {
+    const exists = await admin.query(
+      'SELECT 1 FROM pg_database WHERE datname = $1',
+      [dbName],
+    );
+    if (exists.rowCount === 0)
+      await admin.query(`CREATE DATABASE "${dbName.replaceAll('"', '')}"`);
+  } finally {
+    await admin.end();
+  }
+  targetUrl.pathname = `/${dbName}`;
+}
+
+const client = new pg.Client({ connectionString: targetUrl.href });
 await client.connect();
 
 try {
+  if (isReset) {
+    console.log(`초기화: ${targetUrl.pathname.slice(1)}`);
+    await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+  }
   await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       filename   text PRIMARY KEY,

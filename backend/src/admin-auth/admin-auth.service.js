@@ -52,8 +52,8 @@ export class AdminAuthService {
    * 관리자 아이디 또는 이메일 + 비밀번호, 사용자 로그인과 같은 5회·5분 잠금
    * 로그인 결과는 감사 로그에 남김(존재하지 않는 계정은 admin_id가 없어 기록 불가)
    */
-  async login({ identifier, password }) {
-    const key = identifier.trim().toLowerCase();
+  async login({ loginId, password }) {
+    const key = loginId.trim().toLowerCase();
     const outcome = await this.database.withTransaction(async (tx) => {
       const { rows } = await tx.query(
         `SELECT id, password_hash, status, failed_attempt_count,
@@ -153,6 +153,18 @@ export class AdminAuthService {
       },
     );
     return this.tokenResponse(rotated.ownerId, rotated);
+  }
+
+  async me(adminId) {
+    const { rows } = await this.database.query(
+      'SELECT id, login_id, email FROM admin_accounts WHERE id = $1',
+      [adminId],
+    );
+    return {
+      id: rows[0].id,
+      loginId: rows[0].login_id,
+      email: rows[0].email,
+    };
   }
 
   async logout(adminId, sessionId) {

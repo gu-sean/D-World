@@ -22,7 +22,8 @@ const badRequest = (message) =>
 
 const COLUMNS = `d.id, d.origin, d.created_by_user_id, d.title, d.description, d.category_id,
   d.difficulty_id, d.estimated_duration_seconds, d.target_value, d.target_unit,
-  d.verification_method, d.publication_status, d.created_at, d.updated_at`;
+  d.verification_method, d.publication_status, d.created_at, d.updated_at,
+  d.exercise_code, d.base_points, d.base_user_xp, d.base_pet_xp`;
 
 // PATCH로 바꿀 수 있는 컬럼(쿼리에 들어가므로 고정 목록만 사용)
 const PATCH_COLUMNS = {
@@ -54,7 +55,7 @@ const encodeCursor = (row) =>
   );
 
 /**
- * 미션 원형 (3-B-3, 사용자 쪽)
+ * 미션 틀 (사용자 쪽)
  * 상태: private → review_pending → public / rejected / hidden
  * 원형의 기본 보상(base_*)은 사용자가 정할 수 없고 항상 0, 보상은 미션 생성 시 보상표에서 확정
  */
@@ -78,6 +79,8 @@ export class DefinitionsService {
       targetValue: row.target_value === null ? null : num(row.target_value),
       targetUnit: row.target_unit,
       verificationMethod: row.verification_method,
+      exerciseCode: row.exercise_code ?? null,
+      rewardPreview: row.reward_preview ?? null,
       authorNickname:
         row.origin === 'user' ? (row.author_nickname ?? null) : null,
       createdAt: row.created_at,
@@ -138,7 +141,23 @@ export class DefinitionsService {
   }
 
   /** 공개된 원형 탐색(관리자 템플릿 포함), 최신순 커서 */
-  async listPublic({ categoryId, difficultyId, cursor, limit }) {
+  async listPublic({
+    categoryId,
+    difficultyId,
+    exerciseCode,
+    sort,
+    cursor,
+    limit,
+  }) {
+    if (sort === 'duration') {
+      return this.listPublicByDuration({
+        categoryId,
+        difficultyId,
+        exerciseCode,
+        cursor,
+        limit,
+      });
+    }
     const after = decodeCursor(cursor);
     const { rows } = await this.database.query(
       `SELECT ${COLUMNS}, p.nickname AS author_nickname, d.created_at::text AS created_at_raw
@@ -148,6 +167,7 @@ export class DefinitionsService {
           AND ($1::uuid IS NULL OR d.category_id = $1)
           AND ($2::uuid IS NULL OR d.difficulty_id = $2)
           AND ($3::timestamptz IS NULL OR (d.created_at, d.id) < ($3::timestamptz, $4::uuid))
+          AND ($6::text IS NULL OR d.exercise_code = $6)
         ORDER BY d.created_at DESC, d.id DESC
         LIMIT $5`,
       [
@@ -156,9 +176,59 @@ export class DefinitionsService {
         after?.t ?? null,
         after?.id ?? null,
         limit + 1,
+        exerciseCode ?? null,
       ],
     );
     return this.page(rows, limit, false);
+  }
+
+  /** sort=duration: 짧은 순(소요 시간이 없는 원형은 맨 뒤), 커서는 (소요 시간, id) */
+  async listPublicByDuration({
+    categoryId,
+    difficultyId,
+    exerciseCode,
+    cursor,
+    limit,
+  }) {
+    let after = null;
+    if (cursor) {
+      try {
+        after = JSON.parse(Buffer.from(cursor, 'base64url').toString());
+        if (typeof after.k !== 'number' || typeof after.id !== 'string') {
+          throw new Error();
+        }
+      } catch {
+        throw badRequest('잘못된 cursor');
+      }
+    }
+    const { rows } = await this.database.query(
+      `SELECT ${COLUMNS}, p.nickname AS author_nickname,
+              COALESCE(d.estimated_duration_seconds, 2147483647) AS duration_key
+         FROM mission_definitions d
+         LEFT JOIN profiles p ON p.user_id = d.created_by_user_id
+        WHERE d.publication_status = 'public' AND d.deleted_at IS NULL
+          AND ($1::uuid IS NULL OR d.category_id = $1)
+          AND ($2::uuid IS NULL OR d.difficulty_id = $2)
+          AND ($3::text IS NULL OR d.exercise_code = $3)
+          AND ($4::int IS NULL
+               OR (COALESCE(d.estimated_duration_seconds, 2147483647), d.id)
+                  > ($4::int, $5::uuid))
+        ORDER BY COALESCE(d.estimated_duration_seconds, 2147483647), d.id
+        LIMIT $6`,
+      [
+        categoryId ?? null,
+        difficultyId ?? null,
+        exerciseCode ?? null,
+        after?.k ?? null,
+        after?.id ?? null,
+        limit + 1,
+      ],
+    );
+    return this.page(rows, limit, false, (row) =>
+      Buffer.from(
+        JSON.stringify({ k: Number(row.duration_key), id: row.id }),
+      ).toString('base64url'),
+    );
   }
 
   /** 내가 만든 원형(삭제 제외), 검수 상태 포함 */
@@ -178,13 +248,94 @@ export class DefinitionsService {
     return this.page(rows, limit, true);
   }
 
-  page(rows, limit, owner) {
+  async page(rows, limit, owner, cursorOf = encodeCursor) {
     const items = rows.slice(0, limit);
+    await this.attachRewardPreviews(items);
     return {
       items: items.map((row) => this.toView(row, { owner })),
       nextCursor:
-        rows.length > limit ? encodeCursor(items[items.length - 1]) : null,
+        rows.length > limit ? cursorOf(items[items.length - 1]) : null,
     };
+  }
+
+  /**
+   * 보상 미리보기: 관리자 원형은 원형의 기본 보상, 그 외는 (분야, 난이도)의 최신 보상표
+   * 미션을 만들 때 확정되는 값과 같은 규칙(RewardResolver)
+   */
+  async attachRewardPreviews(rows) {
+    const rated = rows.filter((row) => row.origin !== 'admin');
+    const rates = new Map();
+    if (rated.length > 0) {
+      const { rows: found } = await this.database.query(
+        `SELECT DISTINCT ON (category_id, difficulty_id)
+                category_id, difficulty_id, points, user_xp, pet_xp
+           FROM mission_reward_rate_versions
+          WHERE effective_at <= now()
+          ORDER BY category_id, difficulty_id, effective_at DESC, version_no DESC`,
+      );
+      for (const r of found) {
+        rates.set(`${r.category_id}:${r.difficulty_id}`, {
+          points: num(r.points),
+          userXp: num(r.user_xp),
+          petXp: num(r.pet_xp),
+        });
+      }
+    }
+    for (const row of rows) {
+      row.reward_preview =
+        row.origin === 'admin'
+          ? {
+              points: num(row.base_points),
+              userXp: num(row.base_user_xp),
+              petXp: num(row.base_pet_xp),
+            }
+          : (rates.get(`${row.category_id}:${row.difficulty_id}`) ?? null);
+    }
+  }
+
+  /** 여러 원형을 공개 보기(보상 미리보기 포함)로, 요청한 순서대로 */
+  async viewsByIds(ids) {
+    if (ids.length === 0) return [];
+    const { rows } = await this.database.query(
+      `SELECT ${COLUMNS}, p.nickname AS author_nickname
+         FROM mission_definitions d
+         LEFT JOIN profiles p ON p.user_id = d.created_by_user_id
+        WHERE d.id = ANY($1::uuid[]) AND d.deleted_at IS NULL`,
+      [ids],
+    );
+    await this.attachRewardPreviews(rows);
+    const byId = new Map(rows.map((row) => [row.id, this.toView(row)]));
+    return ids.map((id) => byId.get(id)).filter(Boolean);
+  }
+
+  /**
+   * A36 다음에 할 미션 추천 (최대 10)
+   * source=interest: 진행 중인 목표의 분야만, ai·all: 관심 분야를 앞에 두고 나머지도 포함
+   * 최근 7일 안에 같은 원형으로 만든 미션이 있으면 제외
+   */
+  async nextMissions(userId, source) {
+    const { rows } = await this.database.query(
+      `SELECT ${COLUMNS}, p.nickname AS author_nickname,
+              d.category_id IN (
+                SELECT category_id FROM goals
+                 WHERE user_id = $1 AND status = 'active') AS interest
+         FROM mission_definitions d
+         LEFT JOIN profiles p ON p.user_id = d.created_by_user_id
+        WHERE d.publication_status = 'public' AND d.deleted_at IS NULL
+          AND NOT EXISTS (
+                SELECT 1 FROM missions m
+                 WHERE m.user_id = $1 AND m.definition_id = d.id
+                   AND m.deleted_at IS NULL AND m.status <> 'cancelled'
+                   AND m.scheduled_date >= (now() AT TIME ZONE 'Asia/Seoul')::date - 7)
+        ORDER BY interest DESC, d.created_at DESC, d.id DESC
+        LIMIT 40`,
+      [userId],
+    );
+    const picked =
+      source === 'interest' ? rows.filter((row) => row.interest) : rows;
+    const items = picked.slice(0, 10);
+    await this.attachRewardPreviews(items);
+    return items.map((row) => this.toView(row));
   }
 
   /** 공개된 원형 또는 내 원형 한 건, 검수 이력(사유 포함)은 작성자에게만 */
@@ -199,6 +350,7 @@ export class DefinitionsService {
     );
     if (!rows[0]) throw definitionNotFound();
 
+    await this.attachRewardPreviews([rows[0]]);
     const owner = rows[0].created_by_user_id === userId;
     const view = this.toView(rows[0], { owner });
     if (owner) {

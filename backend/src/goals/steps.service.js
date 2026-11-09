@@ -16,7 +16,7 @@ const stepNotFound = () =>
   );
 
 /**
- * 목표 단계 (3-B-1)
+ * 목표 단계
  * 단계 번호는 목표 행을 잠근 뒤 마지막 번호 + 1로 부여해 동시 생성에서도 겹치지 않게 함
  */
 @Injectable()
@@ -145,7 +145,7 @@ export class StepsService {
    * 시작했거나 끝난 미션(취소 이력 포함)이 하나라도 있으면 거절하고,
    * 시작 전 미션만 있으면 단계 연결만 해제(목표에는 유지) 후 삭제
    */
-  async deleteStep(userId, goalId, stepId) {
+  async removeStep(userId, goalId, stepId) {
     await this.database.withTransaction(async (tx) => {
       await this.goals.loadGoal(tx, userId, goalId, { lock: true });
       await this.loadStep(tx, goalId, stepId, { lock: true });

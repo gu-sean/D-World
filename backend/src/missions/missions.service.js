@@ -14,6 +14,16 @@ import { conflict, unprocessable } from '../common/errors/http-errors.js';
 
 const num = (value) => Number(value);
 
+const MAX_SUBMISSIONS = 4;
+const GUIDES = {
+  push_up: '몸이 일직선이 되도록 옆모습이 화면에 들어오게 기기를 세워 주세요.',
+  burpee: '온몸이 화면에 들어오도록 2~3m 떨어진 곳에 기기를 세워 주세요.',
+  squat: '온몸이 화면에 들어오도록 2~3m 떨어진 곳에 기기를 세워 주세요.',
+  lunge: '온몸이 화면에 들어오도록 2~3m 떨어진 곳에 기기를 세워 주세요.',
+  plank: '옆모습 전체가 보이도록 기기를 낮게 세워 주세요.',
+  running: '러닝 앱 화면을 켜 둔 채 휴대폰을 가지고 달려 주세요.',
+};
+
 const missionNotFound = () =>
   new AppException(
     HttpStatus.NOT_FOUND,
@@ -38,7 +48,7 @@ const badRequest = (message) =>
 const COLUMNS = `id, user_id, goal_id, goal_step_id, definition_id, source_type, title,
   description, category_id, difficulty_id, target_value, target_unit,
   estimated_duration_seconds, verification_method, scheduled_date, due_at, is_required,
-  status, memo, cancel_reason, cancelled_at, reward_points, reward_user_xp, reward_pet_xp,
+  exercise_code, status, memo, cancel_reason, cancelled_at, reward_points, reward_user_xp, reward_pet_xp,
   created_at, updated_at`;
 
 // PATCH로 바꿀 수 있는 컬럼(쿼리에 들어가므로 고정 목록만 사용)
@@ -60,8 +70,8 @@ const PATCH_COLUMNS = {
 const defaultDueAt = (date) => kstDayStart(addDays(date, 1)).toISOString();
 
 /**
- * 미션 생성·조회·수정·취소·삭제 (3-B-2)
- * 수행 시작·인증·판정은 3-C. 보상(reward_*)은 생성 시 확정, 이후 불변
+ * 미션 생성·조회·수정·취소·삭제
+ * 수행 시작·인증·판정은 VerificationModule. 보상(reward_*)은 생성 시 확정, 이후 불변
  */
 @Injectable()
 @Dependencies(DatabaseService, GoalsService, RewardResolver, ActiveAccountGuard)
@@ -78,6 +88,9 @@ export class MissionsService {
       id: row.id,
       goalId: row.goal_id,
       stepId: row.goal_step_id,
+      goalStepId: row.goal_step_id,
+      challengeId: null,
+      exerciseCode: row.exercise_code ?? null,
       definitionId: row.definition_id,
       sourceType: row.source_type,
       title: row.title,
@@ -96,6 +109,11 @@ export class MissionsService {
       cancelReason: row.cancel_reason,
       cancelledAt: row.cancelled_at,
       reward: {
+        points: row.reward_points,
+        userXp: row.reward_user_xp,
+        petXp: row.reward_pet_xp,
+      },
+      rewardPreview: {
         points: row.reward_points,
         userXp: row.reward_user_xp,
         petXp: row.reward_pet_xp,
@@ -190,7 +208,7 @@ export class MissionsService {
     const { rows } = await db.query(
       `SELECT id, origin, title, description, category_id, difficulty_id, target_value,
               target_unit, estimated_duration_seconds, verification_method,
-              base_points, base_user_xp, base_pet_xp
+              base_points, base_user_xp, base_pet_xp, exercise_code
          FROM mission_definitions
         WHERE id = $1 AND deleted_at IS NULL AND publication_status <> 'hidden'
           AND (publication_status = 'public' OR created_by_user_id = $2)`,
@@ -261,6 +279,7 @@ export class MissionsService {
           targetUnit: definition.target_unit,
           estimatedDurationSeconds: definition.estimated_duration_seconds,
           verificationMethod: definition.verification_method,
+          exerciseCode: definition.exercise_code ?? null,
         };
       } else {
         spec = {
@@ -273,6 +292,7 @@ export class MissionsService {
           targetUnit: input.targetUnit ?? null,
           estimatedDurationSeconds: input.estimatedDurationSeconds ?? null,
           verificationMethod: input.verificationMethod,
+          exerciseCode: input.exerciseCode ?? null,
         };
         if (!spec.categoryId || !spec.difficultyId) {
           throw badRequest(
@@ -332,8 +352,8 @@ export class MissionsService {
                source_proposal_id, title, description, category_id, difficulty_id,
                target_value, target_unit, estimated_duration_seconds, verification_method,
                scheduled_date, due_at, is_required, memo, reward_points,
-               reward_rate_version_id, reward_user_xp, reward_pet_xp)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+               reward_rate_version_id, reward_user_xp, reward_pet_xp, exercise_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
        RETURNING ${COLUMNS}`,
       [
         randomUUID(),
@@ -359,6 +379,7 @@ export class MissionsService {
         m.reward.rateVersionId,
         m.reward.userXp,
         m.reward.petXp,
+        m.exerciseCode ?? null,
       ],
     );
     return this.toView(rows[0]);
@@ -407,7 +428,18 @@ export class MissionsService {
    * 기본은 취소·삭제 제외, status=cancelled를 직접 요청하면 취소 이력을 보여 줌
    */
   async listMissions(userId, filters) {
-    const { date, from, to, goalId, stepId, status, cursor, limit } = filters;
+    const {
+      date,
+      from,
+      to,
+      goalId,
+      stepId,
+      status,
+      statuses,
+      categoryId,
+      cursor,
+      limit,
+    } = filters;
     const where = ['user_id = $1', 'deleted_at IS NULL'];
     const params = [userId];
     const add = (sql, value) => {
@@ -420,7 +452,9 @@ export class MissionsService {
     if (to) add('scheduled_date <= ?::date', to);
     if (goalId) add('goal_id = ?::uuid', goalId);
     if (stepId) add('goal_step_id = ?::uuid', stepId);
-    if (status) add('status = ?::text', status);
+    if (categoryId) add('category_id = ?::uuid', categoryId);
+    if (statuses?.length) add('status = ANY(?::text[])', statuses);
+    else if (status) add('status = ?::text', status);
     else where.push("status <> 'cancelled'");
 
     if (cursor) {
@@ -652,5 +686,61 @@ export class MissionsService {
       if (done) failed += 1;
     }
     return { failed };
+  }
+
+  /** 챌린지 미션이면 challengeId를 채움 (08 Mission.challengeId) */
+  async attachChallengeIds(views) {
+    const list = Array.isArray(views) ? views : [views];
+    if (list.length === 0) return views;
+    const { rows } = await this.database.query(
+      `SELECT mission_id, challenge_id
+         FROM challenge_daily_missions WHERE mission_id = ANY($1::uuid[])`,
+      [list.map((view) => view.id)],
+    );
+    const byMission = new Map(rows.map((r) => [r.mission_id, r.challenge_id]));
+    for (const view of list) view.challengeId = byMission.get(view.id) ?? null;
+    return views;
+  }
+
+  /** A32 MissionDetail: 미션 + 최근 수행 기록·제출 횟수·가능한 동작 */
+  async getDetail(userId, missionId) {
+    const view = await this.getMission(userId, missionId);
+    return this.toDetail(view);
+  }
+
+  async toDetail(view) {
+    await this.attachChallengeIds(view);
+    const { rows } = await this.database.query(
+      `SELECT id, attempt_no, status, started_at,
+              (SELECT d.decision FROM verification_results d
+                WHERE d.record_id = r.id
+                ORDER BY d.result_no DESC LIMIT 1) AS decision,
+              (SELECT count(*)::int FROM mission_records s
+                WHERE s.mission_id = r.mission_id AND s.submission_no IS NOT NULL) AS submissions
+         FROM mission_records r
+        WHERE r.mission_id = $1
+        ORDER BY r.attempt_no DESC
+        LIMIT 1`,
+      [view.id],
+    );
+    const latest = rows[0];
+    const submissionCount = latest?.submissions ?? 0;
+    return {
+      ...view,
+      latestRecord: latest
+        ? {
+            id: latest.id,
+            attemptNo: latest.attempt_no,
+            status: latest.status,
+            decision: latest.decision ?? null,
+            startedAt: latest.started_at,
+          }
+        : null,
+      submissionCount,
+      remainingSubmissions: Math.max(0, MAX_SUBMISSIONS - submissionCount),
+      canStart: view.status === 'scheduled' || view.status === 'in_progress',
+      canEdit: view.status === 'scheduled' && view.challengeId === null,
+      guide: GUIDES[view.exerciseCode] ?? null,
+    };
   }
 }

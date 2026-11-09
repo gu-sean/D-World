@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 const toNumber = (value) => Number(value);
 
 /** 해당 시각에 이미 발효된 레벨 정책 중 가장 최근 버전(불변, 계정에 고정해 사용) */
-export async function latestPolicy(tx, table) {
+async function latestPolicy(tx, table) {
   const { rows } = await tx.query(
     `SELECT id FROM ${table} WHERE effective_at <= now()
       ORDER BY effective_at DESC LIMIT 1`,

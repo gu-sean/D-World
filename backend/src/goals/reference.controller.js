@@ -1,6 +1,8 @@
 import { Controller, Dependencies, Get } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
 
+import { EXERCISE_TYPES } from './exercise-types.js';
+
 /** 카테고리·난이도는 관리자가 관리하는 목록, 사용자에게는 활성 값만 보여 줌 */
 @Controller()
 @Dependencies(DatabaseService)
@@ -31,5 +33,11 @@ export class ReferenceController {
   @Get('difficulty-levels')
   difficultyLevels() {
     return this.list('difficulty_levels');
+  }
+
+  /** A19 운동 종류 6종 (고정 값) */
+  @Get('exercise-types')
+  exerciseTypes() {
+    return EXERCISE_TYPES.map((type) => ({ ...type }));
   }
 }

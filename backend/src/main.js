@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
+import { setupSwagger } from './app.swagger.js';
 import { configureApp, registerNotFoundFallback } from './app.setup.js';
 
 async function bootstrap() {
@@ -14,11 +15,12 @@ async function bootstrap() {
   app.use(helmet());
 
   const origins = config
-    .get('CORS_ORIGINS')
+    .get('ADMIN_WEB_ORIGIN')
     ?.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
-  if (origins?.length) app.enableCors({ origin: origins });
+  if (origins?.length) app.enableCors({ origin: origins, credentials: true });
+  if (config.get('NODE_ENV') !== 'production') setupSwagger(app);
 
   // 요청 검증은 컨트롤러의 common/validation.js 규칙 함수가 담당(DTO·ValidationPipe 미사용)
   // SIGTERM 시 요청 처리 후 DB 풀 종료

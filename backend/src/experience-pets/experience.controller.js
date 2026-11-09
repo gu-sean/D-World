@@ -10,10 +10,10 @@ export class ExperienceController {
 
   @Get()
   @Bind(Req())
-  summary(req) {
+  summary(request) {
     return this.experience.getExperience(
       this.experience.database,
-      req.auth.userId,
+      request.auth.userId,
     );
   }
 }

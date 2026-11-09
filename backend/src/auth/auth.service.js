@@ -145,6 +145,27 @@ export class AuthService {
       'signup',
       code,
     );
+    return this.completePhoneSignup({
+      phone,
+      challengeId,
+      password,
+      nickname,
+      consents,
+      current,
+    });
+  }
+
+  /** 확인이 끝난 인증번호(challenge)로 휴대폰 가입을 마무리 */
+  async completePhoneSignup({
+    phone,
+    challengeId,
+    password,
+    nickname,
+    consents,
+    current: given,
+  }) {
+    const current = given ?? (await this.consents.currentVersions());
+    if (!given) this.consents.assertSignupConsents(current, consents);
     const passwordHash = await this.passwords.hash(password);
 
     try {
@@ -166,8 +187,8 @@ export class AuthService {
         },
       );
       return { userId, ...(await this.tokenResponse(userId, session)) };
-    } catch (err) {
-      rethrowConstraint(err, {
+    } catch (error) {
+      rethrowConstraint(error, {
         profiles_nickname_ci_uq: nicknameTaken,
         phone_credentials_phone_e164_key: phoneTaken,
       });
@@ -258,7 +279,20 @@ export class AuthService {
   }
 
   async loginSocial({ provider, token }) {
-    const { subject } = await this.socialVerifier.verify(provider, token);
+    const identity = await this.socialVerifier.verify(provider, token);
+    const result = await this.loginWithIdentity(provider, identity);
+    if (!result) {
+      throw new AppException(
+        HttpStatus.NOT_FOUND,
+        'social_not_registered',
+        '가입되지 않은 소셜 계정',
+      );
+    }
+    return result;
+  }
+
+  /** 검증된 소셜 신원으로 로그인, 가입되지 않았으면 null */
+  async loginWithIdentity(provider, { subject }) {
     const { rows } = await this.database.query(
       `SELECT i.user_id, u.status
          FROM user_identities i
@@ -267,13 +301,7 @@ export class AuthService {
       [provider, subject],
     );
     const identity = rows[0];
-    if (!identity) {
-      throw new AppException(
-        HttpStatus.NOT_FOUND,
-        'social_not_registered',
-        '가입되지 않은 소셜 계정',
-      );
-    }
+    if (!identity) return null;
     if (identity.status !== 'active') throw accountUnavailable();
 
     const session = await this.database.withTransaction((tx) =>
@@ -287,6 +315,16 @@ export class AuthService {
 
   async signupSocial({ provider, token, nickname, consents }) {
     const identity = await this.socialVerifier.verify(provider, token);
+    return this.completeSocialSignup({
+      provider,
+      identity,
+      nickname,
+      consents,
+    });
+  }
+
+  /** 검증된 소셜 신원으로 가입 */
+  async completeSocialSignup({ provider, identity, nickname, consents }) {
     const current = await this.consents.currentVersions();
     this.consents.assertSignupConsents(current, consents);
 
@@ -307,8 +345,8 @@ export class AuthService {
         },
       );
       return { userId, ...(await this.tokenResponse(userId, session)) };
-    } catch (err) {
-      rethrowConstraint(err, {
+    } catch (error) {
+      rethrowConstraint(error, {
         profiles_nickname_ci_uq: nicknameTaken,
         user_identities_provider_provider_subject_key: identityTaken,
       });
@@ -327,7 +365,10 @@ export class AuthService {
         if (rows[0]?.status !== 'active') throw accountUnavailable();
       },
     );
-    return this.tokenResponse(rotated.ownerId, rotated);
+    return {
+      userId: rotated.ownerId,
+      ...(await this.tokenResponse(rotated.ownerId, rotated)),
+    };
   }
 
   logout(userId, sessionId) {
@@ -350,6 +391,11 @@ export class AuthService {
       'reset_password',
       code,
     );
+    await this.completePasswordReset({ phone, challengeId, newPassword });
+  }
+
+  /** 확인이 끝난 인증번호(challenge)로 비밀번호를 바꾸고 기존 세션을 폐기 */
+  async completePasswordReset({ phone, challengeId, newPassword }) {
     const passwordHash = await this.passwords.hash(newPassword);
 
     await this.database.withTransaction(async (tx) => {
@@ -393,8 +439,8 @@ export class AuthService {
           [userId, phone, passwordHash],
         );
       });
-    } catch (err) {
-      rethrowConstraint(err, {
+    } catch (error) {
+      rethrowConstraint(error, {
         phone_credentials_pkey: phoneAlreadyLinked,
         phone_credentials_phone_e164_key: phoneTaken,
       });
@@ -409,8 +455,8 @@ export class AuthService {
          VALUES ($1, $2, $3, $4, $5)`,
         [randomUUID(), userId, provider, identity.subject, identity.email],
       );
-    } catch (err) {
-      rethrowConstraint(err, {
+    } catch (error) {
+      rethrowConstraint(error, {
         user_identities_provider_provider_subject_key: identityTaken,
         user_identities_user_id_provider_key: providerAlreadyLinked,
       });
