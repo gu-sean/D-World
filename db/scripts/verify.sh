@@ -1,7 +1,7 @@
 #!/bin/sh
 # 마이그레이션·smoke·개발 시드를 임시 DB에 적용한 뒤 삭제
 # 접속 정보는 PGHOST/PGPORT/PGUSER/PGPASSWORD
-# (docker 사용자는 backend 폴더에서 `npm run db:verify`를 쓴다 — docs/12 §7)
+# (docker 사용자는 backend 폴더에서 `npm run db:verify`를 쓴다)
 set -eu
 cd "$(dirname "$0")/../.."
 DB="d_world_verify_$$"
