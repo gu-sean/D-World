@@ -3,11 +3,9 @@ import { Dependencies, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppException } from '../common/errors/app-exception.js';
 import { DatabaseService } from '../database/database.service.js';
-import {
-  DOWNLOAD_URL_TTL_SEC,
-  MEDIA_RULES,
-  OPEN_RECORD_STATUSES,
-} from './media.constants.js';
+import { DOWNLOAD_URL_TTL_SEC, MEDIA_RULES } from './media.constants.js';
+import { OPEN_RECORD_STATUSES } from '../verification/records/records.constants.js';
+import { recordMediaKey } from './storage/keys.js';
 import { OBJECT_STORAGE } from './storage/object-storage.js';
 import { conflict, unprocessable } from '../common/errors/http-errors.js';
 
@@ -38,7 +36,7 @@ const COLUMNS = `id, user_id, record_id, object_key, media_kind, mime_type, expe
   deleted_at, created_at`;
 
 /**
- * 인증 원본(R2) 관리 (3-C-1)
+ * 인증 원본(R2) 관리
  * - 객체 키는 서버가 생성, 응답에 노출 안 함
  * - R2와 DB는 원자적이지 않으므로 상태(pending → uploaded, uploaded → deleting → deleted)로 표현하고,
  *   R2 호출은 가능한 한 DB 잠금 밖, 실패한 정리는 상태에 남겨 작업이 재시도
@@ -62,7 +60,9 @@ export class MediaService {
   toView(row) {
     return {
       id: row.id,
+      mediaId: row.id,
       recordId: row.record_id,
+      uploadStatus: row.upload_status,
       mediaKind: row.media_kind,
       mimeType: row.mime_type,
       sizeBytes: num(row.expected_size_bytes),
@@ -158,16 +158,20 @@ export class MediaService {
         );
       }
 
-      // 실패·삭제된 파일은 개수에서 제외
+      // 실패·삭제된 파일은 개수에서 제외, 카메라 증거는 사진·영상을 합쳐 센다(AI는 파일 1개만 받음)
+      const kinds = Object.entries(MEDIA_RULES)
+        .filter(([, other]) => other.method === rule.method)
+        .map(([kind]) => kind);
       const { rows: count } = await tx.query(
         `SELECT count(*) AS n FROM media_files
-          WHERE record_id = $1 AND media_kind = $2 AND upload_status IN ('pending', 'uploaded')`,
-        [recordId, input.mediaKind],
+          WHERE record_id = $1 AND media_kind = ANY($2::text[])
+            AND upload_status IN ('pending', 'uploaded')`,
+        [recordId, kinds],
       );
       if (num(count[0].n) >= rule.maxPerRecord) {
         throw conflict(
           'media_limit_reached',
-          `이 종류의 파일은 회차당 최대 ${rule.maxPerRecord}개`,
+          `증거 파일은 회차당 최대 ${rule.maxPerRecord}개`,
           {
             mediaKind: input.mediaKind,
           },
@@ -175,7 +179,13 @@ export class MediaService {
       }
 
       const id = randomUUID();
-      const key = `u/${userId}/r/${recordId}/${id}.${extension}`;
+      const key = recordMediaKey({
+        prefix: this.config.get('R2_KEY_PREFIX'),
+        userId,
+        recordId,
+        mediaId: id,
+        extension,
+      });
       const { rows } = await tx.query(
         `INSERT INTO media_files
                 (id, user_id, record_id, object_key, media_kind, mime_type,
@@ -441,8 +451,8 @@ export class MediaService {
     try {
       await this.storage.delete(key);
       return true;
-    } catch (err) {
-      this.logger.warn(`R2 객체 삭제 실패 ${key}: ${err.message}`);
+    } catch (error) {
+      this.logger.warn(`R2 객체 삭제 실패 ${key}: ${error.message}`);
       return false;
     }
   }

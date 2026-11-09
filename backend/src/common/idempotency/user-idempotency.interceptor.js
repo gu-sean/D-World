@@ -20,7 +20,9 @@ const IDEMPOTENT = 'idempotent';
 const STALE_AFTER = "interval '5 minutes'";
 
 /** 앱 API 변경 요청에 Idempotency-Key 필수 처리를 붙임 (팀 문서 05 §5.1) */
-export const Idempotent = () => SetMetadata(IDEMPOTENT, true);
+// optional: true면 헤더가 있을 때만 멱등 처리(없으면 그냥 실행), 모바일이 키를 보내지만 서버가 강제하지 않는 요청용
+export const Idempotent = ({ optional = false } = {}) =>
+  SetMetadata(IDEMPOTENT, { optional });
 
 /**
  * 앱 API 멱등 처리 (009 user_idempotency_keys)
@@ -40,11 +42,13 @@ export class UserIdempotencyInterceptor {
   }
 
   intercept(context, next) {
-    if (!this.reflector.get(IDEMPOTENT, context.getHandler())) {
-      return next.handle();
-    }
+    const options = this.reflector.get(IDEMPOTENT, context.getHandler());
+    if (!options) return next.handle();
     const http = context.switchToHttp();
     const request = http.getRequest();
+    if (options.optional && !request.headers?.['idempotency-key']) {
+      return next.handle();
+    }
     // 응답 상태는 인터셉터 이후에 Nest가 정하므로 @HttpCode 또는 기본값(POST 201)을 직접 계산
     const status =
       Reflect.getMetadata('__httpCode__', context.getHandler()) ??
@@ -81,12 +85,12 @@ export class UserIdempotencyInterceptor {
     let body;
     try {
       body = await handle();
-    } catch (err) {
+    } catch (error) {
       await this.database.query(
         'DELETE FROM user_idempotency_keys WHERE id = $1 AND status = $2',
         [started.id, 'in_progress'],
       );
-      throw err;
+      throw error;
     }
     await this.database.query(
       `UPDATE user_idempotency_keys

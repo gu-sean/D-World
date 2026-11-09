@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../../admin-auth/audit.service.js';
+import { adminPage } from '../../common/pagination/admin-page.js';
 import { AppException } from '../../common/errors/app-exception.js';
 import { rethrowConstraint } from '../../common/errors/constraint.js';
 import { AdminIdempotencyService } from '../../common/idempotency/admin-idempotency.service.js';
@@ -26,7 +27,7 @@ const alreadyFiled = () =>
   conflict('appeal_already_filed', '이 판정에는 이미 이의 제기가 접수됨');
 
 /**
- * 이의 제기 (3-C-4)
+ * 이의 제기
  * - 대상: 안내 후 7일 이내의 **AI 거절** 판정, 관리자 판정은 최종(이의 제기 불가)
  * - 처리: 관리자가 거절 유지 또는 승인으로 변경, 둘 다 새 관리자 판정 기록
  *   판정 반영은 DecisionService.applyDecision 재사용 → 늦은 승인(실패 미션 완료), 이력만 남는 경우 등 동일 규칙
@@ -51,6 +52,7 @@ export class AppealsService {
     return {
       id: row.id,
       recordId: row.record_id,
+      originalResultId: row.original_result_id ?? null,
       status: row.status,
       reason: row.reason,
       filedAt: row.filed_at,
@@ -136,16 +138,40 @@ export class AppealsService {
           `INSERT INTO verification_appeals
                   (id, record_id, filed_by_user_id, original_result_id, reason)
            VALUES ($1, $2, $3, $4, $5)
-           RETURNING id, record_id, status, reason, filed_at, resolved_at`,
+           RETURNING id, record_id, original_result_id, status, reason, filed_at, resolved_at`,
           [randomUUID(), recordId, userId, current.id, reason],
         );
         return this.toView(created[0]);
       });
-    } catch (err) {
-      rethrowConstraint(err, {
+    } catch (error) {
+      rethrowConstraint(error, {
         verification_appeals_original_result_id_key: alreadyFiled,
       });
     }
+  }
+
+  /** A46: 판정 ID로 이의 제기, 현재 판정이 아니면 이의 제기할 수 없음 */
+  async fileAppealByResult(userId, resultId, reason) {
+    const { rows } = await this.database.query(
+      `SELECT vr.record_id, vr.is_current
+         FROM verification_results vr
+         JOIN mission_records r ON r.id = vr.record_id
+        WHERE vr.id = $1 AND r.user_id = $2`,
+      [resultId, userId],
+    );
+    if (!rows[0]) {
+      throw new AppException(
+        HttpStatus.NOT_FOUND,
+        'result_not_found',
+        '판정을 찾을 수 없음',
+      );
+    }
+    if (!rows[0].is_current) {
+      throw conflict('appeal_not_allowed', '이의 제기할 수 없는 판정', {
+        reason: 'not_current',
+      });
+    }
+    return this.fileAppeal(userId, rows[0].record_id, reason);
   }
 
   /** 내 회차의 이의 제기 목록과 처리 결과 */
@@ -167,46 +193,39 @@ export class AppealsService {
     return { items: rows.map((row) => this.toView(row)) };
   }
 
-  /** 관리자 대기열(기본 open), 오래 기다린 순서. 원 판정(AI 의견)과 미션 조건을 함께 보여 줌 */
-  async listQueue({ status = 'open', cursor, limit }) {
-    let after = null;
-    if (cursor) {
-      try {
-        after = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-        if (typeof after.t !== 'string' || typeof after.id !== 'string')
-          throw new Error();
-      } catch {
-        throw new AppException(
-          HttpStatus.BAD_REQUEST,
-          'bad_request',
-          '잘못된 cursor',
-        );
-      }
-    }
-    const { rows } = await this.database.query(
-      `SELECT a.id, a.record_id, a.status, a.reason, a.filed_at, a.filed_at::text AS filed_at_raw,
-              a.resolved_at, r.mission_id, r.user_id, r.attempt_no, r.submission_no,
-              m.title, m.verification_method, m.status AS mission_status,
-              vr.engine_version, vr.confidence, vr.reason AS ai_reason, vr.decided_at,
-              vr.notified_at
-         FROM verification_appeals a
-         JOIN mission_records r ON r.id = a.record_id
-         JOIN missions m ON m.id = r.mission_id
-         JOIN verification_results vr ON vr.id = a.original_result_id
-        WHERE a.status = $1
-          AND ($2::timestamptz IS NULL OR (a.filed_at, a.id) > ($2::timestamptz, $3::uuid))
-        ORDER BY a.filed_at, a.id
-        LIMIT $4`,
-      [status, after?.t ?? null, after?.id ?? null, limit + 1],
-    );
-    const page = rows.slice(0, limit);
-    const last = page[page.length - 1];
-    return {
-      items: page.map((row) => ({
+  /** M34 관리자 이의 제기 목록(AdminPage), 기본 open, 원 판정(AI 의견)과 미션 조건을 함께 보여 줌 */
+  async list({ status, paging }) {
+    const [{ rows }, count] = await Promise.all([
+      this.database.query(
+        `SELECT a.id, a.record_id, a.status, a.reason, a.filed_at,
+                a.resolved_at, r.mission_id, r.user_id, r.attempt_no, r.submission_no,
+                m.title, m.verification_method, m.status AS mission_status,
+                vr.engine_version, vr.confidence, vr.reason AS ai_reason, vr.decided_at,
+                vr.notified_at, vr.decision AS original_decision, p.nickname
+           FROM verification_appeals a
+           JOIN mission_records r ON r.id = a.record_id
+           JOIN missions m ON m.id = r.mission_id
+           JOIN verification_results vr ON vr.id = a.original_result_id
+           LEFT JOIN profiles p ON p.user_id = r.user_id
+          WHERE a.status = $1
+          ORDER BY ${paging.orderBy}
+          LIMIT $2 OFFSET $3`,
+        [status, paging.size, paging.offset],
+      ),
+      this.database.query(
+        'SELECT count(*) AS n FROM verification_appeals a WHERE a.status = $1',
+        [status],
+      ),
+    ]);
+    return adminPage(
+      rows.map((row) => ({
         id: row.id,
         recordId: row.record_id,
         missionId: row.mission_id,
         userId: row.user_id,
+        nickname: row.nickname,
+        missionTitle: row.title,
+        originalDecision: row.original_decision,
         attemptNo: row.attempt_no,
         submissionNo: row.submission_no,
         status: row.status,
@@ -226,13 +245,23 @@ export class AppealsService {
           notifiedAt: row.notified_at,
         },
       })),
-      nextCursor:
-        rows.length > limit
-          ? Buffer.from(
-              JSON.stringify({ t: last.filed_at_raw, id: last.id }),
-            ).toString('base64url')
-          : null,
-    };
+      paging,
+      count.rows[0].n,
+    );
+  }
+
+  /** M35 관리자용 이의 제기 단건 (처리 결과 포함) */
+  async getForAdmin(appealId) {
+    const { rows } = await this.database.query(
+      `SELECT a.id, a.record_id, a.status, a.reason, a.filed_at, a.resolved_at,
+              rr.decision AS resolution_decision, rr.reason AS resolution_reason
+         FROM verification_appeals a
+         LEFT JOIN verification_results rr ON rr.id = a.resolution_result_id
+        WHERE a.id = $1`,
+      [appealId],
+    );
+    if (!rows[0]) throw recordNotFound();
+    return { view: this.toView(rows[0]), recordId: rows[0].record_id };
   }
 
   /**
@@ -244,7 +273,7 @@ export class AppealsService {
       adminId,
       {
         key,
-        operation: 'verification.appeal.resolve',
+        operation: 'appeal.resolve',
         payload: { appealId, outcome, reason },
       },
       async (tx) => {
@@ -302,7 +331,7 @@ export class AppealsService {
         await this.audit.record(tx, {
           adminId,
           targetUserId: appeal.user_id,
-          action: 'verification.appeal.resolve',
+          action: 'appeal.resolve',
           result: 'success',
           reason,
           before: {

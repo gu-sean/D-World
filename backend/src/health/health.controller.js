@@ -29,8 +29,8 @@ export class HealthController {
   async ready() {
     try {
       await this.database.ping();
-    } catch (err) {
-      this.logger.error(`DB 헬스 체크 실패: ${err.message}`);
+    } catch (error) {
+      this.logger.error(`DB 헬스 체크 실패: ${error.message}`);
       throw new ServiceUnavailableException('database unavailable');
     }
     return { status: 'ok', database: 'up' };

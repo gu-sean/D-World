@@ -15,7 +15,7 @@ const notFound = () =>
   );
 
 /**
- * 참가·포기와 일별 미션 (4-B)
+ * 참가·포기와 일별 미션
  * - 참가하면 기간의 날짜마다 챌린지 전용 미션(source_type='challenge', 보상 0)과 challenge_daily_missions를
  *   한 트랜잭션에서 모두 생성. 수행·제출·판정은 기존 수행 회차 흐름 재사용
  * - 시작 전 포기는 미션을 지우고(재신청 가능), 시작 후 포기는 이력을 남기고 앞으로의 미션만 취소한다(재참가 불가).
@@ -96,17 +96,17 @@ export class ParticipationService {
             [participation.id, challengeId, userId],
           );
         }
-      } catch (err) {
-        if (err?.code === '23514' && /full/.test(err.message)) {
+      } catch (error) {
+        if (error?.code === '23514' && /full/.test(error.message)) {
           throw conflict('challenge_full', '참가 인원이 가득 참');
         }
-        if (err?.code === '23514' && /not open/.test(err.message)) {
+        if (error?.code === '23514' && /not open/.test(error.message)) {
           throw conflict(
             'challenge_not_open',
             '지금은 참가할 수 없는 챌린지(공개 전이거나 계정 상태 제한)',
           );
         }
-        throw err;
+        throw error;
       }
 
       await this.createDailyMissions(tx, userId, participation.id, challenge);
@@ -257,17 +257,17 @@ export class ParticipationService {
           AND NOT EXISTS (SELECT 1 FROM mission_records r WHERE r.mission_id = m.id)`,
       [participation.id, !started],
     );
-    for (const row of rows) {
-      await tx.query(
-        `UPDATE missions SET status = 'cancelled', cancel_reason = $2, cancelled_at = now(),
-                updated_at = now() WHERE id = $1`,
-        [row.mission_id, reason],
-      );
-      await tx.query(
-        `UPDATE challenge_daily_missions SET status = 'cancelled', updated_at = now() WHERE id = $1`,
-        [row.daily_id],
-      );
-    }
+    if (rows.length === 0) return;
+    await tx.query(
+      `UPDATE missions SET status = 'cancelled', cancel_reason = $2, cancelled_at = now(),
+              updated_at = now() WHERE id = ANY($1::uuid[])`,
+      [rows.map((row) => row.mission_id), reason],
+    );
+    await tx.query(
+      `UPDATE challenge_daily_missions SET status = 'cancelled', updated_at = now()
+        WHERE id = ANY($1::uuid[])`,
+      [rows.map((row) => row.daily_id)],
+    );
   }
 
   // ───────── 조회 ─────────
@@ -394,7 +394,7 @@ export class ParticipationService {
         );
         await this.audit.record(tx, {
           adminId,
-          action: 'challenge.cancel',
+          action: 'challenge.update',
           result: 'success',
           reason,
           before: { status: challenge.publication_status },

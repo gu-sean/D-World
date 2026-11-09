@@ -12,7 +12,7 @@ const notFound = (
 ) => httpError(HttpStatus.NOT_FOUND, code, message);
 
 /**
- * 정산 초안·확정 (5-A)
+ * 정산 초안·확정
  * 1) 초안: 종료 다음 날부터, 참가자별 성공 일수·완주 여부·순위·보상 묶음을 계산해 draft 정산으로 저장
  * 2) 확정: 관리자가 사유와 함께 확정하면 순위 스냅샷을 만들고 참가 상태를 갱신한다(이전 확정본은 superseded).
  *    확정 조건(종료, 미확정 일별 결과·판정 대기·열린 이의 제기 없음)은 DB 트리거도 검사
@@ -208,31 +208,14 @@ export class SettlementService {
 
   // ───────── 조회 ─────────
 
-  async listRuns(challengeId) {
-    const { rows: exists } = await this.database.query(
-      'SELECT 1 FROM challenges WHERE id = $1',
-      [challengeId],
-    );
-    if (!exists[0]) throw notFound();
+  /** 정산 실행 ID로 챌린지를 찾음 (M57~M59는 실행 ID만 경로에 있음) */
+  async challengeIdOfRun(runId) {
     const { rows } = await this.database.query(
-      `SELECT r.id, r.run_no, r.status, r.based_on_at, r.confirmed_at,
-              (SELECT count(*) FROM challenge_settlement_entries e WHERE e.run_id = r.id)::int AS entries,
-              (SELECT count(*) FROM challenge_settlement_entries e
-                WHERE e.run_id = r.id AND e.payment_status IN ('pending', 'failed'))::int AS unpaid
-         FROM challenge_settlement_runs r WHERE r.challenge_id = $1 ORDER BY r.run_no DESC`,
-      [challengeId],
+      'SELECT challenge_id FROM challenge_settlement_runs WHERE id = $1',
+      [runId],
     );
-    return {
-      items: rows.map((row) => ({
-        id: row.id,
-        runNo: row.run_no,
-        status: row.status,
-        basedOnAt: row.based_on_at,
-        confirmedAt: row.confirmed_at,
-        entries: row.entries,
-        unpaid: row.unpaid,
-      })),
-    };
+    if (!rows[0]) throw notFound('settlement_not_found', '정산을 찾을 수 없음');
+    return rows[0].challenge_id;
   }
 
   async getRun(challengeId, runId) {
@@ -257,10 +240,11 @@ export class SettlementService {
   // ───────── 초안 ─────────
 
   /** 정산 초안 생성(기존 초안 대체), 확정본이 있으면 정정 초안 */
-  createDraft(adminId, challengeId, key) {
+  createDraft(adminId, challengeId, key, reason) {
     return this.mutation.run(adminId, {
       key,
-      operation: 'challenge.settlement.draft',
+      reason,
+      operation: 'settlement.create',
       payload: { challengeId },
       run: async (tx) => {
         const challenge = await this.lockChallenge(tx, challengeId);
@@ -296,27 +280,29 @@ export class SettlementService {
           [runId, challengeId, rows[0].n],
         );
         const entries = await this.computeEntries(tx, challenge);
-        for (const entry of entries) {
+        if (entries.length > 0) {
+          const col = (pick) => entries.map(pick);
           await tx.query(
             `INSERT INTO challenge_settlement_entries
                     (run_id, challenge_id, participation_id, successful_days,
                      last_qualifying_submitted_at, rank_no, outcome, exclusion_reason,
                      promised_points, paid_points, user_xp, pet_xp, payment_status)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+             SELECT $1, $2, * FROM unnest($3::uuid[], $4::int[], $5::timestamptz[], $6::int[],
+                    $7::text[], $8::text[], $9::int[], $10::int[], $11::int[], $12::int[], $13::text[])`,
             [
               runId,
               challengeId,
-              entry.participationId,
-              entry.successfulDays,
-              entry.lastSubmittedAt,
-              entry.rank,
-              entry.outcome,
-              entry.exclusionReason,
-              entry.promisedPoints,
-              entry.paidPoints,
-              entry.userXp,
-              entry.petXp,
-              entry.paymentStatus,
+              col((e) => e.participationId),
+              col((e) => e.successfulDays),
+              col((e) => e.lastSubmittedAt),
+              col((e) => e.rank),
+              col((e) => e.outcome),
+              col((e) => e.exclusionReason),
+              col((e) => e.promisedPoints),
+              col((e) => e.paidPoints),
+              col((e) => e.userXp),
+              col((e) => e.petXp),
+              col((e) => e.paymentStatus),
             ],
           );
         }
@@ -339,7 +325,7 @@ export class SettlementService {
   async confirm(adminId, challengeId, runId, reason, key) {
     const result = await this.mutation.run(adminId, {
       key,
-      operation: 'challenge.settlement.confirm',
+      operation: 'settlement.confirm',
       payload: { challengeId, runId, reason },
       reason,
       run: async (tx) => {
@@ -411,43 +397,45 @@ export class SettlementService {
               WHERE id = $1`,
             [runId, adminId, reason],
           );
-        } catch (err) {
-          if (err?.code === '23514') {
+        } catch (error) {
+          if (error?.code === '23514') {
             throw conflict(
               'settlement_not_ready',
               '확정 조건을 아직 만족하지 못함',
               blockers,
             );
           }
-          throw err;
+          throw error;
         }
 
         // 공개 순위 스냅샷(이름은 확정 시점 닉네임), 참가 상태 갱신
-        for (const entry of fresh) {
-          if (entry.rank !== null) {
-            await tx.query(
-              `INSERT INTO challenge_final_rankings (id, run_id, participation_id, rank_no, score, display_name)
-               VALUES ($1,$2,$3,$4,$5,$6)`,
-              [
-                randomUUID(),
-                runId,
-                entry.participationId,
-                entry.rank,
-                entry.successfulDays * 100,
-                entry.nickname,
-              ],
-            );
-          }
-          if (entry.outcome === 'completed' || entry.outcome === 'failed') {
-            await tx.query(
-              `UPDATE challenge_participations
-                  SET status = $2::text,
-                      completed_at = CASE WHEN $2::text = 'completed' THEN COALESCE(completed_at, now()) END,
-                      updated_at = now()
-                WHERE id = $1`,
-              [entry.participationId, entry.outcome],
-            );
-          }
+        const ranked = fresh.filter((entry) => entry.rank !== null);
+        if (ranked.length > 0) {
+          await tx.query(
+            `INSERT INTO challenge_final_rankings (id, run_id, participation_id, rank_no, score, display_name)
+             SELECT gen_random_uuid(), $1, * FROM unnest($2::uuid[], $3::int[], $4::int[], $5::text[])`,
+            [
+              runId,
+              ranked.map((e) => e.participationId),
+              ranked.map((e) => e.rank),
+              ranked.map((e) => e.successfulDays * 100),
+              ranked.map((e) => e.nickname),
+            ],
+          );
+        }
+        for (const outcome of ['completed', 'failed']) {
+          const ids = fresh
+            .filter((entry) => entry.outcome === outcome)
+            .map((entry) => entry.participationId);
+          if (ids.length === 0) continue;
+          await tx.query(
+            `UPDATE challenge_participations
+                SET status = $2::text,
+                    completed_at = CASE WHEN $2::text = 'completed' THEN COALESCE(completed_at, now()) END,
+                    updated_at = now()
+              WHERE id = ANY($1::uuid[])`,
+            [ids, outcome],
+          );
         }
         const corrected = await this.payout.reconcileGrants(tx, fresh);
         await tx.query(

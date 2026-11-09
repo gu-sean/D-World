@@ -279,17 +279,6 @@ export class UserChallengesService {
 
   // ───────── 관리자 검수 ─────────
 
-  /** 검수 대기열: 오래 기다린 순서, 신청자 닉네임 포함 */
-  async reviewQueue({ limit }) {
-    const { rows } = await this.database.query(
-      `${SELECT}
-        WHERE c.publication_status = 'review_pending'
-        ORDER BY c.updated_at, c.id LIMIT $1`,
-      [limit],
-    );
-    return { items: rows.map(toView) };
-  }
-
   /** 승인(공개) 또는 반려(사유 필수). 대기 중인 사용자 개설 챌린지만 */
   review(adminId, id, { decision, reason }, key) {
     return this.idempotency.run(

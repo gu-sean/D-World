@@ -18,7 +18,12 @@ import {
   Param,
   Post,
   Req,
+  UseInterceptors,
 } from '@nestjs/common';
+import {
+  Idempotent,
+  UserIdempotencyInterceptor,
+} from '../common/idempotency/user-idempotency.interceptor.js';
 import { RequireActive } from '../accounts/active-account.guard.js';
 
 @Controller()
@@ -32,9 +37,9 @@ export class MediaController {
   @Post('records/:recordId/media')
   @RequireActive()
   @Bind(Req(), Param('recordId'), Body())
-  register(req, recordId, body) {
+  register(request, recordId, body) {
     return this.media.register(
-      req.auth.userId,
+      request.auth.userId,
       idOf(recordId),
       validateBody(body, {
         mediaKind: oneOf(MEDIA_KINDS),
@@ -51,36 +56,53 @@ export class MediaController {
     );
   }
 
+  /** A43: 업로드 URL 받기 (멱등 필수), 모바일 MediaUploadTicket 모양 */
+  @Post('mission-records/:recordId/media')
+  @UseInterceptors(UserIdempotencyInterceptor)
+  @Idempotent()
+  @RequireActive()
+  @Bind(Req(), Param('recordId'), Body())
+  async registerMobile(request, recordId, body) {
+    const view = await this.register(request, recordId, body);
+    return {
+      mediaId: view.id,
+      uploadUrl: view.upload.url,
+      uploadMethod: 'PUT',
+      uploadHeaders: view.upload.headers,
+      expiresAt: view.upload.expiresAt,
+    };
+  }
+
   @Get('records/:recordId/media')
   @Bind(Req(), Param('recordId'))
-  list(req, recordId) {
-    return this.media.list(req.auth.userId, idOf(recordId));
+  list(request, recordId) {
+    return this.media.list(request.auth.userId, idOf(recordId));
   }
 
   @Post('media/:id/complete')
   @HttpCode(200)
   @Bind(Req(), Param('id'))
-  complete(req, id) {
-    return this.media.complete(req.auth.userId, idOf(id));
+  complete(request, id) {
+    return this.media.complete(request.auth.userId, idOf(id));
   }
 
   @Post('media/:id/retry')
   @HttpCode(200)
   @Bind(Req(), Param('id'))
-  retry(req, id) {
-    return this.media.retry(req.auth.userId, idOf(id));
+  retry(request, id) {
+    return this.media.retry(request.auth.userId, idOf(id));
   }
 
   @Get('media/:id/url')
   @Bind(Req(), Param('id'))
-  url(req, id) {
-    return this.media.signedUrl(req.auth.userId, idOf(id));
+  url(request, id) {
+    return this.media.signedUrl(request.auth.userId, idOf(id));
   }
 
   @Delete('media/:id')
   @HttpCode(204)
   @Bind(Req(), Param('id'))
-  async remove(req, id) {
-    await this.media.remove(req.auth.userId, idOf(id));
+  async remove(request, id) {
+    await this.media.remove(request.auth.userId, idOf(id));
   }
 }

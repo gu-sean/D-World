@@ -22,13 +22,13 @@ export class StreakController {
 
   @Get()
   @Bind(Req())
-  summary(req) {
-    return this.streak.getSummary(req.auth.userId);
+  summary(request) {
+    return this.streak.getSummary(request.auth.userId);
   }
 
   @Get('days')
   @Bind(Req(), Query())
-  days(req, query) {
+  days(request, query) {
     const filters = validateBody(query, {
       from: dateString({ optional: true }),
       to: dateString({ optional: true }),
@@ -43,6 +43,6 @@ export class StreakController {
         `범위는 최대 ${MAX_RANGE_DAYS}일까지 조회할 수 있음`,
       ]);
     }
-    return this.streak.listDays(req.auth.userId, { from, to });
+    return this.streak.listDays(request.auth.userId, { from, to });
   }
 }

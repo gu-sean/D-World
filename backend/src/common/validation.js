@@ -43,8 +43,15 @@ export function boolean({ optional = false } = {}) {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** UUID 문자열, 대문자로 와도 소문자로 통일(DB가 돌려주는 값과 문자열 비교가 맞도록) */
 export function uuid({ optional = false } = {}) {
-  return string({ min: 36, max: 36, pattern: UUID_PATTERN, optional });
+  const rule = string({ min: 36, max: 36, pattern: UUID_PATTERN, optional });
+  return (raw) => {
+    const result = rule(raw);
+    return typeof result.value === 'string'
+      ? ok(result.value.toLowerCase())
+      : result;
+  };
 }
 
 export function integer({

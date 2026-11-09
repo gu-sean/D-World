@@ -526,6 +526,57 @@ export class PointsService {
     };
   }
 
+  /**
+   * 상점 주문 결제: 지갑을 잠그고 가용 잔액에서 차감(월 한도에는 포함하지 않음)
+   * 지갑 → 주문 순서를 지키도록 호출자는 이 메서드를 먼저 부른 뒤 주문 행을 삽입
+   * 반환: spend 거래 id (주문 삽입 트리거가 거래의 종류·금액·소스를 검증)
+   */
+  async spendForShopOrder(tx, { userId, orderId, amount }) {
+    assertPoints(amount, 'amount');
+    const wallet = await lockWallet(tx, userId);
+    if (amount > wallet.available) {
+      throw new AppException(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'insufficient_points',
+        '포인트가 부족함',
+      );
+    }
+    return recordTransaction(tx, wallet, {
+      kind: 'spend',
+      availableDelta: -amount,
+      sourceType: 'shop_order',
+      sourceId: orderId,
+      key: `shop_order:${orderId}:spend`,
+    });
+  }
+
+  /**
+   * 상점 주문 환불: 원 spend 거래를 가리키는 refund 거래를 추가, 한도에는 포함하지 않음
+   * 환불액으로 미회수액이 있으면 먼저 정산(refund_offset), 이미 지갑을 잠갔다면 다시 잠가도 같은 행
+   * 반환: refund 거래 id
+   */
+  async refundShopOrder(tx, { userId, orderId, amount, spendTransactionId }) {
+    assertPoints(amount, 'amount');
+    const wallet = await lockWallet(tx, userId);
+    const key = `shop_order:${orderId}:refund`;
+    const refundId = await recordTransaction(tx, wallet, {
+      kind: 'refund',
+      availableDelta: amount,
+      sourceType: 'shop_order',
+      sourceId: orderId,
+      originalTransactionId: spendTransactionId,
+      key,
+    });
+    await settleOutstanding(tx, wallet, {
+      amount,
+      kind: 'refund_offset',
+      sourceType: 'shop_order',
+      sourceId: orderId,
+      key,
+    });
+    return refundId;
+  }
+
   async findMissionAward(db, userId, missionId, lock) {
     const { rows } = await db.query(
       `SELECT status, original_points, paid_points
@@ -569,6 +620,16 @@ export class PointsService {
   }
 
   /** 지갑과 이번 달 한도 사용 현황, 지갑이 없으면 0 */
+  /** 판정을 기다리는(제출한) 미션이 승인되면 받을 포인트 */
+  async pendingPoints(db, userId) {
+    const { rows } = await db.query(
+      `SELECT coalesce(sum(reward_points), 0) AS n FROM missions
+        WHERE user_id = $1 AND status = 'submitted' AND deleted_at IS NULL`,
+      [userId],
+    );
+    return num(rows[0].n);
+  }
+
   async getWallet(db, userId) {
     const [wallet, month] = await Promise.all([
       db.query(
@@ -602,6 +663,13 @@ export class PointsService {
       monthlyLimit: limit,
       monthlyUsed: used,
       monthlyRemaining: Math.max(limit - used, 0),
+      // 모바일 클라이언트(08 PointBalance) 키
+      outstandingPoints: wallet.rows[0]
+        ? num(wallet.rows[0].outstanding_recovery_points)
+        : 0,
+      pendingPoints: await this.pendingPoints(db, userId),
+      monthlyEarnedPoints: used,
+      monthlyLimitPoints: limit,
     };
   }
 

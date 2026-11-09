@@ -9,7 +9,7 @@ import { conflict, unprocessable } from '../common/errors/http-errors.js';
 const num = (value) => Number(value);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export const goalNotFound = () =>
+const goalNotFound = () =>
   new AppException(
     HttpStatus.NOT_FOUND,
     'goal_not_found',
@@ -33,6 +33,7 @@ const PATCH_COLUMNS = {
   startDate: 'start_date',
   endDate: 'end_date',
   targetFrequency: 'target_frequency',
+  dailyAvailableMinutes: 'daily_available_minutes',
 };
 
 function periodDays(startDate, endDate) {
@@ -49,7 +50,7 @@ function rate(done, total) {
 }
 
 /**
- * 목표·진행률 (3-B-1)
+ * 목표·진행률
  * 진행 지표는 저장하지 않고 조회 시 계산(정책 03). 삭제된 목표는 모든 조회에서 제외
  */
 @Injectable()
@@ -97,7 +98,8 @@ export class GoalsService {
   async loadGoal(db, userId, goalId, { lock = false } = {}) {
     const { rows } = await db.query(
       `SELECT id, title, description, category_id, difficulty_id, start_date, end_date,
-              target_frequency, status, completed_at, created_at, updated_at
+              target_frequency, daily_available_minutes, status, completed_at, created_at, updated_at,
+              EXISTS (SELECT 1 FROM ai_plan_proposals ap WHERE ap.goal_id = goals.id AND ap.status = 'accepted') AS has_accepted_plan
          FROM goals
         WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
         ${lock ? 'FOR UPDATE' : ''}`,
@@ -117,11 +119,15 @@ export class GoalsService {
       startDate: row.start_date,
       endDate: row.end_date,
       targetFrequency: row.target_frequency,
+      dailyAvailableMinutes: row.daily_available_minutes ?? null,
       status: row.status,
       completedAt: row.completed_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       progress,
+      // 모바일 클라이언트(08 Goal) 키
+      progressRate: progress?.missions?.rate ?? 0,
+      hasAcceptedPlan: Boolean(row.has_accepted_plan),
     };
   }
 
@@ -201,10 +207,11 @@ export class GoalsService {
       const { rows } = await tx.query(
         `INSERT INTO goals
                 (id, user_id, category_id, difficulty_id, title, description,
-                 start_date, end_date, target_frequency)
-         VALUES ($9, $1, $2, $3, $4, $5, $6, $7, $8)
+                 start_date, end_date, target_frequency, daily_available_minutes)
+         VALUES ($9, $1, $2, $3, $4, $5, $6, $7, $8, $10)
          RETURNING id, title, description, category_id, difficulty_id, start_date,
-                   end_date, target_frequency, status, completed_at, created_at, updated_at`,
+                   end_date, target_frequency, daily_available_minutes, status, completed_at, created_at, updated_at,
+              EXISTS (SELECT 1 FROM ai_plan_proposals ap WHERE ap.goal_id = goals.id AND ap.status = 'accepted') AS has_accepted_plan`,
         [
           userId,
           data.categoryId,
@@ -215,6 +222,7 @@ export class GoalsService {
           data.endDate,
           data.targetFrequency ?? null,
           randomUUID(),
+          data.dailyAvailableMinutes ?? null,
         ],
       );
       return this.toView(
@@ -225,7 +233,10 @@ export class GoalsService {
   }
 
   /** 내 목표 목록, 최신순 커서(마이크로초 정밀도를 위해 created_at을 텍스트로 주고받음) */
-  async listGoals(userId, { status, cursor, limit = 20 }) {
+  async listGoals(
+    userId,
+    { status, statuses, categoryId, cursor, limit = 20 },
+  ) {
     let after = null;
     if (cursor) {
       try {
@@ -243,15 +254,26 @@ export class GoalsService {
 
     const { rows } = await this.database.query(
       `SELECT id, title, description, category_id, difficulty_id, start_date, end_date,
-              target_frequency, status, completed_at, created_at, updated_at,
+              target_frequency, daily_available_minutes, status, completed_at, created_at, updated_at,
+              EXISTS (SELECT 1 FROM ai_plan_proposals ap WHERE ap.goal_id = goals.id AND ap.status = 'accepted') AS has_accepted_plan,
               created_at::text AS created_at_raw
          FROM goals
         WHERE user_id = $1 AND deleted_at IS NULL
           AND ($2::text IS NULL OR status = $2)
           AND ($3::timestamptz IS NULL OR (created_at, id) < ($3::timestamptz, $4::uuid))
+          AND ($6::text[] IS NULL OR status = ANY($6::text[]))
+          AND ($7::uuid IS NULL OR category_id = $7)
         ORDER BY created_at DESC, id DESC
         LIMIT $5`,
-      [userId, status ?? null, after?.t ?? null, after?.id ?? null, limit + 1],
+      [
+        userId,
+        status ?? null,
+        after?.t ?? null,
+        after?.id ?? null,
+        limit + 1,
+        statuses ?? null,
+        categoryId ?? null,
+      ],
     );
 
     const page = rows.slice(0, limit);
@@ -274,7 +296,7 @@ export class GoalsService {
   /** 목표 상세: 단계 목록과 단계별 필수 미션 진행 포함 */
   async getGoal(userId, goalId) {
     const goal = await this.loadGoal(this.database, userId, goalId);
-    const [progress, steps, stepMissions] = await Promise.all([
+    const [progress, steps, stepMissions, todayMissions] = await Promise.all([
       this.progressFor(this.database, [goalId]),
       this.database.query(
         `SELECT id, step_no, title, description, due_date, status, completed_at
@@ -290,7 +312,17 @@ export class GoalsService {
           GROUP BY goal_step_id`,
         [goalId],
       ),
+      this.database.query(
+        `SELECT id FROM missions
+          WHERE goal_id = $1 AND deleted_at IS NULL AND status <> 'cancelled'
+            AND scheduled_date = (now() AT TIME ZONE 'Asia/Seoul')::date
+          ORDER BY created_at, id`,
+        [goalId],
+      ),
     ]);
+    // 모바일 GoalStep.isCurrent: 끝나지 않은 단계 중 번호가 가장 작은 것
+    const currentStepId = steps.rows.find((s) => s.status !== 'completed')?.id;
+    const summary = progress.get(goalId);
     const byStep = new Map(stepMissions.rows.map((r) => [r.goal_step_id, r]));
     return {
       ...this.toView(goal, progress.get(goalId)),
@@ -306,7 +338,13 @@ export class GoalsService {
           total: num(byStep.get(s.id)?.total ?? 0),
           completed: num(byStep.get(s.id)?.done ?? 0),
         },
+        missionCount: num(byStep.get(s.id)?.total ?? 0),
+        completedMissionCount: num(byStep.get(s.id)?.done ?? 0),
+        isCurrent: s.id === currentStepId,
       })),
+      totalMissionCount: summary?.missions.total ?? 0,
+      completedMissionCount: summary?.missions.completed ?? 0,
+      todayMissionIds: todayMissions.rows.map((r) => r.id),
     };
   }
 
@@ -371,7 +409,8 @@ export class GoalsService {
         `UPDATE goals SET ${assignments.join(', ')}, updated_at = now()
           WHERE id = $1 AND user_id = $2
           RETURNING id, title, description, category_id, difficulty_id, start_date,
-                    end_date, target_frequency, status, completed_at, created_at, updated_at`,
+                    end_date, target_frequency, daily_available_minutes, status, completed_at, created_at, updated_at,
+              EXISTS (SELECT 1 FROM ai_plan_proposals ap WHERE ap.goal_id = goals.id AND ap.status = 'accepted') AS has_accepted_plan`,
         [goalId, userId, ...values],
       );
       return this.toView(
@@ -427,7 +466,7 @@ export class GoalsService {
   }
 
   /** 소프트 삭제, DB 트리거가 시작 전 미션을 취소(goal_deleted)로 바꿈 */
-  async deleteGoal(userId, goalId) {
+  async removeGoal(userId, goalId) {
     const { rowCount } = await this.database.query(
       `UPDATE goals SET deleted_at = now(), updated_at = now()
         WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,

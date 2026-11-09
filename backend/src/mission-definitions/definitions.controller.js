@@ -26,6 +26,16 @@ import {
   Req,
 } from '@nestjs/common';
 import { RequireActive } from '../accounts/active-account.guard.js';
+import { parseLimit } from '../common/pagination/limit.js';
+
+const EXERCISE_CODES = [
+  'push_up',
+  'burpee',
+  'squat',
+  'lunge',
+  'plank',
+  'running',
+];
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -46,15 +56,6 @@ const targetUnit = () =>
   string({ min: 1, max: 20, pattern: /\S/, optional: true });
 const duration = () => integer({ min: 1, max: 86_400, optional: true });
 
-export function readLimit(query) {
-  if (query.limit === undefined) return DEFAULT_LIMIT;
-  const limit = Number(query.limit);
-  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-    throw new BadRequestException([`limit: 1~${MAX_LIMIT} 정수여야 함`]);
-  }
-  return limit;
-}
-
 @Controller()
 @Dependencies(DefinitionsService)
 export class DefinitionsController {
@@ -65,17 +66,19 @@ export class DefinitionsController {
   /** scope=public(기본): 공개 원형 탐색, scope=mine: 내가 만든 원형(검수 상태 포함) */
   @Get('mission-definitions')
   @Bind(Req(), Query())
-  list(req, query) {
+  list(request, query) {
     const filters = validateBody(query, {
       scope: oneOf(['public', 'mine'], { optional: true }),
       categoryId: uuid({ optional: true }),
       difficultyId: uuid({ optional: true }),
+      exerciseCode: oneOf(EXERCISE_CODES, { optional: true }),
+      sort: oneOf(['recent', 'duration'], { optional: true }),
       status: oneOf(PUBLICATION_STATUSES, { optional: true }),
       cursor: string({ min: 1, max: 500, optional: true }),
     });
-    const limit = readLimit(query);
+    const limit = parseLimit(query, DEFAULT_LIMIT, MAX_LIMIT);
     if (filters.scope === 'mine') {
-      return this.definitions.listMine(req.auth.userId, {
+      return this.definitions.listMine(request.auth.userId, {
         status: filters.status,
         cursor: filters.cursor,
         limit,
@@ -87,23 +90,35 @@ export class DefinitionsController {
     return this.definitions.listPublic({
       categoryId: filters.categoryId,
       difficultyId: filters.difficultyId,
+      exerciseCode: filters.exerciseCode,
+      sort: filters.sort,
       cursor: filters.cursor,
       limit,
     });
   }
 
+  /** A36 다음에 할 미션 추천 (최대 10) */
+  @Get('recommendations/next-missions')
+  @Bind(Req(), Query())
+  nextMissions(request, query) {
+    const { source } = validateBody(query, {
+      source: oneOf(['ai', 'interest', 'all'], { optional: true }),
+    });
+    return this.definitions.nextMissions(request.auth.userId, source ?? 'all');
+  }
+
   @Get('mission-definitions/:id')
   @Bind(Req(), Param('id'))
-  get(req, id) {
-    return this.definitions.getDefinition(req.auth.userId, idOf(id));
+  get(request, id) {
+    return this.definitions.getDefinition(request.auth.userId, idOf(id));
   }
 
   @Post('me/mission-definitions')
   @RequireActive()
   @Bind(Req(), Body())
-  create(req, body) {
+  create(request, body) {
     return this.definitions.createDefinition(
-      req.auth.userId,
+      request.auth.userId,
       validateBody(body, {
         title: title(),
         description: description(),
@@ -119,9 +134,9 @@ export class DefinitionsController {
 
   @Patch('me/mission-definitions/:id')
   @Bind(Req(), Param('id'), Body())
-  update(req, id, body) {
+  update(request, id, body) {
     return this.definitions.updateDefinition(
-      req.auth.userId,
+      request.auth.userId,
       idOf(id),
       validateBody(body, {
         title: title({ optional: true }),
@@ -139,15 +154,15 @@ export class DefinitionsController {
   @Delete('me/mission-definitions/:id')
   @HttpCode(204)
   @Bind(Req(), Param('id'))
-  async remove(req, id) {
-    await this.definitions.deleteDefinition(req.auth.userId, idOf(id));
+  async remove(request, id) {
+    await this.definitions.deleteDefinition(request.auth.userId, idOf(id));
   }
 
   @Post('me/mission-definitions/:id/publication-request')
   @HttpCode(200)
   @RequireActive()
   @Bind(Req(), Param('id'))
-  requestPublication(req, id) {
-    return this.definitions.requestPublication(req.auth.userId, idOf(id));
+  requestPublication(request, id) {
+    return this.definitions.requestPublication(request.auth.userId, idOf(id));
   }
 }

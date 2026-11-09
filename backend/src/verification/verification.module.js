@@ -6,7 +6,7 @@ import { MediaModule } from '../media/media.module.js';
 import { PointsModule } from '../points/points.module.js';
 import { ChallengesModule } from '../challenges/challenges.module.js';
 import { StreakModule } from '../streak/streak.module.js';
-import { AdminReviewController } from './review/admin-review.controller.js';
+import { AdminVerificationsController } from './review/admin-verifications.controller.js';
 import { AdminReviewService } from './review/admin-review.service.js';
 import { AiIngestController } from './ai/ai-ingest.controller.js';
 import {
@@ -23,8 +23,8 @@ import { RecordsController } from './records/records.controller.js';
 import { RecordsService } from './records/records.service.js';
 
 /**
- * 수행 회차(3-C-2)와 판정 반영(3-C-3): 모든 판정은 DecisionService.applyDecision을 거치고,
- * 이의 제기(3-C-4)도 같은 함수 호출. 스트릭·챌린지 점수는 판정 반영 시 직접 호출됨
+ * 수행 회차와 판정 반영: 모든 판정은 DecisionService.applyDecision을 거치고,
+ * 이의 제기도 같은 함수 호출. 스트릭·챌린지 점수는 판정 반영 시 직접 호출됨
  */
 @Module({
   imports: [
@@ -40,7 +40,7 @@ import { RecordsService } from './records/records.service.js';
     RecordsController,
     AppealsController,
     AiIngestController,
-    AdminReviewController,
+    AdminVerificationsController,
     AdminAppealsController,
   ],
   providers: [

@@ -11,7 +11,7 @@ const RETRY_BASE_MS = 60_000;
 const RETRY_MAX_MS = 6 * 60 * 60_000;
 
 /**
- * 챌린지 보상 지급·회수·복구 (5-B)
+ * 챌린지 보상 지급·회수·복구
  * - 확정된 정산의 완주자별 별도 트랜잭션, 실패는 기록 후 지수 백오프 재시도
  * - 정정 정산 확정 시 자격 상실자 회수(reconcileGrants), 재충족자는 지급 시 복구
  * 잠금 순서: 지갑 → 월간 사용량 → XP/펫 → 업적
@@ -102,19 +102,33 @@ export class RewardPayoutService {
     return summary;
   }
 
-  /** 작업: 확정된 모든 정산의 미지급 건 */
-  async payDue({ limit = 20 } = {}) {
+  /**
+   * 지금 지급할 건이 있는 확정 정산(미지급, 또는 재시도 시각이 된 실패), 오래 확정된 것부터
+   * 재시도 대기 중인 실패만 남은 정산은 고르지 않아, 그런 정산이 쌓여도 새 정산이 밀리지 않음
+   */
+  async dueRunIds(limit) {
     const { rows } = await this.database.query(
-      `SELECT DISTINCT e.run_id
+      `SELECT e.run_id
          FROM challenge_settlement_entries e
          JOIN challenge_settlement_runs r ON r.id = e.run_id
+         LEFT JOIN challenge_reward_payment_attempts a
+           ON a.run_id = e.run_id AND a.participation_id = e.participation_id
         WHERE r.status = 'confirmed' AND e.outcome = 'completed'
-          AND e.payment_status IN ('pending', 'failed')
+          AND (e.payment_status = 'pending'
+               OR (e.payment_status = 'failed'
+                   AND (a.next_retry_at IS NULL OR a.next_retry_at <= now())))
+        GROUP BY e.run_id, r.confirmed_at
+        ORDER BY r.confirmed_at, e.run_id
         LIMIT $1`,
       [limit],
     );
+    return rows.map((row) => row.run_id);
+  }
+
+  /** 작업: 확정된 정산의 지급 대상 건 */
+  async payDue({ limit = 20 } = {}) {
     const total = { paid: 0, failed: 0, skipped: 0 };
-    for (const { run_id: runId } of rows) {
+    for (const runId of await this.dueRunIds(limit)) {
       const result = await this.payRun(runId);
       for (const key of Object.keys(total)) total[key] += result[key];
     }
@@ -128,16 +142,23 @@ export class RewardPayoutService {
         this.payEntry(tx, runId, participationId),
       );
       return outcome;
-    } catch (err) {
+    } catch (error) {
       this.logger.error(
-        `챌린지 보상 지급 실패 run=${runId} participation=${participationId}: ${err.message}`,
+        `챌린지 보상 지급 실패 run=${runId} participation=${participationId}: ${error.message}`,
       );
-      await this.recordFailure(runId, participationId, err);
+      // 실패 기록마저 실패해도 다른 참가자 지급은 이어가야 함
+      try {
+        await this.recordFailure(runId, participationId, error);
+      } catch (recordError) {
+        this.logger.error(
+          `챌린지 보상 실패 기록 실패 run=${runId} participation=${participationId}: ${recordError.message}`,
+        );
+      }
       return 'failed';
     }
   }
 
-  async recordFailure(runId, participationId, err) {
+  async recordFailure(runId, participationId, error) {
     await this.database.withTransaction(async (tx) => {
       await tx.query(
         `UPDATE challenge_settlement_entries SET payment_status = 'failed'
@@ -147,17 +168,19 @@ export class RewardPayoutService {
       await tx.query(
         `INSERT INTO challenge_reward_payment_attempts
                 (run_id, participation_id, attempt_count, last_error, last_attempt_at, next_retry_at)
-         VALUES ($1,$2,1,$3,now(), now() + make_interval(secs => $4::int))
+         VALUES ($1,$2,1,$3,now(), now() + make_interval(secs => $4::float8))
          ON CONFLICT (run_id, participation_id) DO UPDATE
             SET attempt_count = challenge_reward_payment_attempts.attempt_count + 1,
                 last_error = EXCLUDED.last_error, last_attempt_at = now(),
+                -- 실수형으로 계산 후 상한 적용: 정수로 2^n을 먼저 만들면 26회째부터 integer out of range
                 next_retry_at = now() + make_interval(secs => LEAST(
-                    $5::int, $4::int * power(2, challenge_reward_payment_attempts.attempt_count)::int)),
+                    $5::float8,
+                    $4::float8 * power(2::float8, LEAST(challenge_reward_payment_attempts.attempt_count, 30)))),
                 updated_at = now()`,
         [
           runId,
           participationId,
-          String(err.message).slice(0, 500),
+          String(error.message).slice(0, 500),
           RETRY_BASE_MS / 1000,
           RETRY_MAX_MS / 1000,
         ],
@@ -329,11 +352,12 @@ export class RewardPayoutService {
   }
 
   /** 관리자 재시도: 실패한 건을 재시도 시각과 상관없이 바로 지급 */
-  retryPayments(adminId, challengeId, runId, key) {
+  retryPayments(adminId, challengeId, runId, key, reason) {
     return this.mutation
       .run(adminId, {
         key,
-        operation: 'challenge.settlement.retry_payments',
+        reason,
+        operation: 'settlement.retry',
         payload: { challengeId, runId },
         run: async (tx) => {
           const { rows } = await tx.query(

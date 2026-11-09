@@ -33,7 +33,7 @@ const SHARED_REWARD_CONDITIONS = new Set([
 const num = (value) => Number(value);
 
 /**
- * 업적 조건 평가·지급·회수·복구 (3-A-3)
+ * 업적 조건 평가·지급·회수·복구
  * 포인트·XP 지급은 PointsService·ExperienceService에 같은 트랜잭션으로 위임
  * (docs/backend/03-reward-services-design.md)
  */
@@ -275,17 +275,17 @@ export class AchievementsService {
     );
 
     if (!shared && candidate.rewardPoints > 0) {
-      const res = await this.points.awardAutoPoints(tx, {
+      const response = await this.points.awardAutoPoints(tx, {
         userId,
         sourceType: 'achievement',
         sourceId: id,
         originalPoints: candidate.rewardPoints,
         key: `achievement:award:${id}`,
       });
-      if (res.paidPoints !== candidate.rewardPoints) {
+      if (response.paidPoints !== candidate.rewardPoints) {
         await tx.query(
           'UPDATE user_achievements SET paid_points = $2 WHERE id = $1',
-          [id, res.paidPoints],
+          [id, response.paidPoints],
         );
       }
     }
@@ -472,6 +472,74 @@ export class AchievementsService {
       earned,
       lastUserId: users.at(-1)?.id ?? afterUserId,
     };
+  }
+
+  /**
+   * 소급 평가 요청(achievement_backfill_runs)을 사용자 id 순 배치로 처리, 정기 작업이 부름
+   * 버전의 적용 시각이 지나야 시작하고, 배치마다 커서를 같은 트랜잭션에 기록해 이어서 처리 가능
+   * 한 번 호출에 budgetMs 동안 배치를 이어서 돌리고(요청 하나가 오래 걸려도 다음 요청이 굶지 않게
+   * 요청마다 번갈아), 대상이 배치 크기보다 적게 남으면 완료 처리
+   */
+  async processBackfillRuns({
+    runLimit = 5,
+    batchSize = 100,
+    budgetMs = 20_000,
+  } = {}) {
+    const summary = { runs: 0, users: 0, earned: 0, completed: 0 };
+    const deadline = Date.now() + budgetMs;
+    const { rows } = await this.database.query(
+      `SELECT r.id FROM achievement_backfill_runs r
+         JOIN achievement_versions v ON v.id = r.version_id
+        WHERE r.completed_at IS NULL AND v.effective_at <= now()
+        ORDER BY r.requested_at LIMIT $1`,
+      [runLimit],
+    );
+    const active = new Set(rows.map((row) => row.id));
+    const touched = new Set();
+    while (active.size > 0 && Date.now() < deadline) {
+      for (const id of [...active]) {
+        const batch = await this.backfillBatch(id, batchSize);
+        if (batch === null || batch.done) active.delete(id);
+        if (batch) {
+          touched.add(id);
+          summary.users += batch.processed;
+          summary.earned += batch.earned;
+          if (batch.done) summary.completed += 1;
+        }
+        if (Date.now() >= deadline) break;
+      }
+    }
+    summary.runs = touched.size;
+    return summary;
+  }
+
+  /** 요청 하나의 다음 배치를 처리, 다른 곳에서 잠겼거나 이미 끝났으면 null */
+  backfillBatch(runId, batchSize) {
+    return this.database.withTransaction(async (tx) => {
+      const { rows } = await tx.query(
+        `SELECT * FROM achievement_backfill_runs
+          WHERE id = $1 AND completed_at IS NULL FOR UPDATE SKIP LOCKED`,
+        [runId],
+      );
+      if (rows.length === 0) return null;
+      const run = rows[0];
+      const batch = await this.backfill(tx, {
+        achievementId: run.achievement_id,
+        afterUserId: run.cursor_user_id,
+        limit: batchSize,
+      });
+      const done = batch.processed < batchSize;
+      await tx.query(
+        `UPDATE achievement_backfill_runs
+            SET cursor_user_id = $2,
+                processed_users = processed_users + $3,
+                earned_count = earned_count + $4,
+                completed_at = CASE WHEN $5 THEN now() END
+          WHERE id = $1`,
+        [runId, batch.lastUserId, batch.processed, batch.earned, done],
+      );
+      return { ...batch, done };
+    });
   }
 
   async oneCandidate(db, achievementId) {

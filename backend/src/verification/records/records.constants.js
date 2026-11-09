@@ -8,7 +8,7 @@ export const STARTABLE_MISSION_STATUSES = [
   'submitted',
 ];
 
-/** 제출 전 회차 상태 */
+/** 제출 전 회차 상태 (파일 업로드·삭제 가능 상태) */
 export const OPEN_RECORD_STATUSES = ['recording', 'uploading'];
 
 /** 이의 제기 기한: 사용자에게 결과를 안내한 시각부터 7일 */

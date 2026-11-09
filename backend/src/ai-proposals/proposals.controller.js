@@ -17,7 +17,6 @@ import { VERIFICATION_METHODS } from '../missions/missions.constants.js';
 import { MAX_PLAN_MISSIONS, PROPOSAL_STATUSES } from './proposals.constants.js';
 import { ProposalsService } from './proposals.service.js';
 import {
-  BadRequestException,
   Bind,
   Body,
   Controller,
@@ -30,6 +29,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { RequireActive } from '../accounts/active-account.guard.js';
+import { parseLimit } from '../common/pagination/limit.js';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -50,6 +50,10 @@ const missionSpec = object({
   description: text(2000),
   categoryId: uuid({ optional: true }),
   difficultyId: uuid({ optional: true }),
+  exerciseCode: oneOf(
+    ['push_up', 'burpee', 'squat', 'lunge', 'plank', 'running'],
+    { optional: true },
+  ),
   verificationMethod: oneOf(VERIFICATION_METHODS),
   targetValue: number({ min: 0.01, max: 99_999_999.99, optional: true }),
   targetUnit: string({ min: 1, max: 20, pattern: /\S/, optional: true }),
@@ -67,7 +71,7 @@ const stepSpec = object({
   missions: array(missionSpec, { max: MAX_PLAN_MISSIONS, optional: true }),
 });
 
-const planSpec = object({
+export const planSpec = object({
   steps: array(stepSpec, { max: MAX_STEPS_PER_GOAL, optional: true }),
   missions: array(missionSpec, { max: MAX_PLAN_MISSIONS, optional: true }),
 });
@@ -81,19 +85,13 @@ export class ProposalsController {
 
   @Get()
   @Bind(Req(), Param('goalId'), Query())
-  list(req, goalId, query) {
+  list(request, goalId, query) {
     const filters = validateBody(query, {
       status: oneOf(PROPOSAL_STATUSES, { optional: true }),
       cursor: string({ min: 1, max: 500, optional: true }),
     });
-    let limit = DEFAULT_LIMIT;
-    if (query.limit !== undefined) {
-      limit = Number(query.limit);
-      if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-        throw new BadRequestException([`limit: 1~${MAX_LIMIT} 정수여야 함`]);
-      }
-    }
-    return this.proposals.listProposals(req.auth.userId, idOf(goalId), {
+    const limit = parseLimit(query, DEFAULT_LIMIT, MAX_LIMIT);
+    return this.proposals.listProposals(request.auth.userId, idOf(goalId), {
       ...filters,
       limit,
     });
@@ -104,10 +102,10 @@ export class ProposalsController {
   @HttpCode(200)
   @RequireActive()
   @Bind(Req(), Param('goalId'), Param('proposalId'), Body())
-  accept(req, goalId, proposalId, body) {
+  accept(request, goalId, proposalId, body) {
     const { plan } = validateBody(body, { plan: planSpec });
     return this.proposals.acceptProposal(
-      req.auth.userId,
+      request.auth.userId,
       idOf(goalId),
       idOf(proposalId),
       plan,
@@ -117,9 +115,9 @@ export class ProposalsController {
   @Post(':proposalId/reject')
   @HttpCode(200)
   @Bind(Req(), Param('goalId'), Param('proposalId'))
-  reject(req, goalId, proposalId) {
+  reject(request, goalId, proposalId) {
     return this.proposals.rejectProposal(
-      req.auth.userId,
+      request.auth.userId,
       idOf(goalId),
       idOf(proposalId),
     );

@@ -29,7 +29,7 @@ function ledgerKey(kind, awardId, recipient, resultId) {
 }
 
 /**
- * 사용자·펫 XP 원장, 보류 XP, 레벨·진화 공통 서비스 (3-A-2)
+ * 사용자·펫 XP 원장, 보류 XP, 레벨·진화 공통 서비스
  * 변경 메서드는 호출자가 연 트랜잭션(tx)을 받고, 같은 호출을 반복해도 한 번만 반영
  * 잠금 순서: 지급 대상(experience_awards) → user_experience → user_pets (03-reward-services-design.md)
  */

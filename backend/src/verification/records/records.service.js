@@ -14,6 +14,30 @@ import { conflict, unprocessable } from '../../common/errors/http-errors.js';
 
 const num = (value) => Number(value);
 
+const POLL_AFTER_MS = 2000;
+
+/** 07 VerificationMetrics: 모든 키를 항상 두고 해당 없으면 null */
+const EMPTY_METRICS = {
+  exerciseCode: null,
+  repCount: null,
+  validRepCount: null,
+  invalidRepCount: null,
+  holdSeconds: null,
+  accuracy: null,
+  durationSeconds: null,
+  personDetected: null,
+  distanceMeters: null,
+  activeSeconds: null,
+  avgPaceSecondsPerKm: null,
+  steps: null,
+  avgCadenceSpm: null,
+  validPointRatio: null,
+  mockLocationDetected: null,
+  mediaSha256: null,
+  flags: [],
+  issues: [],
+};
+
 const missionNotFound = () =>
   new AppException(
     HttpStatus.NOT_FOUND,
@@ -33,18 +57,22 @@ const RECORD_SELECT = `
          vr.id AS result_id, vr.source AS result_source, vr.decision AS result_decision,
          vr.reason AS result_reason, vr.decided_at AS result_decided_at,
          vr.notified_at AS result_notified_at,
+         vr.result_no AS result_no, vr.confidence AS result_confidence,
+         vr.engine_version AS result_engine_version, vr.metrics AS result_metrics,
+         m.status AS mission_status, m.exercise_code AS mission_exercise_code,
          vr.notified_at + interval '${APPEAL_WINDOW}' AS appeal_deadline,
          a.status AS appeal_status,
          (vr.decision = 'rejected' AND vr.source = 'ai' AND vr.notified_at IS NOT NULL
             AND now() <= vr.notified_at + interval '${APPEAL_WINDOW}' AND a.id IS NULL) AS can_appeal
     FROM mission_records r
+    JOIN missions m ON m.id = r.mission_id
     LEFT JOIN verification_results vr ON vr.record_id = r.id AND vr.is_current
     LEFT JOIN verification_appeals a ON a.record_id = r.id
      AND (a.original_result_id = vr.id OR a.resolution_result_id = vr.id)`;
 
 /**
- * 수행 회차 (3-C-2): 시작, 제출, 포기, 조회
- * 판정·보상 반영은 3-C-3. 이 단계는 미션 상태 scheduled → in_progress → submitted까지
+ * 수행 회차: 시작, 제출, 포기, 조회
+ * 판정·보상 반영은 DecisionService. 여기서는 미션 상태 scheduled → in_progress → submitted까지
  * 잠금 순서: 미션 → 회차 → 파일 (미디어·판정 반영과 같은 순서)
  */
 @Injectable()
@@ -113,6 +141,28 @@ export class RecordsService {
         mediaKind: f.media_kind,
         status: f.upload_status,
       })),
+      // 모바일 클라이언트(08 MissionRecord) 키, 위 키와 함께 내려감
+      media: files.map((f) => ({
+        mediaId: f.id,
+        mediaKind: f.media_kind,
+        uploadStatus: f.upload_status,
+        sizeBytes: Number(f.actual_size_bytes ?? f.expected_size_bytes),
+      })),
+      currentResult: decided ? this.toCurrentResult(row) : null,
+      mission: {
+        id: row.mission_id,
+        status: row.mission_status,
+        remainingSubmissions: Math.max(
+          0,
+          MAX_SUBMISSIONS - Number(row.submission_count ?? 0),
+        ),
+      },
+      rewards: null,
+      canAppeal: Boolean(row.can_appeal),
+      pollAfterMs:
+        !decided && ['recording', 'uploading', 'submitted'].includes(row.status)
+          ? POLL_AFTER_MS
+          : null,
       // 안내 전(검수 대기) 판정의 사유는 보여 주지 않음
       result: decided
         ? {
@@ -140,7 +190,8 @@ export class RecordsService {
   async loadFiles(db, recordIds) {
     if (recordIds.length === 0) return new Map();
     const { rows } = await db.query(
-      `SELECT id, record_id, media_kind, upload_status FROM media_files
+      `SELECT id, record_id, media_kind, upload_status, expected_size_bytes,
+              actual_size_bytes FROM media_files
         WHERE record_id = ANY($1::uuid[]) AND upload_status <> 'deleted'
         ORDER BY created_at, id`,
       [recordIds],
@@ -160,7 +211,89 @@ export class RecordsService {
     );
     if (!rows[0]) throw recordNotFound();
     const files = await this.loadFiles(db, [recordId]);
-    return this.toView(rows[0], files.get(recordId));
+    const view = this.toView(rows[0], files.get(recordId));
+    await this.attachMissionInfo(db, userId, [{ row: rows[0], view }]);
+    return view;
+  }
+
+  /** 07 VerificationResult: 안내 전에는 사유를 숨기고, metrics는 모든 키를 두고 없으면 null */
+  toCurrentResult(row) {
+    return {
+      id: row.result_id,
+      resultNo: row.result_no,
+      source: row.result_source,
+      decision: row.result_decision,
+      confidence:
+        row.result_confidence === null ? null : num(row.result_confidence),
+      reason: row.result_notified_at ? row.result_reason : null,
+      engineVersion: row.result_engine_version,
+      metrics: { ...EMPTY_METRICS, ...(row.result_metrics ?? {}) },
+      decidedAt: row.result_decided_at,
+    };
+  }
+
+  /**
+   * 제출 횟수(남은 제출 수)와 승인된 회차의 지급 보상을 채움
+   * 보상은 지급 기록(mission_point_awards·experience_awards)에서 읽음
+   * 레벨업·진화 여부는 지급 시점에만 알 수 있어 항상 false·null
+   */
+  async attachMissionInfo(db, userId, items) {
+    const missionIds = [...new Set(items.map(({ row }) => row.mission_id))];
+    const { rows: counts } = await db.query(
+      `SELECT mission_id, count(*)::int AS n FROM mission_records
+        WHERE mission_id = ANY($1::uuid[]) AND submission_no IS NOT NULL
+        GROUP BY mission_id`,
+      [missionIds],
+    );
+    const submitted = new Map(counts.map((c) => [c.mission_id, c.n]));
+    for (const { row, view } of items) {
+      view.mission.remainingSubmissions = Math.max(
+        0,
+        MAX_SUBMISSIONS - (submitted.get(row.mission_id) ?? 0),
+      );
+      if (row.result_decision === 'approved') {
+        // 승인 때 저장한 보상 요약을 우선, 없으면(이전 데이터) 지급 기록에서 만든다
+        view.rewards =
+          row.metrics?.rewards ??
+          (await this.grantedRewards(db, userId, row.mission_id));
+      }
+    }
+  }
+
+  async grantedRewards(db, userId, missionId) {
+    const [points, xp, streak] = await Promise.all([
+      db.query(
+        `SELECT original_points, paid_points FROM mission_point_awards
+          WHERE mission_id = $1 AND user_id = $2 AND status = 'active'`,
+        [missionId, userId],
+      ),
+      db.query(
+        `SELECT recipient_pet_id, base_user_xp, base_pet_xp, bonus_pet_xp
+           FROM experience_awards
+          WHERE user_id = $1 AND source_type = 'mission' AND source_id = $2
+            AND status = 'active'`,
+        [userId, missionId],
+      ),
+      db.query(
+        'SELECT current_success_days FROM streak_states WHERE user_id = $1',
+        [userId],
+      ),
+    ]);
+    if (!points.rows[0] && !xp.rows[0]) return null;
+    const point = points.rows[0];
+    const award = xp.rows[0];
+    return {
+      points: point ? point.paid_points : 0,
+      pointsCapped: point ? point.paid_points < point.original_points : false,
+      userXp: award ? award.base_user_xp : 0,
+      petXp: award ? award.base_pet_xp + award.bonus_pet_xp : 0,
+      petId: award?.recipient_pet_id ?? null,
+      levelUp: false,
+      newLevelNo: null,
+      petEvolved: false,
+      streakDays: streak.rows[0]?.current_success_days ?? 0,
+      newBadges: [],
+    };
   }
 
   /**
@@ -391,9 +524,9 @@ export class RecordsService {
     if (!aborted.already) {
       try {
         await this.media.deleteAllForRecord(recordId);
-      } catch (err) {
+      } catch (error) {
         this.logger.warn(
-          `포기한 회차의 파일 정리 실패 ${recordId}: ${err.message}`,
+          `포기한 회차의 파일 정리 실패 ${recordId}: ${error.message}`,
         );
       }
     }
@@ -416,7 +549,13 @@ export class RecordsService {
       this.database,
       rows.map((row) => row.id),
     );
-    return { items: rows.map((row) => this.toView(row, files.get(row.id))) };
+    const views = rows.map((row) => this.toView(row, files.get(row.id)));
+    await this.attachMissionInfo(
+      this.database,
+      userId,
+      rows.map((row, i) => ({ row, view: views[i] })),
+    );
+    return { items: views };
   }
 
   getRecord(userId, recordId) {

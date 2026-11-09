@@ -10,6 +10,7 @@ const CODE_TTL_MINUTES = 3;
 const RESEND_COOLDOWN_SEC = 30;
 const HOURLY_LIMIT = 5;
 const MAX_ATTEMPTS = 5;
+export const CONFIRMED_TTL_MINUTES = 10;
 
 const codeInvalid = () =>
   new AppException(
@@ -32,7 +33,8 @@ export class PhoneVerificationService {
   // 6자리는 무차별 대입에 약하므로 서버 키가 있는 HMAC으로 저장
   hashCode(phone, purpose, code) {
     return hmacHex(
-      this.config.get('JWT_ACCESS_SECRET'),
+      this.config.get('PHONE_CODE_PEPPER') ??
+        this.config.get('JWT_ACCESS_SECRET'),
       `phone-code:${phone}:${purpose}:${code}`,
     );
   }
@@ -44,7 +46,9 @@ export class PhoneVerificationService {
   async send(phone, purpose) {
     const code = randomCode();
     const challengeId = randomUUID();
+    let expiresAt;
 
+    const resendAvailableAt = new Date(Date.now() + RESEND_COOLDOWN_SEC * 1000);
     await this.database.withTransaction(async (tx) => {
       // 같은 번호의 동시 요청이 제한 검사를 함께 통과하지 못하게 직렬화
       await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
@@ -92,10 +96,11 @@ export class PhoneVerificationService {
             AND consumed_at IS NULL AND invalidated_at IS NULL`,
         [phone, purpose],
       );
-      await tx.query(
+      const inserted = await tx.query(
         `INSERT INTO phone_verification_challenges
                 (id, phone_e164, purpose, code_hash, expires_at)
-         VALUES ($1, $2, $3, $4, now() + make_interval(mins => $5))`,
+         VALUES ($1, $2, $3, $4, now() + make_interval(mins => $5))
+         RETURNING expires_at`,
         [
           challengeId,
           phone,
@@ -104,6 +109,7 @@ export class PhoneVerificationService {
           CODE_TTL_MINUTES,
         ],
       );
+      expiresAt = inserted.rows[0].expires_at;
     });
 
     // 외부 호출은 커밋 뒤에 수행해 잠금을 오래 쥐지 않음
@@ -112,8 +118,8 @@ export class PhoneVerificationService {
         phone,
         `[D-World] 인증번호 ${code} (${CODE_TTL_MINUTES}분 이내 입력)`,
       );
-    } catch (err) {
-      this.logger.error(`문자 발송 실패: ${err.message}`);
+    } catch (error) {
+      this.logger.error(`문자 발송 실패: ${error.message}`);
       await this.database.query(
         'UPDATE phone_verification_challenges SET invalidated_at = now() WHERE id = $1',
         [challengeId],
@@ -124,6 +130,24 @@ export class PhoneVerificationService {
         '문자를 보낼 수 없음',
       );
     }
+    return { challengeId, expiresAt, resendAvailableAt };
+  }
+
+  /**
+   * 인증번호 확인(A02): 코드가 맞으면 가입·재설정 단계를 마칠 시간(CONFIRMED_TTL_MINUTES)만큼 유효기간을 늘림
+   * 다음 단계에서 같은 challenge를 consume 한다
+   */
+  async confirm(challengeId, phone, purpose, code) {
+    const checked = await this.check(phone, purpose, code);
+    if (checked !== challengeId) throw codeInvalid();
+    const { rows } = await this.database.query(
+      `UPDATE phone_verification_challenges
+          SET expires_at = now() + make_interval(mins => $2)
+        WHERE id = $1
+        RETURNING expires_at`,
+      [challengeId, CONFIRMED_TTL_MINUTES],
+    );
+    return rows[0].expires_at;
   }
 
   /**

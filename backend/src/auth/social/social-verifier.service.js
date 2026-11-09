@@ -42,6 +42,8 @@ export class SocialVerifierService {
   }
 
   verify(provider, token) {
+    if (this.config.get('SOCIAL_DRIVER') === 'mock')
+      return this.verifyMock(token);
     switch (provider) {
       case 'apple':
         return this.verifyApple(token);
@@ -52,6 +54,13 @@ export class SocialVerifierService {
       default:
         throw invalidToken();
     }
+  }
+
+  /** 개발 전용: `mock:{subject}:{email}` 형식이면 검증 없이 통과 */
+  verifyMock(token) {
+    const match = /^mock:([^:\s]{1,100}):?(\S*)$/.exec(token);
+    if (!match) throw invalidToken();
+    return { subject: match[1], email: match[2] || null };
   }
 
   async verifyIdToken(token, { jwksUrl, issuer, audience }) {
@@ -99,8 +108,8 @@ export class SocialVerifierService {
       });
       if (!response.ok) throw invalidToken();
       body = await response.json();
-    } catch (err) {
-      if (err instanceof AppException) throw err;
+    } catch (error) {
+      if (error instanceof AppException) throw error;
       throw invalidToken();
     }
     const id = body?.response?.id;

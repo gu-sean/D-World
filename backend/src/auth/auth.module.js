@@ -2,14 +2,17 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { MobileAuthController } from './mobile-auth.controller.js';
+import { MobileAuthService } from './mobile-auth.service.js';
 import { PhoneVerificationService } from './phone-verification.service.js';
 import { createSmsSender, SMS_SENDER } from './sms/sms-sender.js';
 import { SocialVerifierService } from './social/social-verifier.service.js';
 
 @Module({
-  controllers: [AuthController],
+  controllers: [AuthController, MobileAuthController],
   providers: [
     AuthService,
+    MobileAuthService,
     PhoneVerificationService,
     SocialVerifierService,
     {

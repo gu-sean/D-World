@@ -13,7 +13,6 @@ import {
 } from '../common/validation.js';
 import { CatalogService } from './catalog.service.js';
 import { GrowthPoliciesService } from './growth-policies.service.js';
-import { PolicyReadinessService } from './policy-readiness.service.js';
 import { RewardPoliciesService } from './reward-policies.service.js';
 import {
   BadRequestException,
@@ -30,6 +29,7 @@ import {
 } from '@nestjs/common';
 import { AdminOnly } from '../common/auth/admin-auth.guard.js';
 import { readIdempotencyKey } from '../common/idempotency/admin-idempotency.service.js';
+import { parseLimit } from '../common/pagination/limit.js';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -37,17 +37,15 @@ const MAX_POINTS = 1_000_000;
 const MAX_XP = 1_000_000_000_000;
 const MAX_LEVELS = 100;
 
-const listLimit = (query) => {
-  if (query.limit === undefined) return DEFAULT_LIMIT;
-  const limit = Number(query.limit);
-  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-    throw new BadRequestException([`limit: 1~${MAX_LIMIT} 정수여야 함`]);
-  }
-  return limit;
-};
-const catalogKind = (kind) =>
-  validateBody({ kind }, { kind: oneOf(['categories', 'difficulties']) }).kind;
-
+// 팀 문서의 정책 목록은 { items } 없이 배열로 응답
+const unwrapItems = (result) => result.items;
+const reasonRule = () =>
+  string({
+    min: 1,
+    max: 500,
+    pattern: /\S/,
+    patternMessage: '공백만 입력할 수 없음',
+  });
 const codeRule = () =>
   string({
     min: 1,
@@ -83,82 +81,106 @@ const levelPolicyRule = () => ({
  */
 @Controller('admin/v1')
 @AdminOnly()
-@Dependencies(
-  CatalogService,
-  RewardPoliciesService,
-  GrowthPoliciesService,
-  PolicyReadinessService,
-)
+@Dependencies(CatalogService, RewardPoliciesService, GrowthPoliciesService)
 export class PoliciesController {
-  constructor(catalogs, rewards, growth, readiness) {
+  constructor(catalogs, rewards, growth) {
     this.catalogs = catalogs;
     this.rewards = rewards;
     this.growth = growth;
-    this.readinessService = readiness;
   }
 
-  // ── 카테고리·난이도 ──
+  // ── 카테고리·난이도 (M45~M50) ──
 
-  @Get('catalogs/:kind')
-  @Bind(Param('kind'))
-  listCatalog(kind) {
-    return this.catalogs.listCatalog(catalogKind(kind));
+  @Get('goal-categories')
+  listCategories() {
+    return this.catalogs.listCatalog('categories');
   }
 
-  @Post('catalogs/:kind')
-  @Bind(Req(), Param('kind'), Body())
-  createCatalog(req, kind, body) {
-    const input = validateBody(body, {
+  @Post('goal-categories')
+  @Bind(Req(), Body())
+  createCategory(request, body) {
+    return this.createCatalog(request, 'categories', body);
+  }
+
+  @Patch('goal-categories/:id')
+  @Bind(Req(), Param('id'), Body())
+  updateCategory(request, id, body) {
+    return this.updateCatalog(request, 'categories', id, body);
+  }
+
+  @Get('difficulty-levels')
+  listDifficulties() {
+    return this.catalogs.listCatalog('difficulties');
+  }
+
+  @Post('difficulty-levels')
+  @Bind(Req(), Body())
+  createDifficulty(request, body) {
+    return this.createCatalog(request, 'difficulties', body);
+  }
+
+  @Patch('difficulty-levels/:id')
+  @Bind(Req(), Param('id'), Body())
+  updateDifficulty(request, id, body) {
+    return this.updateCatalog(request, 'difficulties', id, body);
+  }
+
+  createCatalog(request, kind, body) {
+    const { reason, ...input } = validateBody(body, {
       code: codeRule(),
       name: nameRule(),
       displayOrder: orderRule(),
+      reason: reasonRule(),
     });
     return this.catalogs.createCatalog(
-      req.auth.adminId,
-      catalogKind(kind),
+      request.auth.adminId,
+      kind,
       input,
-      readIdempotencyKey(req),
+      readIdempotencyKey(request),
+      reason,
     );
   }
 
-  @Patch('catalogs/:kind/:id')
-  @Bind(Req(), Param('kind'), Param('id'), Body())
-  updateCatalog(req, kind, id, body) {
-    const patch = validateBody(body, {
+  updateCatalog(request, kind, id, body) {
+    const { reason, ...patch } = validateBody(body, {
       name: nameRule(true),
       displayOrder: orderRule(true),
       isActive: boolean({ optional: true }),
+      reason: reasonRule(),
     });
     if (Object.keys(patch).length === 0) {
       throw new BadRequestException(['바꿀 항목이 없음']);
     }
     return this.catalogs.updateCatalog(
-      req.auth.adminId,
-      catalogKind(kind),
+      request.auth.adminId,
+      kind,
       idOf(id),
       patch,
-      readIdempotencyKey(req),
+      readIdempotencyKey(request),
+      reason,
     );
   }
 
-  // ── 보상표 ──
+  // ── 보상표 (M74~M75) ──
 
-  @Get('policies/reward-rates')
+  @Get('mission-reward-rates')
   @Bind(Query())
   listRewardRates(query) {
     const filters = validateBody(query, {
       categoryId: uuid({ optional: true }),
       difficultyId: uuid({ optional: true }),
     });
-    return this.rewards.listRewardRates({
-      ...filters,
-      limit: listLimit(query),
-    });
+    return this.rewards
+      .listRewardRates({
+        ...filters,
+        limit: parseLimit(query, DEFAULT_LIMIT, MAX_LIMIT),
+      })
+      .then(unwrapItems);
   }
 
-  @Post('policies/reward-rates')
+  @Post('mission-reward-rates')
   @Bind(Req(), Body())
-  createRewardRate(req, body) {
+  createRewardRate(request, body) {
     const input = validateBody(body, {
       categoryId: uuid(),
       difficultyId: uuid(),
@@ -166,88 +188,102 @@ export class PoliciesController {
       userXp: integer({ min: 0, max: MAX_POINTS }),
       petXp: integer({ min: 0, max: MAX_POINTS }),
       effectiveAt: effectiveAtRule(),
+      reason: reasonRule(),
     });
     return this.rewards.createRewardRate(
-      req.auth.adminId,
+      request.auth.adminId,
       input,
-      readIdempotencyKey(req),
+      readIdempotencyKey(request),
     );
   }
 
-  // ── 판정 기준 ──
+  // ── 판정 기준 (M36~M37) ──
 
-  @Get('policies/criteria')
+  @Get('verification-criteria')
   @Bind(Query())
   listCriteria(query) {
     const filters = validateBody(query, {
       categoryId: uuid({ optional: true }),
-      verificationMethod: oneOf(['camera', 'sensor'], { optional: true }),
+      method: oneOf(['camera', 'sensor'], { optional: true }),
     });
-    return this.rewards.listCriteria({ ...filters, limit: listLimit(query) });
+    return this.rewards
+      .listCriteria({
+        categoryId: filters.categoryId,
+        verificationMethod: filters.method,
+        limit: parseLimit(query, DEFAULT_LIMIT, MAX_LIMIT),
+      })
+      .then(unwrapItems);
   }
 
-  @Post('policies/criteria')
+  @Post('verification-criteria')
   @Bind(Req(), Body())
-  createCriteria(req, body) {
+  createCriteria(request, body) {
     const input = validateBody(body, {
       categoryId: uuid(),
       verificationMethod: oneOf(['camera', 'sensor']),
       rules: jsonObject(),
       effectiveAt: effectiveAtRule(),
+      reason: reasonRule(),
     });
     return this.rewards.createCriteria(
-      req.auth.adminId,
+      request.auth.adminId,
       input,
-      readIdempotencyKey(req),
+      readIdempotencyKey(request),
     );
   }
 
-  // ── 스트릭 마일스톤 금액 ──
+  // ── 스트릭 마일스톤 금액 (M82~M83) ──
 
-  @Get('policies/streak-milestones')
+  @Get('streak-milestone-policies')
   listStreakMilestones() {
-    return this.growth.listStreakMilestones();
+    return this.growth.listStreakMilestones().then(unwrapItems);
   }
 
-  @Post('policies/streak-milestones')
+  @Post('streak-milestone-policies')
   @Bind(Req(), Body())
-  createStreakMilestone(req, body) {
+  createStreakMilestone(request, body) {
     const raw = validateBody(body, {
-      targetDays: integer(),
+      targetSuccessDays: integer(),
       points: pointsRule(),
+      userXp: integer({ min: 0, max: MAX_POINTS }),
+      petXp: integer({ min: 0, max: MAX_POINTS }),
       effectiveAt: effectiveAtRule(),
+      reason: reasonRule(),
     });
-    if (![7, 30, 100].includes(raw.targetDays)) {
-      throw new BadRequestException(['targetDays: 7, 30, 100 중 하나여야 함']);
+    if (![7, 30, 100].includes(raw.targetSuccessDays)) {
+      throw new BadRequestException([
+        'targetSuccessDays: 7, 30, 100 중 하나여야 함',
+      ]);
     }
     return this.growth.createStreakMilestone(
-      req.auth.adminId,
-      raw,
-      readIdempotencyKey(req),
+      request.auth.adminId,
+      { ...raw, targetDays: raw.targetSuccessDays },
+      readIdempotencyKey(request),
     );
   }
 
-  // ── 월간 포인트 한도 ──
+  // ── 월간 포인트 한도 (M72~M73) ──
 
-  @Get('policies/monthly-caps')
+  @Get('point-cap-policies')
   listMonthlyCaps() {
-    return this.growth.listMonthlyCaps();
+    return this.growth.listMonthlyCaps().then(unwrapItems);
   }
 
-  @Post('policies/monthly-caps')
+  @Post('point-cap-policies')
   @Bind(Req(), Body())
-  createMonthlyCap(req, body) {
+  createMonthlyCap(request, body) {
     const input = validateBody(body, {
       effectiveMonth: string({
         pattern: /^\d{4}-(0[1-9]|1[0-2])-01$/,
         patternMessage: '매월 1일(YYYY-MM-01)이어야 함',
       }),
-      limitPoints: integer({ min: 0, max: 100_000_000 }),
+      monthlyLimitPoints: integer({ min: 0, max: 1_000_000 }),
+      reason: reasonRule(),
     });
     return this.growth.createMonthlyCap(
-      req.auth.adminId,
-      input,
-      readIdempotencyKey(req),
+      request.auth.adminId,
+      { ...input, limitPoints: input.monthlyLimitPoints },
+      readIdempotencyKey(request),
     );
   }
 
@@ -260,12 +296,12 @@ export class PoliciesController {
 
   @Post('policies/user-levels')
   @Bind(Req(), Body())
-  createUserLevels(req, body) {
+  createUserLevels(request, body) {
     return this.growth.createLevelPolicy(
-      req.auth.adminId,
+      request.auth.adminId,
       'user-levels',
       validateBody(body, levelPolicyRule()),
-      readIdempotencyKey(req),
+      readIdempotencyKey(request),
     );
   }
 
@@ -276,19 +312,12 @@ export class PoliciesController {
 
   @Post('policies/pet-levels')
   @Bind(Req(), Body())
-  createPetLevels(req, body) {
+  createPetLevels(request, body) {
     return this.growth.createLevelPolicy(
-      req.auth.adminId,
+      request.auth.adminId,
       'pet-levels',
       validateBody(body, levelPolicyRule()),
-      readIdempotencyKey(req),
+      readIdempotencyKey(request),
     );
-  }
-
-  // ── 서비스 시작 준비 상태 ──
-
-  @Get('policies/readiness')
-  readiness() {
-    return this.readinessService.readiness();
   }
 }

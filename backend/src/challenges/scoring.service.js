@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
+import { Dependencies, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AdminMutationService } from '../admin-auth/admin-mutation.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { POINTS_PER_SUCCESS_DAY } from './challenges.constants.js';
@@ -13,7 +13,7 @@ const notFound = (
 ) => httpError(HttpStatus.NOT_FOUND, code, message);
 
 /**
- * 일별 결과·순위·운영 조치 (4-C)
+ * 일별 결과·순위·운영 조치
  * - 하루 성공 = 그 날짜(KST) 안에 제출된 수행의 현재 판정이 승인. 날이 끝났는데 성공이 없으면 판정 대기 제출이
  *   있을 때 pending, 없으면 failed. 판정 반영마다(승인 여부 무관) 그 참가의 모든 날 재평가
  * - 관리자가 제외한 날(excluded)은 재계산 대상 아님, 복구하면 다시 평가
@@ -22,6 +22,8 @@ const notFound = (
 @Injectable()
 @Dependencies(DatabaseService, AdminMutationService, ParticipationService)
 export class ScoringService {
+  logger = new Logger(ScoringService.name);
+
   constructor(database, mutation, participation) {
     this.database = database;
     this.mutation = mutation;
@@ -49,9 +51,10 @@ export class ScoringService {
         ORDER BY challenge_date`,
       [participationId],
     );
+    const verdicts = await this.evaluateDays(tx, days);
     let changed = 0;
     for (const day of days) {
-      const next = await this.evaluateDay(tx, day);
+      const next = verdicts.get(day.id);
       const same =
         next.status === day.status &&
         (next.record ?? null) === (day.qualifying_record_id ?? null) &&
@@ -69,50 +72,99 @@ export class ScoringService {
     return changed;
   }
 
-  async evaluateDay(tx, day) {
+  /**
+   * 여러 날을 쿼리 2번으로 평가 (일별 행 id → 결과)
+   * 성공: 그날(KST) 제출 중 현재 판정이 승인인 가장 이른 회차 / 대기: 날이 끝났고 판정 대기 제출 존재
+   */
+  async evaluateDays(tx, days) {
+    const ids = days.map((day) => day.id);
     const { rows: winners } = await tx.query(
-      `SELECT r.id AS record_id, v.id AS result_id
-         FROM mission_records r
+      `SELECT DISTINCT ON (d.id) d.id AS day_id, r.id AS record_id, v.id AS result_id
+         FROM challenge_daily_missions d
+         JOIN mission_records r ON r.mission_id = d.mission_id
+          AND (r.submitted_at AT TIME ZONE 'Asia/Seoul')::date = d.challenge_date
          JOIN verification_results v ON v.record_id = r.id
-        WHERE r.mission_id = $1 AND v.is_current AND v.decision = 'approved'
-          AND (r.submitted_at AT TIME ZONE 'Asia/Seoul')::date = $2
-        ORDER BY r.submitted_at, r.id LIMIT 1`,
-      [day.mission_id, day.date],
+          AND v.is_current AND v.decision = 'approved'
+        WHERE d.id = ANY($1::uuid[])
+        ORDER BY d.id, r.submitted_at, r.id`,
+      [ids],
     );
-    if (winners[0]) {
-      return {
-        status: 'success',
-        record: winners[0].record_id,
-        result: winners[0].result_id,
-      };
-    }
-    if (!day.day_over) return { status: 'pending' };
     const { rows: waiting } = await tx.query(
-      `SELECT 1 FROM mission_records
-        WHERE mission_id = $1 AND status IN ('submitted', 'review_required')
-          AND (submitted_at AT TIME ZONE 'Asia/Seoul')::date = $2 LIMIT 1`,
-      [day.mission_id, day.date],
+      `SELECT DISTINCT d.id AS day_id
+         FROM challenge_daily_missions d
+         JOIN mission_records r ON r.mission_id = d.mission_id
+          AND (r.submitted_at AT TIME ZONE 'Asia/Seoul')::date = d.challenge_date
+          AND r.status IN ('submitted', 'review_required')
+        WHERE d.id = ANY($1::uuid[])`,
+      [ids],
     );
-    return { status: waiting[0] ? 'pending' : 'failed' };
+    const won = new Map(winners.map((row) => [row.day_id, row]));
+    const pending = new Set(waiting.map((row) => row.day_id));
+    return new Map(
+      days.map((day) => {
+        const winner = won.get(day.id);
+        if (winner) {
+          return [
+            day.id,
+            {
+              status: 'success',
+              record: winner.record_id,
+              result: winner.result_id,
+            },
+          ];
+        }
+        if (!day.day_over || pending.has(day.id)) {
+          return [day.id, { status: 'pending' }];
+        }
+        return [day.id, { status: 'failed' }];
+      }),
+    );
   }
 
-  /** 작업: 날이 끝났는데 아직 pending인 일별 결과를 확정(자정 이후 failed·pending) */
-  async settleDays({ limit = 200 } = {}) {
+  /** 확정할 날이 있는 참가 id (settleDays 설명 참고) */
+  async dueParticipationIds(limit) {
     const { rows } = await this.database.query(
-      `SELECT DISTINCT d.participation_id
+      `SELECT d.participation_id
          FROM challenge_daily_missions d
         WHERE d.status = 'pending' AND d.challenge_date < ${TODAY_SQL}
+          AND NOT EXISTS (
+                SELECT 1 FROM mission_records r
+                 WHERE r.mission_id = d.mission_id
+                   AND (r.submitted_at AT TIME ZONE 'Asia/Seoul')::date = d.challenge_date
+                   AND r.status IN ('submitted', 'review_required'))
+        GROUP BY d.participation_id
+        ORDER BY min(d.challenge_date), d.participation_id
         LIMIT $1`,
       [limit],
     );
+    return rows.map((row) => row.participation_id);
+  }
+
+  /**
+   * 작업: 날이 끝났는데 아직 pending인 일별 결과를 확정(자정 이후 failed·pending)
+   * 그날 판정 대기 중인 제출이 있는 날은 고르지 않음: 작업이 다시 봐도 pending으로 남고,
+   * 판정이 나면 onDecisionApplied가 다시 계산한다. 이런 날이 쌓여도 다른 참가가 밀리지 않도록
+   * 오래된 날부터 고름
+   */
+  async settleDays({ limit = 200 } = {}) {
+    const ids = await this.dueParticipationIds(limit);
     let participations = 0;
-    for (const { participation_id: id } of rows) {
-      await this.database.withTransaction((tx) =>
-        this.recalculateParticipation(tx, id),
-      );
-      participations += 1;
+    let failed = 0;
+    for (const id of ids) {
+      // 한 참가의 실패가 나머지 참가 확정을 막지 않도록 건별로 격리
+      try {
+        await this.database.withTransaction((tx) =>
+          this.recalculateParticipation(tx, id),
+        );
+        participations += 1;
+      } catch (error) {
+        failed += 1;
+        this.logger.error(
+          `챌린지 일별 확정 실패 participation=${id}: ${error.message}`,
+        );
+      }
     }
-    return { participations };
+    return { participations, failed };
   }
 
   // ───────── 순위 ─────────
@@ -209,6 +261,34 @@ export class ScoringService {
     };
   }
 
+  /**
+   * M60 순위: 점수·성공 일수 내림차순, 같으면 먼저 참가한 순서
+   * 실격자는 순위에서 뺌. flags는 자동 감지 항목이 아직 없어 빈 배열
+   */
+  async getRankings(challengeId) {
+    const { items } = await this.listParticipants(challengeId);
+    const ranked = items
+      .filter((item) => item.status !== 'disqualified')
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          b.successfulDays - a.successfulDays ||
+          new Date(a.joinedAt) - new Date(b.joinedAt),
+      );
+    return {
+      ranking: { challengeId, calculatedAt: new Date().toISOString() },
+      entries: ranked.map((item, index) => ({
+        participationId: item.id,
+        userId: item.userId,
+        nickname: item.nickname,
+        rankNo: index + 1,
+        score: item.score,
+        successfulDays: item.successfulDays,
+        flags: [],
+      })),
+    };
+  }
+
   async getParticipantDays(challengeId, participationId) {
     const { rows } = await this.database.query(
       `SELECT d.id, d.challenge_date::text AS date, d.status, d.mission_id,
@@ -254,7 +334,7 @@ export class ScoringService {
   disqualify(adminId, challengeId, participationId, reason, key) {
     return this.mutation.run(adminId, {
       key,
-      operation: 'challenge.disqualify',
+      operation: 'challenge.moderate',
       payload: { challengeId, participationId, reason },
       reason,
       run: async (tx) => {
@@ -303,7 +383,7 @@ export class ScoringService {
   excludeDay(adminId, challengeId, participationId, dailyId, input, key) {
     return this.mutation.run(adminId, {
       key,
-      operation: 'challenge.exclude_day',
+      operation: 'challenge.moderate',
       payload: { challengeId, participationId, dailyId, ...input },
       reason: input.reason,
       run: async (tx) => {
@@ -360,7 +440,7 @@ export class ScoringService {
   restoreDay(adminId, challengeId, participationId, dailyId, reason, key) {
     return this.mutation.run(adminId, {
       key,
-      operation: 'challenge.restore_day',
+      operation: 'challenge.moderate',
       payload: { challengeId, participationId, dailyId, reason },
       reason,
       run: async (tx) => {

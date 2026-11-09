@@ -20,8 +20,8 @@ const IDLE_TIMEOUT_MS = 30_000;
 const PG_DATE_OID = 1082;
 pg.types.setTypeParser(PG_DATE_OID, (value) => value);
 
-export function isRetryableError(err) {
-  const code = err?.code;
+export function isRetryableError(error) {
+  const code = error?.code;
   return typeof code === 'string' && RETRYABLE_SQLSTATES.has(code);
 }
 
@@ -45,8 +45,8 @@ export class DatabaseService {
         'DATABASE_IDLE_TX_TIMEOUT_MS',
       ),
     });
-    this.pool.on('error', (err) =>
-      this.logger.error(`유휴 연결 오류: ${err.message}`),
+    this.pool.on('error', (error) =>
+      this.logger.error(`유휴 연결 오류: ${error.message}`),
     );
   }
 
@@ -78,7 +78,7 @@ export class DatabaseService {
         const result = await fn(client);
         await client.query('COMMIT');
         return result;
-      } catch (err) {
+      } catch (error) {
         try {
           await client.query('ROLLBACK');
         } catch (rollbackErr) {
@@ -86,14 +86,14 @@ export class DatabaseService {
           destroy = true;
           this.logger.error(`ROLLBACK 실패: ${rollbackErr.message}`);
         }
-        if (isRetryableError(err) && attempt < retries) {
+        if (isRetryableError(error) && attempt < retries) {
           this.logger.warn(`트랜잭션 재시도 ${attempt + 1}/${retries}`);
           await new Promise((resolve) =>
             setTimeout(resolve, 25 * 2 ** attempt),
           );
           continue;
         }
-        throw err;
+        throw error;
       } finally {
         client.release(destroy);
       }

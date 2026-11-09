@@ -20,13 +20,13 @@ export class PointsController {
 
   @Get()
   @Bind(Req())
-  wallet(req) {
-    return this.points.getWallet(this.points.database, req.auth.userId);
+  wallet(request) {
+    return this.points.getWallet(this.points.database, request.auth.userId);
   }
 
   @Get('transactions')
   @Bind(Req(), Query())
-  transactions(req, query) {
+  transactions(request, query) {
     let limit = 20;
     if (query.limit !== undefined) {
       limit = Number(query.limit);
@@ -37,9 +37,13 @@ export class PointsController {
     if (query.cursor !== undefined && typeof query.cursor !== 'string') {
       throw new BadRequestException(['cursor: 문자열이어야 함']);
     }
-    return this.points.listTransactions(this.points.database, req.auth.userId, {
-      cursor: query.cursor,
-      limit,
-    });
+    return this.points.listTransactions(
+      this.points.database,
+      request.auth.userId,
+      {
+        cursor: query.cursor,
+        limit,
+      },
+    );
   }
 }

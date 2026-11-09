@@ -46,8 +46,9 @@ export class RewardPoliciesService {
   createRewardRate(adminId, input, key) {
     return this.mutation.run(adminId, {
       key,
-      operation: 'policy.reward_rate.create',
+      operation: 'reward_rate.create',
       payload: input,
+      reason: input.reason,
       run: async (tx) => {
         await this.catalogs.assertCatalogRow(
           tx,
@@ -127,8 +128,9 @@ export class RewardPoliciesService {
   createCriteria(adminId, input, key) {
     return this.mutation.run(adminId, {
       key,
-      operation: 'policy.criteria.create',
+      operation: 'criteria.create',
       payload: input,
+      reason: input.reason,
       run: async (tx) => {
         await this.catalogs.assertCatalogRow(
           tx,

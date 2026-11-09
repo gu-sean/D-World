@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AdminMutationService } from '../admin-auth/admin-mutation.service.js';
+import { adminPage } from '../common/pagination/admin-page.js';
 import { AppException } from '../common/errors/app-exception.js';
 import { DatabaseService } from '../database/database.service.js';
 import { DURATIONS } from './challenges.constants.js';
@@ -30,6 +31,12 @@ export const SELECT = `
               ELSE 'ended' END AS phase
     FROM challenges c
     LEFT JOIN challenge_reward_packages p ON p.challenge_id = c.id`;
+
+const periodDaysOf = (start, end) =>
+  Math.round(
+    (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) /
+      86_400_000,
+  ) + 1;
 
 export function toView(row) {
   return {
@@ -61,6 +68,16 @@ export function toView(row) {
       petXp: row.pet_xp ?? 0,
       badgeAchievementVersionId: row.badge_achievement_version_id ?? null,
     },
+    // 모바일 클라이언트(07 Challenge) 키
+    periodDays: periodDaysOf(row.start_date, row.end_date),
+    capacity: row.max_participants,
+    completionRateRequired: Number(
+      (
+        row.required_success_days / periodDaysOf(row.start_date, row.end_date)
+      ).toFixed(4),
+    ),
+    rewardPoints: row.points ?? 0,
+    joined: false,
   };
 }
 
@@ -86,8 +103,9 @@ function decodeCursor(cursor) {
 }
 
 /**
- * 챌린지 정의·공개 (4-A, 공식 챌린지)
- * - 관리자가 만든 공식 챌린지만 다룬다(사용자 개설·검수는 이후 단계).
+ * 챌린지 정의·공개
+ * - 관리자 공식 챌린지의 생성·수정·공개·숨김(createOfficial 등)과 사용자 조회(목록·상세)를 맡는다.
+ * - 사용자 개설·검수는 UserChallengesService, 모바일 응답 조립은 MobileChallengesService.
  * - 첫 참가자 이후 기간·조건·보상은 DB 트리거가 잠금 → 수정은 참가자 없는 draft/public만 성공
  */
 @Injectable()
@@ -128,6 +146,7 @@ export class ChallengesService {
     return {
       items: page.map((row) => ({
         ...toView(row),
+        joined: mine.get(row.id)?.status === 'enrolled',
         myParticipation: mine.get(row.id) ?? null,
       })),
       nextCursor:
@@ -154,21 +173,50 @@ export class ChallengesService {
     );
     if (!rows[0]) throw notFound();
     const mine = await this.myParticipations(userId, [id]);
-    return { ...toView(rows[0]), myParticipation: mine.get(id) ?? null };
+    return {
+      ...toView(rows[0]),
+      joined: mine.get(id)?.status === 'enrolled',
+      myParticipation: mine.get(id) ?? null,
+    };
   }
 
   // ───────── 관리자 ─────────
 
-  /** 관리자 목록: 최근 등록순, 상태 필터(커서 없이 상한만) */
-  async listAdmin({ status, limit }) {
-    const { rows } = await this.database.query(
-      `${SELECT}
-        WHERE ($1::text IS NULL OR c.publication_status = $1)
-        ORDER BY c.created_at DESC, c.id
-        LIMIT $2`,
-      [status ?? null, limit],
-    );
-    return { items: rows.map(toView) };
+  /** M53 관리자 목록(AdminPage): 공개 상태·정산 상태·단계·분야·출처 필터, 시작일 순 */
+  async listAdmin({
+    publicationStatus,
+    settlementStatus,
+    phase,
+    categoryId,
+    origin,
+    paging,
+  }) {
+    const params = [
+      publicationStatus ?? null,
+      settlementStatus ?? null,
+      phase ?? null,
+      categoryId ?? null,
+      origin ?? null,
+    ];
+    const where = `($1::text IS NULL OR publication_status = $1)
+          AND ($2::text IS NULL OR settlement_status = $2)
+          AND ($3::text IS NULL OR phase = $3)
+          AND ($4::uuid IS NULL OR category_id = $4)
+          AND ($5::text IS NULL OR origin = $5)`;
+    const [{ rows }, count] = await Promise.all([
+      this.database.query(
+        `SELECT * FROM (${SELECT}) c
+          WHERE ${where}
+          ORDER BY ${paging.orderBy}
+          LIMIT $6 OFFSET $7`,
+        [...params, paging.size, paging.offset],
+      ),
+      this.database.query(
+        `SELECT count(*) AS n FROM (${SELECT}) c WHERE ${where}`,
+        params,
+      ),
+    ]);
+    return adminPage(rows.map(toView), paging, count.rows[0].n);
   }
 
   async getAdmin(id) {
@@ -235,21 +283,22 @@ export class ChallengesService {
     }
   }
 
-  badgeError(err) {
-    if (err?.code === '23514' && /badge/i.test(err.message)) {
+  badgeError(error) {
+    if (error?.code === '23514' && /badge/i.test(error.message)) {
       return unprocessable(
         'invalid_badge',
         '배지는 보상이 0인 챌린지 완주 업적 버전이어야 함',
       );
     }
-    return err;
+    return error;
   }
 
-  createOfficial(adminId, input, key) {
+  createOfficial(adminId, input, key, reason) {
     return this.mutation.run(adminId, {
       key,
       operation: 'challenge.create',
       payload: input,
+      reason,
       run: async (tx) => {
         const duration = this.assertPeriod(
           input.startDate,
@@ -298,8 +347,8 @@ export class ChallengesService {
               input.reward.badgeAchievementVersionId ?? null,
             ],
           );
-        } catch (err) {
-          throw this.badgeError(err);
+        } catch (error) {
+          throw this.badgeError(error);
         }
         const { rows } = await tx.query(`${SELECT} WHERE c.id = $1`, [id]);
         return { result: toView(rows[0]) };
@@ -308,9 +357,10 @@ export class ChallengesService {
   }
 
   /** 참가자가 없는 draft·public 챌린지의 정의 수정, 참가자가 생긴 뒤는 DB가 거절 */
-  updateOfficial(adminId, id, patch, key) {
+  updateOfficial(adminId, id, patch, key, reason) {
     return this.mutation.run(adminId, {
       key,
+      reason,
       operation: 'challenge.update',
       payload: { id, ...patch },
       run: async (tx) => {
@@ -397,17 +447,17 @@ export class ChallengesService {
               ],
             );
           }
-        } catch (err) {
+        } catch (error) {
           if (
-            err?.code === '23514' &&
-            /locked after first enrollment/.test(err.message)
+            error?.code === '23514' &&
+            /locked after first enrollment/.test(error.message)
           ) {
             throw conflict(
               'challenge_locked',
               '첫 참가자가 생긴 뒤에는 기간·조건·보상을 바꿀 수 없음(취소 후 새로 등록)',
             );
           }
-          throw this.badgeError(err);
+          throw this.badgeError(error);
         }
         const after = toView(
           (await tx.query(`${SELECT} WHERE c.id = $1`, [id])).rows[0],
@@ -418,10 +468,11 @@ export class ChallengesService {
   }
 
   /** 공개: 시작일이 미래여야 함(DB 트리거도 검사), 게시 시각은 불변 */
-  publish(adminId, id, key) {
+  publish(adminId, id, key, reason) {
     return this.mutation.run(adminId, {
       key,
-      operation: 'challenge.publish',
+      reason,
+      operation: 'challenge.update',
       payload: { id },
       run: async (tx) => {
         const current = await this.lockOfficial(tx, id);
@@ -460,7 +511,8 @@ export class ChallengesService {
   hide(adminId, id, reason, key) {
     return this.mutation.run(adminId, {
       key,
-      operation: 'challenge.hide',
+      reason,
+      operation: 'challenge.update',
       payload: { id, reason },
       run: async (tx) => {
         const current = await this.lockOfficial(tx, id, { anyOrigin: true });

@@ -3,7 +3,8 @@
  * DB 고유 인덱스가 최종 판단이므로 사전 조회는 UX용일 뿐 경쟁 상태는 여기서 처리
  * map: { [constraint]: () => Error }
  */
-export function rethrowConstraint(err, map) {
-  if (err?.code === '23505' && map[err.constraint]) throw map[err.constraint]();
-  throw err;
+export function rethrowConstraint(error, map) {
+  if (error?.code === '23505' && map[error.constraint])
+    throw map[error.constraint]();
+  throw error;
 }

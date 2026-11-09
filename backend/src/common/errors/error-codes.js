@@ -89,16 +89,25 @@ export const ERROR_CODES = {
   MEDIA_NOT_UPLOADED: [422, '파일이 올라가지 않았어요. 다시 시도해 주세요.'],
   // 7.5 보상·펫·챌린지
   POINT_INSUFFICIENT: [422, '포인트가 부족해요.'],
+  SHOP_ITEM_UNAVAILABLE: [409, '지금은 살 수 없는 상품이에요.'],
+  SHOP_PRICE_CHANGED: [409, '가격이 바뀌었어요. 새로고침해 주세요.'],
+  SHOP_ALREADY_OWNED: [409, '이미 가지고 있는 상품이에요.'],
   ACHIEVEMENT_NOT_EARNED: [409, '아직 얻지 못한 업적이에요.'],
   PET_NICKNAME_INVALID: [400, '별명은 한글·영문 2~10자예요.'],
   PET_NICKNAME_TAKEN: [409, '이미 쓰고 있는 별명이에요.'],
   PET_SPECIES_LOCKED: [403, '아직 만날 수 없는 펫이에요.'],
   PET_ALREADY_OWNED: [409, '이미 함께하고 있는 펫이에요.'],
+  RECOMMENDATION_RATE_LIMITED: [429, '추천은 10분에 한 번 받을 수 있어요.'],
+  RECOMMENDATION_EXPIRED: [410, '추천 시간이 지났어요.'],
+  RECOMMENDATION_NOT_OPEN: [409, '이미 처리한 추천이에요.'],
   CHALLENGE_NOT_OPEN: [409, '지금은 참여할 수 없는 챌린지예요.'],
   CHALLENGE_FULL: [409, '정원이 다 찼어요.'],
   CHALLENGE_ALREADY_JOINED: [409, '이미 참여한 챌린지예요.'],
   CHALLENGE_NOT_JOINED: [409, '참여 중인 챌린지가 아니에요.'],
+  SUPPORT_DUPLICATE_REPORT: [409, '이미 신고한 대상이에요.'],
   // 7.6 AI·관리자
+  AI_INVALID_REQUEST: [400, '잘못된 AI 요청이에요.'],
+  AI_MEDIA_UNAVAILABLE: [422, 'AI가 인증 파일을 읽지 못했어요.'],
   AI_LLM_UNAVAILABLE: [
     503,
     'AI가 잠시 쉬고 있어요. 잠시 후 다시 시도해 주세요.',
@@ -118,7 +127,7 @@ export const ERROR_CODES = {
  * 서비스 내부 코드 → 팀 코드
  * 표에 없는 도메인 코드는 대문자로 바꿔 그대로 노출(상태·문구는 던진 쪽 값)
  */
-export const LEGACY_CODE_MAP = {
+const LEGACY_CODE_MAP = {
   // 공통
   bad_request: 'COMMON_VALIDATION_FAILED',
   unauthorized: 'COMMON_UNAUTHORIZED',
@@ -157,6 +166,7 @@ export const LEGACY_CODE_MAP = {
   goal_limit_reached: 'GOAL_LIMIT_REACHED',
   goal_completed: 'GOAL_ALREADY_COMPLETED',
   draft_stale: 'PLAN_PROPOSAL_OUTDATED',
+  adjustment_not_open: 'PLAN_ADJUSTMENT_NOT_OPEN',
   proposal_not_open: 'PLAN_PROPOSAL_NOT_DRAFT',
   plan_too_large: 'PLAN_INVALID',
   steps_outside_period: 'PLAN_INVALID',
@@ -180,12 +190,15 @@ export const LEGACY_CODE_MAP = {
   upload_incomplete: 'MEDIA_NOT_UPLOADED',
   // 보상·펫·챌린지
   insufficient_points: 'POINT_INSUFFICIENT',
+  item_unavailable: 'SHOP_ITEM_UNAVAILABLE',
+  price_changed: 'SHOP_PRICE_CHANGED',
   pet_nickname_taken: 'PET_NICKNAME_TAKEN',
   pet_locked: 'PET_SPECIES_LOCKED',
   pet_already_owned: 'PET_ALREADY_OWNED',
   challenge_not_open: 'CHALLENGE_NOT_OPEN',
   enrollment_closed: 'CHALLENGE_NOT_OPEN',
   challenge_full: 'CHALLENGE_FULL',
+  already_joined: 'CHALLENGE_ALREADY_JOINED',
   not_enrolled: 'CHALLENGE_NOT_JOINED',
   challenge_not_ended: 'CHALLENGE_NOT_ENDED',
   // 관리자

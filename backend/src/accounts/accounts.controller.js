@@ -48,26 +48,26 @@ export class AccountsController {
 
   @Get('me')
   @Bind(Req())
-  me(req) {
-    return this.accounts.getMe(req.auth.userId);
+  me(request) {
+    return this.accounts.getMe(request.auth.userId);
   }
 
   @Patch('me/profile')
   @Bind(Req(), Body())
-  updateProfile(req, body) {
+  updateProfile(request, body) {
     const data = validateBody(body, {
       nickname: nickname({ optional: true }),
       notificationEnabled: boolean({ optional: true }),
     });
-    return this.accounts.updateProfile(req.auth.userId, data);
+    return this.accounts.updateProfile(request.auth.userId, data);
   }
 
   @Post('me/consents')
   @Bind(Req(), Body())
-  recordConsents(req, body) {
+  recordConsents(request, body) {
     const { consents } = validateBody(body, {
       consents: array(consentItem, { max: 10 }),
     });
-    return this.accounts.recordConsents(req.auth.userId, consents);
+    return this.accounts.recordConsents(request.auth.userId, consents);
   }
 }

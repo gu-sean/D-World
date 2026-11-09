@@ -62,9 +62,9 @@ export class GoalsController {
   @Idempotent()
   @RequireActive()
   @Bind(Req(), Body())
-  create(req, body) {
+  create(request, body) {
     return this.goals.createGoal(
-      req.auth.userId,
+      request.auth.userId,
       validateBody(body, {
         title: title(),
         description: description(),
@@ -73,16 +73,28 @@ export class GoalsController {
         startDate: dateString(),
         endDate: dateString(),
         targetFrequency: integer({ min: 1, max: 7, optional: true }),
+        dailyAvailableMinutes: integer({ min: 5, max: 240, optional: true }),
       }),
     );
   }
 
   @Get()
   @Bind(Req(), Query())
-  list(req, query) {
-    const { status } = validateBody(query, {
-      status: oneOf(GOAL_STATUSES, { optional: true }),
+  list(request, query) {
+    const { categoryId, status: statusText } = validateBody(query, {
+      status: string({ min: 1, max: 60, optional: true }),
+      categoryId: uuid({ optional: true }),
     });
+    // 여러 값 필터 `?status=a,b` (05 §6)
+    const statuses = statusText
+      ?.split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (statuses?.some((value) => !GOAL_STATUSES.includes(value))) {
+      throw new BadRequestException([
+        `status: ${GOAL_STATUSES.join(', ')} 중 하나 이상이어야 함`,
+      ]);
+    }
     let limit = 20;
     if (query.limit !== undefined) {
       limit = Number(query.limit);
@@ -93,8 +105,9 @@ export class GoalsController {
     if (query.cursor !== undefined && typeof query.cursor !== 'string') {
       throw new BadRequestException(['cursor: 문자열이어야 함']);
     }
-    return this.goals.listGoals(req.auth.userId, {
-      status,
+    return this.goals.listGoals(request.auth.userId, {
+      statuses,
+      categoryId,
       cursor: query.cursor,
       limit,
     });
@@ -102,16 +115,57 @@ export class GoalsController {
 
   @Get(':id')
   @Bind(Req(), Param('id'))
-  get(req, id) {
-    return this.goals.getGoal(req.auth.userId, idParams({ id }).id);
+  get(request, id) {
+    return this.goals.getGoal(request.auth.userId, idParams({ id }).id);
   }
 
+  /**
+   * 목표 수정. 본문에 status가 있으면 상태도 바꾼다(active·paused·completed)
+   * 응답은 GoalDetail
+   */
   @Patch(':id')
+  @Idempotent({ optional: true })
   @Bind(Req(), Param('id'), Body())
-  update(req, id, body) {
+  async update(request, id, rawBody) {
+    const goalId = idParams({ id }).id;
+    const { status: wanted, ...body } = rawBody ?? {};
+    if (wanted !== undefined && !GOAL_STATUSES.includes(wanted)) {
+      throw new BadRequestException([
+        `status: ${GOAL_STATUSES.join(', ')} 중 하나여야 함`,
+      ]);
+    }
+    const hasFields = Object.keys(body).length > 0;
+    if (hasFields || wanted === undefined) {
+      await this.updateFields(request.auth.userId, goalId, body);
+    }
+    if (wanted !== undefined) {
+      await this.changeStatus(request.auth.userId, goalId, wanted);
+    }
+    return this.goals.getGoal(request.auth.userId, goalId);
+  }
+
+  async changeStatus(userId, goalId, wanted) {
+    const current = (await this.goals.getGoal(userId, goalId)).status;
+    if (current === wanted) return;
+    const action = {
+      'active:paused': 'pause',
+      'paused:active': 'resume',
+      'active:completed': 'complete',
+      'paused:completed': 'complete',
+      'completed:active': 'reopen',
+    }[`${current}:${wanted}`];
+    if (!action) {
+      throw new BadRequestException([
+        `status: ${current}에서 ${wanted}로 바꿀 수 없음`,
+      ]);
+    }
+    await this.goals.transition(userId, goalId, action);
+  }
+
+  updateFields(userId, goalId, body) {
     return this.goals.updateGoal(
-      req.auth.userId,
-      idParams({ id }).id,
+      userId,
+      goalId,
       validateBody(body, {
         title: title({ optional: true }),
         description: description(),
@@ -120,6 +174,7 @@ export class GoalsController {
         startDate: dateString({ optional: true }),
         endDate: dateString({ optional: true }),
         targetFrequency: integer({ min: 1, max: 7, optional: true }),
+        dailyAvailableMinutes: integer({ min: 5, max: 240, optional: true }),
       }),
     );
   }
@@ -127,16 +182,20 @@ export class GoalsController {
   @Post(':id/pause')
   @HttpCode(200)
   @Bind(Req(), Param('id'))
-  pause(req, id) {
-    return this.goals.transition(req.auth.userId, idParams({ id }).id, 'pause');
+  pause(request, id) {
+    return this.goals.transition(
+      request.auth.userId,
+      idParams({ id }).id,
+      'pause',
+    );
   }
 
   @Post(':id/resume')
   @HttpCode(200)
   @Bind(Req(), Param('id'))
-  resume(req, id) {
+  resume(request, id) {
     return this.goals.transition(
-      req.auth.userId,
+      request.auth.userId,
       idParams({ id }).id,
       'resume',
     );
@@ -147,9 +206,9 @@ export class GoalsController {
   @HttpCode(200)
   @RequireActive()
   @Bind(Req(), Param('id'))
-  complete(req, id) {
+  complete(request, id) {
     return this.goals.transition(
-      req.auth.userId,
+      request.auth.userId,
       idParams({ id }).id,
       'complete',
     );
@@ -158,9 +217,9 @@ export class GoalsController {
   @Post(':id/reopen')
   @HttpCode(200)
   @Bind(Req(), Param('id'))
-  reopen(req, id) {
+  reopen(request, id) {
     return this.goals.transition(
-      req.auth.userId,
+      request.auth.userId,
       idParams({ id }).id,
       'reopen',
     );
@@ -168,17 +227,18 @@ export class GoalsController {
 
   @Delete(':id')
   @HttpCode(204)
+  @Idempotent({ optional: true })
   @Bind(Req(), Param('id'))
-  async remove(req, id) {
-    await this.goals.deleteGoal(req.auth.userId, idParams({ id }).id);
+  async remove(request, id) {
+    await this.goals.removeGoal(request.auth.userId, idParams({ id }).id);
   }
 
   @Post(':id/steps')
   @RequireActive()
   @Bind(Req(), Param('id'), Body())
-  createStep(req, id, body) {
+  createStep(request, id, body) {
     return this.steps.createStep(
-      req.auth.userId,
+      request.auth.userId,
       idParams({ id }).id,
       validateBody(body, {
         title: title(),
@@ -190,10 +250,10 @@ export class GoalsController {
 
   @Patch(':id/steps/:stepId')
   @Bind(Req(), Param('id'), Param('stepId'), Body())
-  updateStep(req, id, stepId, body) {
+  updateStep(request, id, stepId, body) {
     const ids = idParams({ id, stepId });
     return this.steps.updateStep(
-      req.auth.userId,
+      request.auth.userId,
       ids.id,
       ids.stepId,
       validateBody(body, {
@@ -207,8 +267,8 @@ export class GoalsController {
   @Delete(':id/steps/:stepId')
   @HttpCode(204)
   @Bind(Req(), Param('id'), Param('stepId'))
-  async removeStep(req, id, stepId) {
+  async removeStep(request, id, stepId) {
     const ids = idParams({ id, stepId });
-    await this.steps.deleteStep(req.auth.userId, ids.id, ids.stepId);
+    await this.steps.removeStep(request.auth.userId, ids.id, ids.stepId);
   }
 }
