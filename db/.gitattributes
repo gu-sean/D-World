@@ -1,5 +1,0 @@
-# 마이그레이션 체크섬(SHA-256)이 PC마다 같도록 줄바꿈을 LF로 고정한다
-*.sql text eol=lf
-*.sh  text eol=lf
-*.md  text eol=lf
-*.png binary
