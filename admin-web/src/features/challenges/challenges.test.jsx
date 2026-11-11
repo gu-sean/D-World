@@ -1,8 +1,9 @@
 import { vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { App, Modal } from 'antd';
+import { Modal } from 'antd';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http as mswHttp, HttpResponse } from 'msw';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { server } from '../../test/setup.js';
 import { handlers, resetMockData } from './mocks.js';
@@ -20,14 +21,12 @@ const renderAt = (path, routePath, element) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <App>
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>
-            <Route path={routePath} element={element} />
-            <Route path="/challenges" element={<div>목록 이동됨</div>} />
-          </Routes>
-        </MemoryRouter>
-      </App>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path={routePath} element={element} />
+          <Route path="/challenges" element={<div>목록 이동됨</div>} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 };
@@ -50,7 +49,7 @@ describe('challenge screens', () => {
     expect(screen.getAllByText('검수 대기').length).toBeGreaterThan(0);
   });
 
-  it('shows the ranking and asks for a reason before disqualifying', async () => {
+  it('shows the ranking and blocks disqualifying without a reason', async () => {
     const user = userEvent.setup();
     renderAt(
       '/challenges/c0000000-0000-4000-8000-000000000001/rankings',
@@ -60,7 +59,8 @@ describe('challenge screens', () => {
     expect(await screen.findByText('민수')).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: '검토' })[0]);
     await user.click(await screen.findByRole('button', { name: '실격 처리' }));
-    await user.click(await screen.findByRole('button', { name: '확인 후 적용' }));
+    // The drawer is also a dialog, so look for the modal by its confirm button.
+    await user.click(await screen.findByRole('button', { name: '확인' }));
     expect(await screen.findByText('사유를 입력해 주세요.')).toBeInTheDocument();
   });
 
@@ -73,17 +73,39 @@ describe('challenge screens', () => {
     );
     await user.click(await screen.findByRole('button', { name: '정산 초안 만들기' }));
     const dialog = await screen.findByRole('dialog');
-    await user.type(within(dialog).getByPlaceholderText(/사유/), '정기 정산');
-    await user.click(within(dialog).getByRole('button', { name: '초안 만들기' }));
+    await user.type(within(dialog).getByRole('textbox'), '정기 정산');
+    await user.click(within(dialog).getByRole('button', { name: '확인' }));
     await waitFor(() => expect(screen.getByText('초안')).toBeInTheDocument());
     expect(screen.getAllByText('완주').length).toBeGreaterThan(0);
   });
 
-  it('validates the form before sending', async () => {
+  it('shows the CHALLENGE_NOT_ENDED text when the draft cannot be made yet', async () => {
+    server.use(
+      mswHttp.post('/admin/v1/challenges/:id/settlement-runs', () =>
+        HttpResponse.json(
+          { error: { code: 'CHALLENGE_NOT_ENDED', message: '아직 정산할 수 없어요.' } },
+          { status: 409 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt(
+      '/challenges/c0000000-0000-4000-8000-000000000001/settlement',
+      '/challenges/:challengeId/settlement',
+      <ChallengeSettlementPage />,
+    );
+    await user.click(await screen.findByRole('button', { name: '정산 초안 만들기' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox'), '정기 정산');
+    await user.click(within(dialog).getByRole('button', { name: '확인' }));
+    expect(await within(dialog).findByText('아직 정산할 수 없어요.')).toBeInTheDocument();
+  });
+
+  it('validates the form before the confirm modal opens', async () => {
     const user = userEvent.setup();
     renderAt('/challenges/new', '/challenges/new', <ChallengeFormPage />);
     await user.click(await screen.findByRole('button', { name: '저장' }));
     expect(await screen.findByText('제목을 입력해 주세요.')).toBeInTheDocument();
-    expect(screen.getByText('사유를 입력해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

@@ -1,28 +1,21 @@
 // ADM-25 Achievement conditions and rewards (append-only versions, badge image upload)
 import { useMemo, useState } from 'react';
-import {
-  Button,
-  Drawer,
-  Form,
-  Image,
-  Input,
-  InputNumber,
-  Select,
-  Table,
-  Tag,
-  Typography,
-} from 'antd';
-import QueryState from '../../../components/QueryState.jsx';
-import ImageUpload from '../components/ImageUpload.jsx';
-import { EffectiveAtItem, ErrorAlert, ReasonItem } from '../components/formBits.jsx';
-import { formatTime, toIso } from '../components/helpers.js';
+import { Button, Drawer, Form, Image, Input, InputNumber, Select, Table, Typography } from 'antd';
+import { DateText } from '../../../components/DateText.jsx';
+import { ImageUploadField } from '../../../components/ImageUploadField.jsx';
+import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
+import { StatePanel } from '../../../components/StatePanel.jsx';
+import { StatusTag } from '../../../components/StatusTag.jsx';
+import { EffectiveAtItem } from '../components/EffectiveAtItem.jsx';
+import { toIso } from '../components/helpers.js';
 import {
   ACHIEVEMENT_CONDITIONS,
+  conditionOptions,
   MAX_POINTS,
-  RARITIES,
+  optionsOf,
   STREAK_TARGET_DAYS,
-  VERSION_STATUS,
 } from '../components/labels.js';
+import { useConfirmedChange } from '../components/useConfirmedChange.jsx';
 import {
   useAchievements,
   useCategories,
@@ -30,8 +23,6 @@ import {
   useCreateAchievementVersion,
 } from '../queries.js';
 import dayjs from 'dayjs';
-
-const options = (labels) => Object.entries(labels).map(([value, label]) => ({ value, label }));
 
 /** Same rules as the server, so the admin sees them next to the field. */
 function conditionError(values) {
@@ -58,7 +49,7 @@ function AchievementDrawer({ target, onClose }) {
   const createAchievement = useCreateAchievement();
   const createVersion = useCreateAchievementVersion();
   const isNew = target.mode === 'create';
-  const mutation = isNew ? createAchievement : createVersion;
+  const [ask, modal] = useConfirmedChange();
   // A new achievement uses an id chosen in advance, so its badge can be uploaded before saving.
   const newOwnerId = useMemo(() => crypto.randomUUID(), []);
   const ownerId = isNew ? newOwnerId : target.achievement.id;
@@ -84,22 +75,29 @@ function AchievementDrawer({ target, onClose }) {
         effectiveAt: dayjs().add(5, 'minute'),
       };
 
-  const onFinish = async ({ effectiveAt, reason, categoryId, ...values }) => {
+  const onFinish = ({ effectiveAt, categoryId, ...values }) => {
     const body = {
       ...values,
       title: values.title.trim(),
       description: values.description.trim(),
       effectiveAt: toIso(effectiveAt),
-      reason: reason.trim(),
       ...(conditionType === 'category_approved_mission_count' ? { categoryId } : {}),
     };
-    try {
-      if (isNew) await createAchievement.mutateAsync({ ...body, code: values.code.trim() });
-      else await createVersion.mutateAsync({ id: ownerId, ...body });
-      onClose();
-    } catch {
-      // the error is shown at the top of the form
-    }
+    ask({
+      title: isNew ? '새 업적을 저장할까요?' : '새 버전을 저장할까요?',
+      summary: `${body.title} · ${ACHIEVEMENT_CONDITIONS[body.conditionType]} ${body.targetCount}`,
+      run: ({ reason, idempotencyKey }) =>
+        isNew
+          ? createAchievement.mutateAsync({
+              payload: { ...body, code: values.code.trim(), reason },
+              idempotencyKey,
+            })
+          : createVersion.mutateAsync({
+              payload: { id: ownerId, ...body, reason },
+              idempotencyKey,
+            }),
+      onDone: onClose,
+    });
   };
 
   return (
@@ -110,14 +108,8 @@ function AchievementDrawer({ target, onClose }) {
       title={isNew ? '새 업적' : `새 버전 · ${target.achievement.code}`}
       destroyOnHidden
     >
-      <ErrorAlert error={mutation.error} />
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={initial}
-        onFinish={onFinish}
-        onValuesChange={() => mutation.reset()}
-      >
+      {modal}
+      <Form form={form} layout="vertical" initialValues={initial} onFinish={onFinish}>
         {isNew && (
           <Form.Item
             name="code"
@@ -154,10 +146,10 @@ function AchievementDrawer({ target, onClose }) {
           <Input.TextArea rows={3} />
         </Form.Item>
         <Form.Item name="rarity" label="희귀도">
-          <Select options={options(RARITIES)} />
+          <Select options={optionsOf('achievementRarity')} />
         </Form.Item>
         <Form.Item name="conditionType" label="달성 조건">
-          <Select options={options(ACHIEVEMENT_CONDITIONS)} />
+          <Select options={conditionOptions(ACHIEVEMENT_CONDITIONS)} />
         </Form.Item>
         <Form.Item
           name="targetCount"
@@ -211,23 +203,17 @@ function AchievementDrawer({ target, onClose }) {
           label="배지 이미지"
           rules={[{ required: true, message: '배지 이미지를 올려 주세요.' }]}
         >
-          <ImageUpload assetKind="badge" ownerId={ownerId} previewUrl={current?.badgeImageUrl} />
+          <ImageUploadField assetKind="badge" ownerId={ownerId} />
         </Form.Item>
         <Form.Item
           name="status"
           label="공개 상태"
           extra="공개로 저장하면 과거 활동도 소급해서 평가해요."
         >
-          <Select
-            options={[
-              { value: 'draft', label: VERSION_STATUS.draft },
-              { value: 'public', label: VERSION_STATUS.public },
-            ]}
-          />
+          <Select options={optionsOf('missionDefinitionPublicationStatus', ['draft', 'public'])} />
         </Form.Item>
         <EffectiveAtItem required />
-        <ReasonItem />
-        <Button type="primary" htmlType="submit" loading={mutation.isPending}>
+        <Button type="primary" htmlType="submit">
           저장
         </Button>
       </Form>
@@ -238,7 +224,6 @@ function AchievementDrawer({ target, onClose }) {
 export default function AchievementPolicyPage() {
   const list = useAchievements();
   const [target, setTarget] = useState(null);
-  const items = list.data ?? [];
 
   const versionColumns = [
     { title: '버전', dataIndex: 'versionNo', render: (v) => `v${v}` },
@@ -251,7 +236,16 @@ export default function AchievementPolicyPage() {
       title: '보상',
       render: (_, v) => `${v.rewardPoints}P / 사용자 ${v.rewardUserXp}XP / 펫 ${v.rewardPetXp}XP`,
     },
-    { title: '시행 시각', dataIndex: 'effectiveAt', render: formatTime },
+    {
+      title: '희귀도',
+      dataIndex: 'rarity',
+      render: (value) => <StatusTag kind="achievementRarity" value={value} />,
+    },
+    {
+      title: '시행 시각',
+      dataIndex: 'effectiveAt',
+      render: (value) => <DateText value={value} />,
+    },
   ];
 
   const columns = [
@@ -274,9 +268,7 @@ export default function AchievementPolicyPage() {
     {
       title: '상태',
       dataIndex: 'status',
-      render: (s) => (
-        <Tag color={s === 'public' ? 'green' : undefined}>{VERSION_STATUS[s] ?? s}</Tag>
-      ),
+      render: (value) => <StatusTag kind="missionDefinitionPublicationStatus" value={value} />,
     },
     {
       title: '',
@@ -301,30 +293,31 @@ export default function AchievementPolicyPage() {
           새 업적
         </Button>
       </div>
-      <QueryState
-        loading={list.isLoading}
-        error={list.error}
-        empty={items.length === 0}
-        onRetry={list.refetch}
-      >
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={items}
-          pagination={false}
-          expandable={{
-            expandedRowRender: (row) => (
-              <Table
-                rowKey="versionNo"
-                size="small"
-                pagination={false}
-                columns={versionColumns}
-                dataSource={row.versions}
-              />
-            ),
-          }}
-        />
-      </QueryState>
+      <QueryBoundary query={list}>
+        {(items) =>
+          items.length === 0 ? (
+            <StatePanel type="empty" />
+          ) : (
+            <Table
+              rowKey="id"
+              columns={columns}
+              dataSource={items}
+              pagination={false}
+              expandable={{
+                expandedRowRender: (row) => (
+                  <Table
+                    rowKey="versionNo"
+                    size="small"
+                    pagination={false}
+                    columns={versionColumns}
+                    dataSource={row.versions}
+                  />
+                ),
+              }}
+            />
+          )
+        }
+      </QueryBoundary>
       {target && <AchievementDrawer target={target} onClose={() => setTarget(null)} />}
     </div>
   );

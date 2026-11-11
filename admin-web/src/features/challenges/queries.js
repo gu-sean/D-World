@@ -1,6 +1,4 @@
-import { useRef } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { newIdempotencyKey } from '../../api/idempotency.js';
 import * as api from './api.js';
 
 export const challengeKeys = {
@@ -13,39 +11,6 @@ export const challengeKeys = {
   categories: ['challenges', 'categories'],
   difficulties: ['challenges', 'difficulties'],
 };
-
-/**
- * One Idempotency-Key per user action. The same payload sent again after a failure reuses the
- * key; a different payload, or a success, starts a new action.
- */
-function useActionKey() {
-  const last = useRef(null);
-  return {
-    keyFor(payload) {
-      const fingerprint = JSON.stringify(payload);
-      if (last.current?.fingerprint !== fingerprint) {
-        last.current = { fingerprint, key: newIdempotencyKey() };
-      }
-      return last.current.key;
-    },
-    release() {
-      last.current = null;
-    },
-  };
-}
-
-/** mutation whose function receives the action key as its second argument */
-function useKeyedMutation(fn, onSuccess) {
-  const queryClient = useQueryClient();
-  const action = useActionKey();
-  return useMutation({
-    mutationFn: (vars) => fn(vars, action.keyFor(vars)),
-    onSuccess: (result, vars) => {
-      action.release();
-      return onSuccess?.(queryClient, result, vars);
-    },
-  });
-}
 
 // ---- queries ----
 
@@ -86,64 +51,73 @@ export const useSettlementRun = (runId) =>
     enabled: Boolean(runId),
   });
 
-// ---- mutations (vars are the arguments of the api function, as one object) ----
+// ---- mutations ----
+// The variables always carry `idempotencyKey`: ConfirmActionModal makes one key per user action
+// and reuses it when the same action is tried again after a failure (docs/05 §5.2).
 
 const refreshChallenges = (queryClient) =>
   queryClient.invalidateQueries({ queryKey: challengeKeys.all });
 
-/** M51. vars: `{body}` */
+function useChallengeMutation(mutationFn, onSuccess) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: (result, vars) =>
+      onSuccess?.(queryClient, result, vars) ?? refreshChallenges(queryClient),
+  });
+}
+
+/** M51. vars: `{body, idempotencyKey}` */
 export const useCreateChallenge = () =>
-  useKeyedMutation(({ body }, key) => api.createChallenge(body, key), refreshChallenges);
+  useChallengeMutation(({ body, idempotencyKey }) => api.createChallenge(body, idempotencyKey));
 
-/** M52 field patch. vars: `{id, patch}` */
+/** M52 field patch. vars: `{id, patch, idempotencyKey}` */
 export const useUpdateChallenge = () =>
-  useKeyedMutation(({ id, patch }, key) => api.updateChallenge(id, patch, key), refreshChallenges);
+  useChallengeMutation(({ id, patch, idempotencyKey }) =>
+    api.updateChallenge(id, patch, idempotencyKey),
+  );
 
-/** M52 publish / hide / cancel. vars: `{id, action, reason}` */
+/** M52 publish / hide / cancel. vars: `{id, action, reason, idempotencyKey}` */
 export const useChallengeAction = () =>
-  useKeyedMutation(
-    ({ id, action, reason }, key) => api.changeChallengeStatus(id, { action, reason }, key),
-    refreshChallenges,
+  useChallengeMutation(({ id, action, reason, idempotencyKey }) =>
+    api.changeChallengeStatus(id, { action, reason }, idempotencyKey),
   );
 
-/** M55. vars: `{id, decision, reason}` */
+/** M55. vars: `{id, decision, reason, idempotencyKey}` */
 export const useReviewChallenge = () =>
-  useKeyedMutation(
-    ({ id, decision, reason }, key) => api.reviewChallenge(id, { decision, reason }, key),
-    refreshChallenges,
+  useChallengeMutation(({ id, decision, reason, idempotencyKey }) =>
+    api.reviewChallenge(id, { decision, reason }, idempotencyKey),
   );
 
-/** M61. vars: `{id, participationId, action, dailyMissionId?, reason}` */
+/** M61. vars: `{id, participationId, action, dailyMissionId?, reason, idempotencyKey}` */
 export const useModerate = () =>
-  useKeyedMutation(
-    ({ id, ...body }, key) => api.moderate(id, body, key),
-    (queryClient, _r, vars) =>
+  useChallengeMutation(
+    ({ id, idempotencyKey, ...body }) => api.moderate(id, body, idempotencyKey),
+    (queryClient, _result, vars) =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: challengeKeys.rankings(vars.id) }),
         queryClient.invalidateQueries({ queryKey: ['challenges', 'days', vars.id] }),
       ]),
   );
 
-/** M56. vars: `{id, reason}` */
+/** M56. vars: `{id, reason, idempotencyKey}` */
 export const useCreateSettlementRun = () =>
-  useKeyedMutation(
-    ({ id, reason }, key) => api.createSettlementRun(id, { reason }, key),
+  useChallengeMutation(
+    ({ id, reason, idempotencyKey }) => api.createSettlementRun(id, { reason }, idempotencyKey),
     (queryClient, run) => {
       queryClient.setQueryData(challengeKeys.run(run.id), run);
       return refreshChallenges(queryClient);
     },
   );
 
-/** M58. vars: `{runId, reason}` */
+/** M58. vars: `{runId, reason, idempotencyKey}` */
 export const useConfirmSettlementRun = () =>
-  useKeyedMutation(
-    ({ runId, reason }, key) => api.confirmSettlementRun(runId, { reason }, key),
-    refreshChallenges,
+  useChallengeMutation(({ runId, reason, idempotencyKey }) =>
+    api.confirmSettlementRun(runId, { reason }, idempotencyKey),
   );
 
-/** M59. vars: `{runId, reason}` */
+/** M59. vars: `{runId, reason, idempotencyKey}` */
 export const useRetryPayments = () =>
-  useKeyedMutation(
-    ({ runId, reason }, key) => api.retrySettlementPayments(runId, { reason }, key),
-    refreshChallenges,
+  useChallengeMutation(({ runId, reason, idempotencyKey }) =>
+    api.retrySettlementPayments(runId, { reason }, idempotencyKey),
   );

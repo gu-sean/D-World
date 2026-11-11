@@ -15,7 +15,7 @@ const records = [1, 2, 3].map((n) => ({
   status: 'review_required',
   attemptNo: 1,
   submissionNo: 1,
-  evidenceKind: 'photo',
+  evidenceKind: 'camera_media',
   startedAt: hoursAgo(n + 2),
   submittedAt: hoursAgo(n),
   completedAt: null,
@@ -38,7 +38,18 @@ const records = [1, 2, 3].map((n) => ({
       decision: 'review_required',
       engineVersion: 'vision-1.2',
       confidence: 0.55 + n / 10,
-      metrics: null,
+      metrics: {
+        exerciseCode: 'push_up',
+        repCount: 18,
+        validRepCount: 16,
+        invalidRepCount: 2,
+        accuracy: 0.89,
+        durationSeconds: 42,
+        personDetected: true,
+        mediaSha256: 'ab12cd34ef56',
+        flags: ['low_confidence'],
+        issues: [],
+      },
       reason: '증거가 불명확해요.',
       reviewedByAdminId: null,
       isCurrent: true,
@@ -205,6 +216,9 @@ export const handlers = [
   mswHttp.post(`${BASE}/verification-criteria`, async ({ request }) => {
     await delay(200);
     const body = await request.json();
+    if (!body.rules || typeof body.rules !== 'object' || Array.isArray(body.rules)) {
+      return errorResponse(400, 'CRITERIA_RULES_INVALID', '판정 기준 형식이 맞지 않아요.');
+    }
     const created = {
       id: crypto.randomUUID(),
       categoryId: body.categoryId,

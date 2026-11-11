@@ -1,46 +1,40 @@
-// ADM-16 User-made mission review
+// ADM-16 사용자 미션 검수
 import { useState } from 'react';
-import { Button, Select, Space, Table, Tag, Typography, message } from 'antd';
-import QueryState from '../../../components/QueryState.jsx';
-import confirmWithReason from '../confirmWithReason.jsx';
-import {
-  EXERCISE_OPTIONS,
-  formatDateTime,
-  PAGE_SIZE,
-  STATUS_LABELS,
-  labelOf,
-} from '../constants.js';
+import { Button, message, Space, Typography } from 'antd';
+import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
+import { DataTable } from '../../../components/DataTable.jsx';
+import { DateText } from '../../../components/DateText.jsx';
+import { FilterBar } from '../../../components/FilterBar.jsx';
+import { StatusTag } from '../../../components/StatusTag.jsx';
+import { useListParams } from '../../../components/useListParams.js';
+import { EXERCISE_OPTIONS, labelOf } from '../constants.js';
 import { useDefinitions, useReviewDefinition } from '../queries.js';
 
 const DECISIONS = {
-  approved: { text: '승인', title: '이 미션을 공개할까요?' },
-  rejected: { text: '반려', title: '이 미션을 반려할까요?', danger: true },
-  hidden: { text: '숨김', title: '이 미션을 숨길까요?', danger: true },
+  approved: { text: '승인', title: '미션 공개 승인' },
+  rejected: { text: '반려', title: '미션 반려', danger: true },
+  hidden: { text: '숨김', title: '미션 숨김', danger: true },
 };
 
-export default function UserMissionReviewPage() {
-  const [status, setStatus] = useState('review_pending');
-  const [page, setPage] = useState(1);
-  const params = {
-    origin: 'user',
-    publicationStatus: status,
-    page,
-    size: PAGE_SIZE,
-    sort: 'createdAt,asc',
-  };
-  const { data, isLoading, error, refetch, isFetching } = useDefinitions(params);
-  const review = useReviewDefinition();
+const STATUS_OPTIONS = [
+  { value: 'review_pending', label: '검수 대기' },
+  { value: 'public', label: '공개' },
+  { value: 'rejected', label: '반려' },
+  { value: 'hidden', label: '숨김' },
+];
 
-  const decide = (row, decision) =>
-    confirmWithReason({
-      title: `${row.title}: ${DECISIONS[decision].title}`,
-      okText: DECISIONS[decision].text,
-      danger: DECISIONS[decision].danger,
-      onOk: async (reason, idempotencyKey) => {
-        await review.mutateAsync({ id: row.id, body: { decision, reason }, idempotencyKey });
-        message.success('처리 결과를 저장했습니다.');
-      },
-    });
+const fields = [
+  { name: 'publicationStatus', type: 'select', label: '상태', options: STATUS_OPTIONS },
+];
+
+export default function UserMissionReviewPage() {
+  const [params, setParams] = useListParams({
+    publicationStatus: 'review_pending',
+    sort: 'createdAt,asc', // API default (docs/09)
+  });
+  const query = useDefinitions({ ...params, origin: 'user' });
+  const review = useReviewDefinition();
+  const [target, setTarget] = useState(null); // {row, decision}
 
   const columns = [
     { title: '제목', dataIndex: 'title' },
@@ -51,68 +45,66 @@ export default function UserMissionReviewPage() {
       render: (value) => labelOf(EXERCISE_OPTIONS, value),
     },
     { title: '설명', dataIndex: 'description', ellipsis: true },
-    { title: '제출일', dataIndex: 'submittedAt', render: formatDateTime },
+    {
+      title: '제출 시각',
+      dataIndex: 'submittedAt',
+      key: 'createdAt',
+      sorter: true,
+      render: (value) => <DateText value={value} />,
+    },
     {
       title: '상태',
       dataIndex: 'publicationStatus',
-      render: (value) => <Tag>{STATUS_LABELS[value] ?? value}</Tag>,
+      render: (value) => <StatusTag kind="missionDefinitionPublicationStatus" value={value} />,
     },
     {
       title: '처리',
+      key: 'actions',
       render: (_, row) =>
         row.publicationStatus === 'review_pending' ? (
           <Space>
-            <Button size="small" type="primary" onClick={() => decide(row, 'approved')}>
+            <Button
+              size="small"
+              type="primary"
+              onClick={() => setTarget({ row, decision: 'approved' })}
+            >
               승인
             </Button>
-            <Button size="small" danger onClick={() => decide(row, 'rejected')}>
+            <Button size="small" danger onClick={() => setTarget({ row, decision: 'rejected' })}>
               반려
             </Button>
           </Space>
         ) : row.publicationStatus === 'public' ? (
-          <Button size="small" danger onClick={() => decide(row, 'hidden')}>
+          <Button size="small" danger onClick={() => setTarget({ row, decision: 'hidden' })}>
             숨김
           </Button>
         ) : null,
     },
   ];
 
+  const decision = target ? DECISIONS[target.decision] : null;
+
   return (
     <div>
       <Typography.Title level={4}>사용자 미션 검수</Typography.Title>
-      <Select
-        value={status}
-        style={{ width: 160, marginBottom: 16 }}
-        options={['review_pending', 'public', 'rejected', 'hidden'].map((value) => ({
-          value,
-          label: STATUS_LABELS[value],
-        }))}
-        onChange={(value) => {
-          setPage(1);
-          setStatus(value);
+      <FilterBar fields={fields} value={params} onChange={setParams} />
+      <DataTable query={query} columns={columns} defaultSort="createdAt,asc" />
+      <ConfirmActionModal
+        open={Boolean(target)}
+        title={decision?.title ?? ''}
+        summary={target ? `${target.row.title} · ${decision.text}` : ''}
+        danger={decision?.danger}
+        onSubmit={async ({ reason, idempotencyKey }) => {
+          await review.mutateAsync({
+            id: target.row.id,
+            body: { decision: target.decision, reason },
+            idempotencyKey,
+          });
+          message.success('처리했어요');
+          setTarget(null);
         }}
+        onCancel={() => setTarget(null)}
       />
-      <QueryState
-        loading={isLoading}
-        error={error}
-        onRetry={refetch}
-        empty={data?.items.length === 0}
-        emptyText="검수할 미션이 없습니다."
-      >
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={data?.items}
-          loading={isFetching}
-          pagination={{
-            current: page,
-            pageSize: PAGE_SIZE,
-            total: data?.totalCount,
-            showSizeChanger: false,
-            onChange: setPage,
-          }}
-        />
-      </QueryState>
     </div>
   );
 }

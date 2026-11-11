@@ -1,6 +1,4 @@
-import { useRef } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { newIdempotencyKey } from '../../api/idempotency.js';
 import * as api from './api.js';
 
 export const rewardKeys = {
@@ -16,35 +14,14 @@ export const rewardKeys = {
 };
 
 /**
- * One Idempotency-Key per user action. The same payload sent again after a failure reuses the
- * key; a different payload, or a success, starts a new action.
+ * Mutation for one change. `ConfirmActionModal` makes the Idempotency-Key, so it comes in with the
+ * variables: `mutateAsync({payload, idempotencyKey})`. The menu's queries are invalidated on success.
  */
-function useActionKey() {
-  const last = useRef(null);
-  return {
-    keyFor(payload) {
-      const fingerprint = JSON.stringify(payload);
-      if (last.current?.fingerprint !== fingerprint) {
-        last.current = { fingerprint, key: newIdempotencyKey() };
-      }
-      return last.current.key;
-    },
-    release() {
-      last.current = null;
-    },
-  };
-}
-
-/** mutation whose function receives the action key as its second argument */
-function useKeyedMutation(fn, invalidate) {
+function useChange(fn, invalidate) {
   const queryClient = useQueryClient();
-  const action = useActionKey();
   return useMutation({
-    mutationFn: (vars) => fn(vars, action.keyFor(vars)),
-    onSuccess: () => {
-      action.release();
-      return invalidate ? queryClient.invalidateQueries({ queryKey: invalidate }) : undefined;
-    },
+    mutationFn: ({ payload, idempotencyKey }) => fn(payload, idempotencyKey),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: invalidate }),
   });
 }
 
@@ -83,18 +60,16 @@ export const usePetSpecies = () =>
 
 // ---- mutations ----
 
-export const useAdjustPoints = () =>
-  useKeyedMutation(api.adjustPoints, ['rewards', 'transactions']);
-export const useCreatePointCap = () => useKeyedMutation(api.createPointCap, rewardKeys.caps);
+export const useAdjustPoints = () => useChange(api.adjustPoints, ['rewards', 'transactions']);
+export const useCreatePointCap = () => useChange(api.createPointCap, rewardKeys.caps);
 export const useCreateRewardRate = () =>
-  useKeyedMutation(api.createRewardRate, ['rewards', 'reward-rates']);
+  useChange(api.createRewardRate, ['rewards', 'reward-rates']);
 export const useCreateStreakMilestone = () =>
-  useKeyedMutation(api.createStreakMilestone, rewardKeys.streaks);
-export const useCreatePetLevels = () => useKeyedMutation(api.createPetLevels, rewardKeys.petLevels);
-export const useCreateAchievement = () =>
-  useKeyedMutation(api.createAchievement, rewardKeys.achievements);
+  useChange(api.createStreakMilestone, rewardKeys.streaks);
+export const useCreatePetLevels = () => useChange(api.createPetLevels, rewardKeys.petLevels);
+export const useCreateAchievement = () => useChange(api.createAchievement, rewardKeys.achievements);
 export const useCreateAchievementVersion = () =>
-  useKeyedMutation(api.createAchievementVersion, rewardKeys.achievements);
-export const useCreatePetSpecies = () => useKeyedMutation(api.createPetSpecies, rewardKeys.species);
+  useChange(api.createAchievementVersion, rewardKeys.achievements);
+export const useCreatePetSpecies = () => useChange(api.createPetSpecies, rewardKeys.species);
 export const useCreatePetSpeciesVersion = () =>
-  useKeyedMutation(api.createPetSpeciesVersion, rewardKeys.species);
+  useChange(api.createPetSpeciesVersion, rewardKeys.species);

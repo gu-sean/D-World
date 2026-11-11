@@ -1,33 +1,47 @@
 // ADM-07 Verification queue
-import { useState } from 'react';
-import { Link } from 'react-router';
-import { Card, Select, Space, Statistic, Table, Typography } from 'antd';
-import QueryState from '../../../components/QueryState.jsx';
-import { StatusTag } from '../components/RecordSummary.jsx';
-import { formatDateTime, formatTarget, METHOD_LABEL, RECORD_STATUS } from '../components/format.js';
+import { Link, useNavigate } from 'react-router';
+import { Card, Space, Statistic, Typography } from 'antd';
+import { DataTable } from '../../../components/DataTable.jsx';
+import { DateText } from '../../../components/DateText.jsx';
+import { FilterBar } from '../../../components/FilterBar.jsx';
+import { StatusTag } from '../../../components/StatusTag.jsx';
+import { useListParams } from '../../../components/useListParams.js';
+import { labels } from '../../../constants/labels.js';
+import { formatConfidence, formatTarget, METHOD_LABEL } from '../components/format.js';
 import { useVerifications } from '../queries.js';
 
-const STATUS_OPTIONS = Object.entries(RECORD_STATUS).map(([value, { label }]) => ({
-  value,
-  label,
-}));
-const METHOD_OPTIONS = [
-  { value: undefined, label: '전체 방식' },
-  ...Object.entries(METHOD_LABEL).map(([value, label]) => ({ value, label })),
+const STATUS_VALUES = ['review_required', 'approved', 'rejected', 'submitted'];
+const FIELDS = [
+  {
+    name: 'status',
+    type: 'select',
+    label: '상태',
+    options: STATUS_VALUES.map((value) => ({ value, label: labels.recordStatus[value].text })),
+  },
+  {
+    name: 'method',
+    type: 'select',
+    label: '인증 방식',
+    options: Object.entries(METHOD_LABEL).map(([value, label]) => ({ value, label })),
+  },
 ];
 
 export default function VerificationQueuePage() {
-  const [filters, setFilters] = useState({ status: 'review_required', method: undefined });
-  const [paging, setPaging] = useState({ page: 1, size: 20 });
-  const query = useVerifications({ ...filters, ...paging, sort: 'submittedAt,asc' });
-  const { data } = query;
+  const navigate = useNavigate();
+  // The API default is the oldest request first (docs/09 §5).
+  const [params, setParams] = useListParams({ status: 'review_required', sort: 'submittedAt,asc' });
+  const query = useVerifications(params);
 
   const columns = [
     {
       title: '제출 시각',
       dataIndex: 'submittedAt',
+      key: 'submittedAt',
+      sorter: true,
       render: (value, row) => (
-        <Link to={`/verifications/${row.recordId}`}>{formatDateTime(value)}</Link>
+        <Link to={`/verifications/${row.recordId}`}>
+          <DateText value={value} />
+        </Link>
       ),
     },
     { title: '미션', render: (_, row) => row.mission.title },
@@ -36,68 +50,29 @@ export default function VerificationQueuePage() {
       render: (_, row) => METHOD_LABEL[row.mission.verificationMethod] ?? '-',
     },
     { title: '목표', render: (_, row) => formatTarget(row.mission) },
-    {
-      title: 'AI 신뢰도',
-      render: (_, row) =>
-        row.ai?.confidence == null ? '-' : `${Math.round(row.ai.confidence * 100)}%`,
-    },
+    { title: 'AI 신뢰도', render: (_, row) => formatConfidence(row.ai?.confidence) },
     { title: 'AI 사유', render: (_, row) => row.ai?.reason ?? '-' },
     {
       title: '상태',
       dataIndex: 'status',
-      render: (value) => <StatusTag map={RECORD_STATUS} value={value} />,
+      render: (value) => <StatusTag kind="recordStatus" value={value} />,
     },
   ];
 
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Typography.Title level={3}>검수 대기</Typography.Title>
-      <Space wrap size="large">
-        <Card size="small">
-          <Statistic title="오늘 처리한 판정" value={data?.completedToday ?? 0} suffix="건" />
-        </Card>
-        <Select
-          aria-label="상태"
-          style={{ width: 140 }}
-          value={filters.status}
-          options={STATUS_OPTIONS}
-          onChange={(status) => {
-            setFilters((prev) => ({ ...prev, status }));
-            setPaging((prev) => ({ ...prev, page: 1 }));
-          }}
-        />
-        <Select
-          aria-label="인증 방식"
-          style={{ width: 140 }}
-          value={filters.method}
-          options={METHOD_OPTIONS}
-          onChange={(method) => {
-            setFilters((prev) => ({ ...prev, method }));
-            setPaging((prev) => ({ ...prev, page: 1 }));
-          }}
-        />
-      </Space>
-      <QueryState
-        loading={query.isLoading}
-        error={query.error}
-        empty={data?.items.length === 0}
-        emptyText="검수할 인증이 없습니다."
-        onRetry={query.refetch}
-      >
-        <Table
-          rowKey="recordId"
-          columns={columns}
-          dataSource={data?.items}
-          loading={query.isFetching}
-          scroll={{ x: 'max-content' }}
-          pagination={{
-            current: paging.page,
-            pageSize: paging.size,
-            total: data?.totalCount,
-            onChange: (page, size) => setPaging({ page, size }),
-          }}
-        />
-      </QueryState>
+      <Card size="small" style={{ width: 200 }}>
+        <Statistic title="오늘 처리한 판정" value={query.data?.completedToday ?? 0} suffix="건" />
+      </Card>
+      <FilterBar fields={FIELDS} value={params} onChange={setParams} />
+      <DataTable
+        query={query}
+        rowKey="recordId"
+        columns={columns}
+        defaultSort="submittedAt,asc"
+        onRowClick={(row) => navigate(`/verifications/${row.recordId}`)}
+      />
     </Space>
   );
 }

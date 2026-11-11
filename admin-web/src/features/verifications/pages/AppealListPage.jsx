@@ -1,29 +1,41 @@
 // ADM-09 Appeal list
-import { useState } from 'react';
-import { Link } from 'react-router';
-import { Select, Space, Table, Typography } from 'antd';
-import QueryState from '../../../components/QueryState.jsx';
-import { StatusTag } from '../components/RecordSummary.jsx';
-import { APPEAL_STATUS, DECISION_LABEL, formatDateTime } from '../components/format.js';
+import { Link, useNavigate } from 'react-router';
+import { Space, Typography } from 'antd';
+import { DataTable } from '../../../components/DataTable.jsx';
+import { DateText } from '../../../components/DateText.jsx';
+import { FilterBar } from '../../../components/FilterBar.jsx';
+import { StatusTag } from '../../../components/StatusTag.jsx';
+import { useListParams } from '../../../components/useListParams.js';
+import { labels } from '../../../constants/labels.js';
 import { useAppeals } from '../queries.js';
 
-const STATUS_OPTIONS = Object.entries(APPEAL_STATUS).map(([value, { label }]) => ({
-  value,
-  label,
-}));
+const FIELDS = [
+  {
+    name: 'status',
+    type: 'select',
+    label: '상태',
+    options: Object.entries(labels.verificationAppealStatus).map(([value, { text }]) => ({
+      value,
+      label: text,
+    })),
+  },
+];
 
 export default function AppealListPage() {
-  const [status, setStatus] = useState('open');
-  const [paging, setPaging] = useState({ page: 1, size: 20 });
-  const query = useAppeals({ status, ...paging, sort: 'filedAt,asc' });
-  const { data } = query;
+  const navigate = useNavigate();
+  const [params, setParams] = useListParams({ status: 'open', sort: 'filedAt,asc' });
+  const query = useAppeals(params);
 
   const columns = [
     {
       title: '접수 시각',
       dataIndex: 'filedAt',
+      key: 'filedAt',
+      sorter: true,
       render: (value, row) => (
-        <Link to={`/verifications/appeals/${row.id}`}>{formatDateTime(value)}</Link>
+        <Link to={`/verifications/appeals/${row.id}`}>
+          <DateText value={value} />
+        </Link>
       ),
     },
     { title: '사용자', render: (_, row) => row.nickname ?? row.userId },
@@ -31,51 +43,27 @@ export default function AppealListPage() {
     {
       title: '기존 판정',
       dataIndex: 'originalDecision',
-      render: (value) => DECISION_LABEL[value] ?? value ?? '-',
+      render: (value) => (value ? <StatusTag kind="decision" value={value} /> : '-'),
     },
     { title: '이의 사유', dataIndex: 'reason', ellipsis: true },
     {
       title: '상태',
       dataIndex: 'status',
-      render: (value) => <StatusTag map={APPEAL_STATUS} value={value} />,
+      render: (value) => <StatusTag kind="verificationAppealStatus" value={value} />,
     },
-    { title: '처리 시각', dataIndex: 'resolvedAt', render: formatDateTime },
+    { title: '처리 시각', dataIndex: 'resolvedAt', render: (value) => <DateText value={value} /> },
   ];
 
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Typography.Title level={3}>이의 신청</Typography.Title>
-      <Select
-        aria-label="상태"
-        style={{ width: 140 }}
-        value={status}
-        options={STATUS_OPTIONS}
-        onChange={(next) => {
-          setStatus(next);
-          setPaging((prev) => ({ ...prev, page: 1 }));
-        }}
+      <FilterBar fields={FIELDS} value={params} onChange={setParams} />
+      <DataTable
+        query={query}
+        columns={columns}
+        defaultSort="filedAt,asc"
+        onRowClick={(row) => navigate(`/verifications/appeals/${row.id}`)}
       />
-      <QueryState
-        loading={query.isLoading}
-        error={query.error}
-        empty={data?.items.length === 0}
-        emptyText="처리할 이의 신청이 없습니다."
-        onRetry={query.refetch}
-      >
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={data?.items}
-          loading={query.isFetching}
-          scroll={{ x: 'max-content' }}
-          pagination={{
-            current: paging.page,
-            pageSize: paging.size,
-            total: data?.totalCount,
-            onChange: (page, size) => setPaging({ page, size }),
-          }}
-        />
-      </QueryState>
     </Space>
   );
 }

@@ -15,16 +15,21 @@ import {
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
-import QueryState from '../../../components/QueryState.jsx';
-import ImageUpload from '../components/ImageUpload.jsx';
-import { EffectiveAtItem, ErrorAlert, ReasonItem } from '../components/formBits.jsx';
-import { formatTime, pickCurrent, toIso } from '../components/helpers.js';
+import { DateText } from '../../../components/DateText.jsx';
+import { ImageUploadField } from '../../../components/ImageUploadField.jsx';
+import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
+import { StatePanel } from '../../../components/StatePanel.jsx';
+import { StatusTag } from '../../../components/StatusTag.jsx';
+import { EffectiveAtItem } from '../components/EffectiveAtItem.jsx';
+import { pickCurrent, toIso } from '../components/helpers.js';
 import {
-  STAGE_NAMES,
+  conditionOptions,
+  optionsOf,
+  stageText,
   STREAK_TARGET_DAYS,
   UNLOCK_CONDITIONS,
-  VERSION_STATUS,
 } from '../components/labels.js';
+import { useConfirmedChange } from '../components/useConfirmedChange.jsx';
 import {
   useAchievements,
   useCategories,
@@ -35,7 +40,6 @@ import {
   usePetSpecies,
 } from '../queries.js';
 
-const options = (labels) => Object.entries(labels).map(([value, label]) => ({ value, label }));
 const compact = (obj) =>
   Object.fromEntries(
     Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== ''),
@@ -62,7 +66,7 @@ function SpeciesDrawer({ target, onClose }) {
   const createSpecies = useCreatePetSpecies();
   const createVersion = useCreatePetSpeciesVersion();
   const isNew = target.mode === 'create';
-  const mutation = isNew ? createSpecies : createVersion;
+  const [ask, modal] = useConfirmedChange();
   const newOwnerId = useMemo(() => crypto.randomUUID(), []);
   const ownerId = isNew ? newOwnerId : target.species.id;
   const current = target.species?.versions.find(
@@ -89,7 +93,7 @@ function SpeciesDrawer({ target, onClose }) {
         effectiveAt: dayjs().add(5, 'minute'),
       };
 
-  const onFinish = async ({ effectiveAt, reason, code, ...values }) => {
+  const onFinish = ({ effectiveAt, code, ...values }) => {
     const needs = {
       count: [
         'approved_mission_count',
@@ -112,7 +116,6 @@ function SpeciesDrawer({ target, onClose }) {
       hatchMissionCount: values.hatchMissionCount,
       status: values.status,
       effectiveAt: toIso(effectiveAt),
-      reason: reason.trim(),
     });
     body.stages = values.stages.map(({ stageNo, minTotalXp, bonusBasisPoints, imageAssetId }) => ({
       stageNo,
@@ -120,13 +123,21 @@ function SpeciesDrawer({ target, onClose }) {
       bonusBasisPoints,
       imageAssetId,
     }));
-    try {
-      if (isNew) await createSpecies.mutateAsync({ ...body, code: code.trim() });
-      else await createVersion.mutateAsync({ id: ownerId, ...body });
-      onClose();
-    } catch {
-      // the error is shown at the top of the form
-    }
+    ask({
+      title: isNew ? '새 펫 종류를 저장할까요?' : '새 버전을 저장할까요?',
+      summary: `${body.name} · 해금 조건 ${UNLOCK_CONDITIONS[body.unlockConditionType]}`,
+      run: ({ reason, idempotencyKey }) =>
+        isNew
+          ? createSpecies.mutateAsync({
+              payload: { ...body, code: code.trim(), reason },
+              idempotencyKey,
+            })
+          : createVersion.mutateAsync({
+              payload: { id: ownerId, ...body, reason },
+              idempotencyKey,
+            }),
+      onDone: onClose,
+    });
   };
 
   const categoryOptions = (categories.data ?? []).map((c) => ({ value: c.id, label: c.name }));
@@ -139,14 +150,8 @@ function SpeciesDrawer({ target, onClose }) {
       title={isNew ? '새 펫 종류' : `새 버전 · ${target.species.code}`}
       destroyOnHidden
     >
-      <ErrorAlert error={mutation.error} />
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={initial}
-        onFinish={onFinish}
-        onValuesChange={() => mutation.reset()}
-      >
+      {modal}
+      <Form form={form} layout="vertical" initialValues={initial} onFinish={onFinish}>
         {isNew && (
           <Form.Item
             name="code"
@@ -189,7 +194,7 @@ function SpeciesDrawer({ target, onClose }) {
           <Select options={categoryOptions} />
         </Form.Item>
         <Form.Item name="unlockConditionType" label="해금 조건">
-          <Select options={options(UNLOCK_CONDITIONS)} />
+          <Select options={conditionOptions(UNLOCK_CONDITIONS)} />
         </Form.Item>
         {['approved_mission_count', 'category_approved_mission_count', 'streak_milestone'].includes(
           unlockType,
@@ -257,7 +262,7 @@ function SpeciesDrawer({ target, onClose }) {
               <Card
                 key={field.key}
                 size="small"
-                title={`${index + 1}단계 · ${STAGE_NAMES[index + 1]}`}
+                title={`${index + 1}단계 · ${stageText(index + 1)}`}
                 style={{ marginBottom: 12 }}
               >
                 <Form.Item name={[field.name, 'stageNo']} hidden>
@@ -283,11 +288,7 @@ function SpeciesDrawer({ target, onClose }) {
                   label="이미지"
                   rules={[{ required: true, message: '이미지를 올려 주세요.' }]}
                 >
-                  <ImageUpload
-                    assetKind="pet_stage"
-                    ownerId={ownerId}
-                    previewUrl={current?.stages?.[index]?.imageUrl}
-                  />
+                  <ImageUploadField assetKind="pet_stage" ownerId={ownerId} />
                 </Form.Item>
               </Card>
             ))
@@ -295,16 +296,10 @@ function SpeciesDrawer({ target, onClose }) {
         </Form.List>
 
         <Form.Item name="status" label="공개 상태">
-          <Select
-            options={[
-              { value: 'draft', label: VERSION_STATUS.draft },
-              { value: 'public', label: VERSION_STATUS.public },
-            ]}
-          />
+          <Select options={optionsOf('missionDefinitionPublicationStatus', ['draft', 'public'])} />
         </Form.Item>
         <EffectiveAtItem required />
-        <ReasonItem />
-        <Button type="primary" htmlType="submit" loading={mutation.isPending}>
+        <Button type="primary" htmlType="submit">
           저장
         </Button>
       </Form>
@@ -315,7 +310,6 @@ function SpeciesDrawer({ target, onClose }) {
 function SpeciesTab() {
   const list = usePetSpecies();
   const [target, setTarget] = useState(null);
-  const items = list.data ?? [];
 
   const versionColumns = [
     { title: '버전', dataIndex: 'versionNo', render: (v) => `v${v}` },
@@ -334,7 +328,11 @@ function SpeciesTab() {
         </Image.PreviewGroup>
       ),
     },
-    { title: '시행 시각', dataIndex: 'effectiveAt', render: formatTime },
+    {
+      title: '시행 시각',
+      dataIndex: 'effectiveAt',
+      render: (value) => <DateText value={value} />,
+    },
   ];
 
   return (
@@ -344,60 +342,62 @@ function SpeciesTab() {
           새 펫 종류
         </Button>
       </div>
-      <QueryState
-        loading={list.isLoading}
-        error={list.error}
-        empty={items.length === 0}
-        onRetry={list.refetch}
-      >
-        <Table
-          rowKey="id"
-          pagination={false}
-          dataSource={items}
-          expandable={{
-            expandedRowRender: (row) => (
-              <Table
-                rowKey="versionNo"
-                size="small"
-                pagination={false}
-                columns={versionColumns}
-                dataSource={row.versions}
-              />
-            ),
-          }}
-          columns={[
-            { title: '코드', dataIndex: 'code' },
-            {
-              title: '현재 이름',
-              render: (_, row) =>
-                row.versions.find((v) => v.versionNo === row.currentVersionNo)?.name ?? '(시행 전)',
-            },
-            {
-              title: '현재 버전',
-              dataIndex: 'currentVersionNo',
-              render: (v) => (v ? `v${v}` : '-'),
-            },
-            {
-              title: '상태',
-              dataIndex: 'status',
-              render: (s) => (
-                <Tag color={s === 'public' ? 'green' : undefined}>{VERSION_STATUS[s] ?? s}</Tag>
-              ),
-            },
-            {
-              title: '',
-              render: (_, row) => (
-                <Button
-                  disabled={row.status === 'hidden'}
-                  onClick={() => setTarget({ mode: 'version', species: row })}
-                >
-                  새 버전
-                </Button>
-              ),
-            },
-          ]}
-        />
-      </QueryState>
+      <QueryBoundary query={list}>
+        {(items) =>
+          items.length === 0 ? (
+            <StatePanel type="empty" />
+          ) : (
+            <Table
+              rowKey="id"
+              pagination={false}
+              dataSource={items}
+              expandable={{
+                expandedRowRender: (row) => (
+                  <Table
+                    rowKey="versionNo"
+                    size="small"
+                    pagination={false}
+                    columns={versionColumns}
+                    dataSource={row.versions}
+                  />
+                ),
+              }}
+              columns={[
+                { title: '코드', dataIndex: 'code' },
+                {
+                  title: '현재 이름',
+                  render: (_, row) =>
+                    row.versions.find((v) => v.versionNo === row.currentVersionNo)?.name ??
+                    '(시행 전)',
+                },
+                {
+                  title: '현재 버전',
+                  dataIndex: 'currentVersionNo',
+                  render: (v) => (v ? `v${v}` : '-'),
+                },
+                {
+                  title: '상태',
+                  dataIndex: 'status',
+                  render: (value) => (
+                    <StatusTag kind="missionDefinitionPublicationStatus" value={value} />
+                  ),
+                },
+                {
+                  title: '',
+                  render: (_, row) => (
+                    <Button
+                      disabled={row.status === 'hidden'}
+                      onClick={() => setTarget({ mode: 'version', species: row })}
+                    >
+                      새 버전
+                    </Button>
+                  ),
+                },
+              ]}
+            />
+          )
+        }
+      </QueryBoundary>
       {target && <SpeciesDrawer target={target} onClose={() => setTarget(null)} />}
     </>
   );
@@ -407,60 +407,69 @@ function LevelsTab() {
   const [form] = Form.useForm();
   const list = usePetLevels();
   const create = useCreatePetLevels();
-  const items = list.data?.items ?? [];
-  const current = pickCurrent(items);
+  const [ask, modal] = useConfirmedChange();
 
-  const onFinish = async ({ thresholds, effectiveAt }) => {
-    try {
-      await create.mutateAsync({ thresholds, effectiveAt: toIso(effectiveAt) });
-      form.resetFields();
-    } catch {
-      // shown above the form
-    }
-  };
+  // POST /policies/pet-levels has no `reason` field: the modal only asks for confirmation and
+  // makes the Idempotency-Key, so the reason typed there is not sent.
+  const onFinish = ({ thresholds, effectiveAt }) =>
+    ask({
+      title: '새 레벨 기준을 저장할까요?',
+      summary: `${thresholds.length}개 레벨 기준`,
+      run: ({ idempotencyKey }) =>
+        create.mutateAsync({
+          payload: { thresholds, effectiveAt: toIso(effectiveAt) },
+          idempotencyKey,
+        }),
+      onDone: () => form.resetFields(),
+    });
 
   return (
     <>
-      <QueryState
-        loading={list.isLoading}
-        error={list.error}
-        empty={items.length === 0}
-        onRetry={list.refetch}
-      >
-        <Table
-          rowKey="id"
-          pagination={false}
-          dataSource={items}
-          columns={[
-            { title: '버전', dataIndex: 'versionNo', render: (v) => `v${v}` },
-            { title: '시행 시각', dataIndex: 'effectiveAt', render: formatTime },
-            {
-              title: '레벨별 필요 XP',
-              dataIndex: 'thresholds',
-              render: (t) =>
-                t
-                  .map((x) => `Lv${x.levelNo}: ${Number(x.minTotalXp).toLocaleString()}`)
-                  .join(' · '),
-            },
-            {
-              title: '상태',
-              render: (_, row) =>
-                row.id === current?.id ? <Tag color="green">적용 중</Tag> : <Tag>이력</Tag>,
-            },
-          ]}
-        />
-      </QueryState>
+      {modal}
+      <QueryBoundary query={list}>
+        {({ items }) => {
+          const current = pickCurrent(items);
+          return items.length === 0 ? (
+            <StatePanel type="empty" />
+          ) : (
+            <Table
+              rowKey="id"
+              pagination={false}
+              dataSource={items}
+              columns={[
+                { title: '버전', dataIndex: 'versionNo', render: (v) => `v${v}` },
+                {
+                  title: '시행 시각',
+                  dataIndex: 'effectiveAt',
+                  render: (value) => <DateText value={value} />,
+                },
+                {
+                  title: '레벨별 필요 XP',
+                  dataIndex: 'thresholds',
+                  render: (t) =>
+                    t
+                      .map((x) => `Lv${x.levelNo}: ${Number(x.minTotalXp).toLocaleString()}`)
+                      .join(' · '),
+                },
+                {
+                  title: '상태',
+                  render: (_, row) =>
+                    row.id === current?.id ? <Tag color="green">적용 중</Tag> : <Tag>이력</Tag>,
+                },
+              ]}
+            />
+          );
+        }}
+      </QueryBoundary>
       <Typography.Title level={5} style={{ marginTop: 24 }}>
         새 레벨 기준 추가
       </Typography.Title>
-      <ErrorAlert error={create.error} />
       <Form
         form={form}
         layout="vertical"
         initialValues={{ thresholds: [{ levelNo: 1, minTotalXp: 0 }] }}
         style={{ maxWidth: 480 }}
         onFinish={onFinish}
-        onValuesChange={() => create.reset()}
       >
         <Form.List name="thresholds">
           {(fields, { add, remove }) => (
@@ -497,7 +506,7 @@ function LevelsTab() {
           )}
         </Form.List>
         <EffectiveAtItem />
-        <Button type="primary" htmlType="submit" loading={create.isPending}>
+        <Button type="primary" htmlType="submit">
           새 버전 저장
         </Button>
       </Form>
