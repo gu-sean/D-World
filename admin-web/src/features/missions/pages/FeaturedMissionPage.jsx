@@ -2,7 +2,7 @@
 // ASSUMPTION: the featured-missions API is a proposal (see api.js); no backend endpoint yet.
 import { useState } from 'react';
 import { Alert, Button, Select, Space, Table, Typography, message } from 'antd';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import confirmWithReason from '../confirmWithReason.jsx';
 import { useAddFeatured, useDefinitions, useFeatured, useRemoveFeatured } from '../queries.js';
 
@@ -68,7 +68,7 @@ export default function FeaturedMissionPage() {
           추천으로 선정
         </Button>
       </Space>
-      <StatePanel
+      <QueryState
         loading={isLoading}
         error={error}
         onRetry={refetch}
@@ -93,7 +93,7 @@ export default function FeaturedMissionPage() {
             },
           ]}
         />
-      </StatePanel>
+      </QueryState>
     </div>
   );
 }

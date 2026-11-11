@@ -12,7 +12,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import ImageUpload from '../components/ImageUpload.jsx';
 import { EffectiveAtItem, ErrorAlert, ReasonItem } from '../components/formBits.jsx';
 import { formatTime, toIso } from '../components/helpers.js';
@@ -301,7 +301,7 @@ export default function AchievementPolicyPage() {
           새 업적
         </Button>
       </div>
-      <StatePanel
+      <QueryState
         loading={list.isLoading}
         error={list.error}
         empty={items.length === 0}
@@ -324,7 +324,7 @@ export default function AchievementPolicyPage() {
             ),
           }}
         />
-      </StatePanel>
+      </QueryState>
       {target && <AchievementDrawer target={target} onClose={() => setTarget(null)} />}
     </div>
   );

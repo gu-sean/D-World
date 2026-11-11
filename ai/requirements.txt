@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic>=2
+pydantic-settings
+httpx
+boto3
+mediapipe
+numpy
+Pillow
+google-genai
+tzdata

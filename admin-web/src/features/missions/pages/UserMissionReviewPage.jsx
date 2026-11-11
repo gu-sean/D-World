@@ -1,7 +1,7 @@
 // ADM-16 User-made mission review
 import { useState } from 'react';
 import { Button, Select, Space, Table, Tag, Typography, message } from 'antd';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import confirmWithReason from '../confirmWithReason.jsx';
 import {
   EXERCISE_OPTIONS,
@@ -92,7 +92,7 @@ export default function UserMissionReviewPage() {
           setStatus(value);
         }}
       />
-      <StatePanel
+      <QueryState
         loading={isLoading}
         error={error}
         onRetry={refetch}
@@ -112,7 +112,7 @@ export default function UserMissionReviewPage() {
             onChange: setPage,
           }}
         />
-      </StatePanel>
+      </QueryState>
     </div>
   );
 }

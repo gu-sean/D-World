@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { App, Button, Drawer, Space, Table, Tag, Typography } from 'antd';
 import { useParams } from 'react-router';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import { confirmWithReason } from '../confirmWithReason.jsx';
 import { DAY_STATUS, label } from '../labels.js';
 import { useChallenge, useModerate, useParticipantDays, useRankings } from '../queries.js';
@@ -112,7 +112,7 @@ export default function ChallengeRankingReviewPage() {
           {settled && ' · 정산이 확정되어 정정은 정정 정산으로 처리해야 해요.'}
         </Typography.Text>
       )}
-      <StatePanel
+      <QueryState
         loading={rankings.isLoading}
         error={rankings.error}
         onRetry={rankings.refetch}
@@ -130,7 +130,7 @@ export default function ChallengeRankingReviewPage() {
             계산 시각: {rankings.data.ranking.calculatedAt}
           </Typography.Text>
         )}
-      </StatePanel>
+      </QueryState>
       <Drawer
         open={Boolean(selected)}
         width={520}
@@ -142,7 +142,7 @@ export default function ChallengeRankingReviewPage() {
           </Button>
         }
       >
-        <StatePanel
+        <QueryState
           loading={days.isLoading}
           error={days.error}
           onRetry={days.refetch}
@@ -156,7 +156,7 @@ export default function ChallengeRankingReviewPage() {
             pagination={false}
             size="small"
           />
-        </StatePanel>
+        </QueryState>
       </Drawer>
     </Space>
   );

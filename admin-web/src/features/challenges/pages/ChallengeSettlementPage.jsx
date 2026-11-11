@@ -1,7 +1,7 @@
 // ADM-20 Challenge settlement and rewards
 import { App, Alert, Button, Descriptions, Space, Table, Tag, Typography } from 'antd';
 import { useParams, useSearchParams } from 'react-router';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import { confirmWithReason } from '../confirmWithReason.jsx';
 import {
   BLOCKER_LABEL,
@@ -94,7 +94,7 @@ export default function ChallengeSettlementPage() {
       <Typography.Title level={4} style={{ margin: 0 }}>
         챌린지 정산과 보상
       </Typography.Title>
-      <StatePanel loading={challenge.isLoading} error={challenge.error} onRetry={challenge.refetch}>
+      <QueryState loading={challenge.isLoading} error={challenge.error} onRetry={challenge.refetch}>
         {challenge.data && (
           <Descriptions bordered size="small" column={2}>
             <Descriptions.Item label="챌린지">{challenge.data.title}</Descriptions.Item>
@@ -107,7 +107,7 @@ export default function ChallengeSettlementPage() {
             <Descriptions.Item label="참가자">{challenge.data.participantCount}</Descriptions.Item>
           </Descriptions>
         )}
-      </StatePanel>
+      </QueryState>
 
       <Space>
         <Button type="primary" onClick={startDraft} loading={createRun.isPending}>
@@ -127,7 +127,7 @@ export default function ChallengeSettlementPage() {
       )}
 
       {runId && (
-        <StatePanel loading={run.isLoading} error={run.error} onRetry={run.refetch}>
+        <QueryState loading={run.isLoading} error={run.error} onRetry={run.refetch}>
           {run.data && (
             <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
               <Descriptions size="small" column={3}>
@@ -165,7 +165,7 @@ export default function ChallengeSettlementPage() {
                   }
                 />
               )}
-              <StatePanel
+              <QueryState
                 empty={run.data.entries.length === 0}
                 emptyText="정산 대상 참가자가 없습니다."
               >
@@ -176,10 +176,10 @@ export default function ChallengeSettlementPage() {
                   pagination={false}
                   scroll={{ x: true }}
                 />
-              </StatePanel>
+              </QueryState>
             </Space>
           )}
-        </StatePanel>
+        </QueryState>
       )}
     </Space>
   );

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button, DatePicker, Form, Input, Select, Space, Statistic, Table, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { Link } from 'react-router';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import {} from '../components/formBits.jsx';
 import { formatTime } from '../components/helpers.js';
 import { SOURCE_TYPES, TRANSACTION_KINDS } from '../components/labels.js';
@@ -116,7 +116,7 @@ export default function PointTransactionListPage() {
         </Button>
       </Form>
 
-      <StatePanel
+      <QueryState
         loading={query.isLoading}
         error={query.error}
         empty={data?.items.length === 0}
@@ -146,7 +146,7 @@ export default function PointTransactionListPage() {
             />
           </>
         )}
-      </StatePanel>
+      </QueryState>
     </div>
   );
 }

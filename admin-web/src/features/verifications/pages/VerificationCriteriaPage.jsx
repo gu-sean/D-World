@@ -14,7 +14,7 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import { newIdempotencyKey } from '../../../api/idempotency.js';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import { formatDateTime, METHOD_LABEL, reasonRules } from '../components/format.js';
 import { useCategories, useCreateCriteria, useCriteria } from '../queries.js';
 
@@ -105,7 +105,7 @@ export default function VerificationCriteriaPage() {
           새 버전 추가
         </Button>
       </Space>
-      <StatePanel
+      <QueryState
         loading={criteria.isLoading}
         error={criteria.error}
         empty={criteria.data?.length === 0}
@@ -119,7 +119,7 @@ export default function VerificationCriteriaPage() {
           pagination={false}
           scroll={{ x: 'max-content' }}
         />
-      </StatePanel>
+      </QueryState>
       <Modal
         title="판정 기준 새 버전"
         open={open}

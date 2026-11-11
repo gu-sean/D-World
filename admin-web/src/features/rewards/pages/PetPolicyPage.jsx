@@ -15,7 +15,7 @@ import {
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import ImageUpload from '../components/ImageUpload.jsx';
 import { EffectiveAtItem, ErrorAlert, ReasonItem } from '../components/formBits.jsx';
 import { formatTime, pickCurrent, toIso } from '../components/helpers.js';
@@ -344,7 +344,7 @@ function SpeciesTab() {
           새 펫 종류
         </Button>
       </div>
-      <StatePanel
+      <QueryState
         loading={list.isLoading}
         error={list.error}
         empty={items.length === 0}
@@ -397,7 +397,7 @@ function SpeciesTab() {
             },
           ]}
         />
-      </StatePanel>
+      </QueryState>
       {target && <SpeciesDrawer target={target} onClose={() => setTarget(null)} />}
     </>
   );
@@ -421,7 +421,7 @@ function LevelsTab() {
 
   return (
     <>
-      <StatePanel
+      <QueryState
         loading={list.isLoading}
         error={list.error}
         empty={items.length === 0}
@@ -449,7 +449,7 @@ function LevelsTab() {
             },
           ]}
         />
-      </StatePanel>
+      </QueryState>
       <Typography.Title level={5} style={{ marginTop: 24 }}>
         새 레벨 기준 추가
       </Typography.Title>

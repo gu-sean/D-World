@@ -1,0 +1,55 @@
+# backend/ 변경 시 lint · 단위 · e2e(PostgreSQL 16) 실행
+name: backend
+
+on:
+  pull_request:
+    paths: ['backend/**', 'db/**', '.github/workflows/backend.yml']
+  push:
+    branches: [develop, backend]
+    paths: ['backend/**', 'db/**', '.github/workflows/backend.yml']
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dworld
+          POSTGRES_PASSWORD: dworld
+          POSTGRES_DB: d_world_test
+          TZ: Asia/Seoul
+          PGTZ: Asia/Seoul
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U dworld -d d_world_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgres://dworld:dworld@localhost:5432/d_world_test
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: 테스트 DB 마이그레이션
+        run: npm run db:reset -- --db d_world_test
+      - run: npm run test:e2e

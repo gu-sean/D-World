@@ -3,7 +3,7 @@ import { useEffect, useMemo } from 'react';
 import { App, Button, DatePicker, Form, Input, InputNumber, Select, Space, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import { EXERCISE, VERIFICATION_METHOD } from '../labels.js';
 import {
   useCategories,
@@ -111,7 +111,7 @@ export default function ChallengeFormPage() {
   };
 
   return (
-    <StatePanel loading={loading} error={loadError}>
+    <QueryState loading={loading} error={loadError}>
       <Typography.Title level={4}>
         {isEdit ? '공식 챌린지 수정' : '공식 챌린지 등록'}
       </Typography.Title>
@@ -284,6 +284,6 @@ export default function ChallengeFormPage() {
           </Button>
         </Space>
       </Form>
-    </StatePanel>
+    </QueryState>
   );
 }

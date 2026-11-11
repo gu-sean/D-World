@@ -1,7 +1,7 @@
 // ADM-09 Appeal review: accept (change the decision) or dismiss (keep it)
 import { Link, useNavigate, useParams } from 'react-router';
 import { Card, Descriptions, Space, Typography } from 'antd';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import DecisionForm from '../components/DecisionForm.jsx';
 import RecordSummary, { StatusTag } from '../components/RecordSummary.jsx';
 import { APPEAL_STATUS, DECISION_LABEL, formatDateTime } from '../components/format.js';
@@ -21,7 +21,7 @@ export default function AppealReviewPage() {
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Typography.Title level={3}>이의 신청 검토</Typography.Title>
       <Link to="/verifications/appeals">← 이의 신청 목록</Link>
-      <StatePanel loading={query.isLoading} error={query.error} onRetry={query.refetch}>
+      <QueryState loading={query.isLoading} error={query.error} onRetry={query.refetch}>
         {appeal && (
           <>
             <Descriptions title="이의 신청" bordered size="small" column={2}>
@@ -66,7 +66,7 @@ export default function AppealReviewPage() {
             )}
           </>
         )}
-      </StatePanel>
+      </QueryState>
     </Space>
   );
 }

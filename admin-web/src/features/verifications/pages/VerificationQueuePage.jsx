@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Card, Select, Space, Statistic, Table, Typography } from 'antd';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import { StatusTag } from '../components/RecordSummary.jsx';
 import { formatDateTime, formatTarget, METHOD_LABEL, RECORD_STATUS } from '../components/format.js';
 import { useVerifications } from '../queries.js';
@@ -77,7 +77,7 @@ export default function VerificationQueuePage() {
           }}
         />
       </Space>
-      <StatePanel
+      <QueryState
         loading={query.isLoading}
         error={query.error}
         empty={data?.items.length === 0}
@@ -97,7 +97,7 @@ export default function VerificationQueuePage() {
             onChange: (page, size) => setPaging({ page, size }),
           }}
         />
-      </StatePanel>
+      </QueryState>
     </Space>
   );
 }

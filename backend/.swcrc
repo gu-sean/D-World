@@ -1,0 +1,11 @@
+{
+  "$schema": "https://swc.rs/schema.json",
+  "jsc": {
+    "parser": { "syntax": "ecmascript", "decorators": true, "decoratorsBeforeExport": true },
+    "transform": { "legacyDecorator": true, "decoratorMetadata": false },
+    "target": "es2023",
+    "keepClassNames": true
+  },
+  "module": { "type": "es6" },
+  "sourceMaps": true
+}

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Button, Input, Select, Space, Table, Tag, Typography } from 'antd';
 import { Link } from 'react-router';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import {
   EXERCISE_OPTIONS,
   formatDateTime,
@@ -90,7 +90,7 @@ export default function MissionDefinitionListPage() {
           onChange={(value) => setFilter('categoryId', value)}
         />
       </Space>
-      <StatePanel
+      <QueryState
         loading={isLoading}
         error={error}
         onRetry={refetch}
@@ -109,7 +109,7 @@ export default function MissionDefinitionListPage() {
             onChange: setPage,
           }}
         />
-      </StatePanel>
+      </QueryState>
     </div>
   );
 }

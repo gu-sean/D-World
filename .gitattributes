@@ -1,0 +1,6 @@
+# 줄바꿈은 저장소 전체 LF로 고정 (마이그레이션 체크섬이 PC마다 같도록)
+* text=auto eol=lf
+*.sql text eol=lf
+*.sh  text eol=lf
+*.md  text eol=lf
+*.png binary

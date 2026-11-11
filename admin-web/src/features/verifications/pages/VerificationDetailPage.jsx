@@ -1,7 +1,7 @@
 // ADM-08 Verification detail and decision
 import { Link, useNavigate, useParams } from 'react-router';
 import { Card, Space, Typography } from 'antd';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import DecisionForm from '../components/DecisionForm.jsx';
 import RecordSummary from '../components/RecordSummary.jsx';
 import { useDecideVerification, useVerification } from '../queries.js';
@@ -19,7 +19,7 @@ export default function VerificationDetailPage() {
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Typography.Title level={3}>인증 상세 검토</Typography.Title>
       <Link to="/verifications">← 검수 대기 목록</Link>
-      <StatePanel loading={query.isLoading} error={query.error} onRetry={query.refetch}>
+      <QueryState loading={query.isLoading} error={query.error} onRetry={query.refetch}>
         {record && (
           <>
             <RecordSummary record={record} />
@@ -45,7 +45,7 @@ export default function VerificationDetailPage() {
             )}
           </>
         )}
-      </StatePanel>
+      </QueryState>
     </Space>
   );
 }

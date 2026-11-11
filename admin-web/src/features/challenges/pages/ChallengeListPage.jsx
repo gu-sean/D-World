@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
 import { App, Button, Dropdown, Select, Space, Table, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import { confirmWithReason } from '../confirmWithReason.jsx';
 import { label, ORIGIN, PHASE, PUBLICATION_STATUS, SETTLEMENT_STATUS } from '../labels.js';
 import { useChallengeAction, useChallenges, useReviewChallenge } from '../queries.js';
@@ -210,7 +210,7 @@ export default function ChallengeListPage() {
           필터 초기화
         </Button>
       </Space>
-      <StatePanel
+      <QueryState
         loading={isLoading}
         error={error}
         onRetry={refetch}
@@ -229,7 +229,7 @@ export default function ChallengeListPage() {
             onChange: (page) => setPaging((prev) => ({ ...prev, page })),
           }}
         />
-      </StatePanel>
+      </QueryState>
     </Space>
   );
 }

@@ -1,6 +1,6 @@
 // ADM-27 Streak milestone rewards
 import { Button, Form, InputNumber, Select, Table, Tag, Typography } from 'antd';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import { EffectiveAtItem, ErrorAlert, ReasonItem } from '../components/formBits.jsx';
 import { formatTime, pickCurrent, toIso } from '../components/helpers.js';
 import { MAX_POINTS, STREAK_TARGET_DAYS } from '../components/labels.js';
@@ -62,14 +62,14 @@ export default function StreakPolicyPage() {
         정책은 수정하지 않고 새 버전을 추가해요. 이전 버전은 이력으로 남아요.
       </Typography.Paragraph>
 
-      <StatePanel
+      <QueryState
         loading={list.isLoading}
         error={list.error}
         empty={items.length === 0}
         onRetry={list.refetch}
       >
         <Table rowKey="id" columns={columns} dataSource={items} pagination={false} />
-      </StatePanel>
+      </QueryState>
 
       <Typography.Title level={4} style={{ marginTop: 32 }}>
         새 버전 추가

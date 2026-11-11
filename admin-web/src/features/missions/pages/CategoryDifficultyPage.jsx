@@ -13,7 +13,7 @@ import {
   Tabs,
   Typography,
 } from 'antd';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import confirmWithReason from '../confirmWithReason.jsx';
 import { formatDateTime } from '../constants.js';
 import {
@@ -74,7 +74,7 @@ function CatalogTab({ kind }) {
   ];
 
   return (
-    <StatePanel loading={isLoading} error={error} onRetry={refetch} empty={data.length === 0}>
+    <QueryState loading={isLoading} error={error} onRetry={refetch} empty={data.length === 0}>
       <Button type="primary" style={{ marginBottom: 16 }} onClick={openCreate}>
         {label} 추가
       </Button>
@@ -112,7 +112,7 @@ function CatalogTab({ kind }) {
           </Form.Item>
         </Form>
       </Modal>
-    </StatePanel>
+    </QueryState>
   );
 }
 
@@ -151,7 +151,7 @@ function RewardRateTab() {
   const numberRule = [{ required: true, message: '값을 입력해 주세요.' }];
 
   return (
-    <StatePanel loading={isLoading} error={error} onRetry={refetch} empty={data.length === 0}>
+    <QueryState loading={isLoading} error={error} onRetry={refetch} empty={data.length === 0}>
       <Button
         type="primary"
         style={{ marginBottom: 16 }}
@@ -189,7 +189,7 @@ function RewardRateTab() {
           </Form.Item>
         </Form>
       </Modal>
-    </StatePanel>
+    </QueryState>
   );
 }
 

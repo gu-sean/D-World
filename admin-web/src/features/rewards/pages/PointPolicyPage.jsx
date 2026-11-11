@@ -1,7 +1,7 @@
 // ADM-24 Point policies: monthly cap and mission reward table
 import { useState } from 'react';
 import { Button, DatePicker, Form, InputNumber, Select, Table, Tabs, Typography } from 'antd';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import { EffectiveAtItem, ErrorAlert, ReasonItem } from '../components/formBits.jsx';
 import { formatTime, toIso } from '../components/helpers.js';
 import { MAX_POINTS } from '../components/labels.js';
@@ -35,7 +35,7 @@ function MonthlyCapTab() {
 
   return (
     <>
-      <StatePanel
+      <QueryState
         loading={list.isLoading}
         error={list.error}
         empty={items.length === 0}
@@ -55,7 +55,7 @@ function MonthlyCapTab() {
             },
           ]}
         />
-      </StatePanel>
+      </QueryState>
       <Typography.Title level={5} style={{ marginTop: 24 }}>
         새 월 한도 추가
       </Typography.Title>
@@ -151,7 +151,7 @@ function RewardRateTab() {
           />
         </Form.Item>
       </Form>
-      <StatePanel
+      <QueryState
         loading={list.isLoading}
         error={list.error}
         empty={items.length === 0}
@@ -175,7 +175,7 @@ function RewardRateTab() {
             { title: '시행 시각', dataIndex: 'effectiveAt', render: formatTime },
           ]}
         />
-      </StatePanel>
+      </QueryState>
       <Typography.Title level={5} style={{ marginTop: 24 }}>
         새 보상표 버전 추가
       </Typography.Title>

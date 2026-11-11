@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { Button, Form, Input, InputNumber, message, Select, Space, Typography } from 'antd';
 import { useNavigate, useParams } from 'react-router';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import confirmWithReason from '../confirmWithReason.jsx';
 import { ADMIN_STATUS_OPTIONS, EXERCISE_OPTIONS, METHOD_OPTIONS } from '../constants.js';
 import { useCatalog, useCreateDefinition, useDefinition, useUpdateDefinition } from '../queries.js';
@@ -74,7 +74,7 @@ export default function MissionDefinitionFormPage() {
   return (
     <div style={{ maxWidth: 640 }}>
       <Typography.Title level={4}>{isEdit ? '미션 정의 수정' : '미션 정의 등록'}</Typography.Title>
-      <StatePanel loading={isEdit && isLoading} error={isEdit ? error : null} onRetry={refetch}>
+      <QueryState loading={isEdit && isLoading} error={isEdit ? error : null} onRetry={refetch}>
         <Form
           form={form}
           layout="vertical"
@@ -143,7 +143,7 @@ export default function MissionDefinitionFormPage() {
             </Button>
           </Space>
         </Form>
-      </StatePanel>
+      </QueryState>
     </div>
   );
 }

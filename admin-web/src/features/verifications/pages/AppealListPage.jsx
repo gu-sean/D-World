@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Select, Space, Table, Typography } from 'antd';
-import StatePanel from '../../../components/StatePanel.jsx';
+import QueryState from '../../../components/QueryState.jsx';
 import { StatusTag } from '../components/RecordSummary.jsx';
 import { APPEAL_STATUS, DECISION_LABEL, formatDateTime } from '../components/format.js';
 import { useAppeals } from '../queries.js';
@@ -55,7 +55,7 @@ export default function AppealListPage() {
           setPaging((prev) => ({ ...prev, page: 1 }));
         }}
       />
-      <StatePanel
+      <QueryState
         loading={query.isLoading}
         error={query.error}
         empty={data?.items.length === 0}
@@ -75,7 +75,7 @@ export default function AppealListPage() {
             onChange: (page, size) => setPaging({ page, size }),
           }}
         />
-      </StatePanel>
+      </QueryState>
     </Space>
   );
 }
