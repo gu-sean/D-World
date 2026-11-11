@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { setupServer } from 'msw/node';
 
+// httpClient.js reads the API base URL when it is loaded; pages under test call it through MSW.
+vi.stubEnv('VITE_ADMIN_API_BASE_URL', '/admin/v1');
+
 // Shared MSW server for tests. Tests add handlers with `server.use(...)`
 // (import { server } from '<relative path>/test/setup.js').
 export const server = setupServer();
