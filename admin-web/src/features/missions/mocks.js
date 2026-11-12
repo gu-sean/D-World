@@ -1,7 +1,6 @@
 import { delay, http as mswHttp, HttpResponse } from 'msw';
 
-// MSW handlers for the mission screens (M40~M50, M74~M75 and the assumed featured-missions
-// API). Used with VITE_USE_MSW=true, no backend needed. State lives in memory.
+// MSW handlers for the mission screens (M40~M50, M74~M75). Used with VITE_USE_MSW=true, no backend needed. State lives in memory.
 const BASE = import.meta.env.VITE_ADMIN_API_BASE_URL ?? '/admin/v1';
 
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -60,7 +59,6 @@ const definitions = [
     submittedAt: NOW,
   }),
 ];
-const featured = [{ id: id(301), definitionId: id(101), title: '푸시업 20회', displayOrder: 1 }];
 
 const errorResponse = (status, code, message) =>
   HttpResponse.json({ error: { code, message, details: null } }, { status });
@@ -69,7 +67,8 @@ const needReason = (body) =>
     ? errorResponse(400, 'COMMON_VALIDATION', 'reason: 필수 입력이에요.')
     : null;
 
-const catalogHandlers = (path, list) => [
+// A category or difficulty linked to a public definition cannot be turned off (docs/09 M47).
+const catalogHandlers = (path, list, isInUse) => [
   mswHttp.get(`${BASE}${path}`, () => HttpResponse.json(list)),
   mswHttp.post(`${BASE}${path}`, async ({ request }) => {
     await delay(100);
@@ -86,6 +85,9 @@ const catalogHandlers = (path, list) => [
     if (invalid) return invalid;
     const item = list.find((entry) => entry.id === params.itemId);
     if (!item) return errorResponse(404, 'COMMON_NOT_FOUND', '찾을 수 없어요.');
+    if (patch.isActive === false && isInUse(item)) {
+      return errorResponse(409, 'CATALOG_IN_USE', '사용 중이라 끌 수 없어요.');
+    }
     Object.assign(item, patch);
     return HttpResponse.json(item);
   }),
@@ -157,8 +159,12 @@ export const handlers = [
     });
   }),
 
-  ...catalogHandlers('/goal-categories', categories),
-  ...catalogHandlers('/difficulty-levels', difficulties),
+  ...catalogHandlers('/goal-categories', categories, (item) =>
+    definitions.some((row) => row.categoryId === item.id && row.publicationStatus === 'public'),
+  ),
+  ...catalogHandlers('/difficulty-levels', difficulties, (item) =>
+    definitions.some((row) => row.difficultyId === item.id && row.publicationStatus === 'public'),
+  ),
 
   mswHttp.get(`${BASE}/mission-reward-rates`, () => HttpResponse.json(rewardRates)),
   mswHttp.post(`${BASE}/mission-reward-rates`, async ({ request }) => {
@@ -173,27 +179,5 @@ export const handlers = [
     };
     rewardRates.push(row);
     return HttpResponse.json(row, { status: 201 });
-  }),
-
-  // Assumed API (no backend yet)
-  mswHttp.get(`${BASE}/featured-missions`, () => HttpResponse.json({ items: featured })),
-  mswHttp.post(`${BASE}/featured-missions`, async ({ request }) => {
-    const body = await request.json();
-    const invalid = needReason(body);
-    if (invalid) return invalid;
-    const definition = definitions.find((entry) => entry.id === body.definitionId);
-    const row = {
-      id: id(300 + featured.length + 1),
-      definitionId: body.definitionId,
-      title: definition?.title ?? '-',
-      displayOrder: featured.length + 1,
-    };
-    featured.push(row);
-    return HttpResponse.json(row, { status: 201 });
-  }),
-  mswHttp.delete(`${BASE}/featured-missions/:featuredId`, ({ params }) => {
-    const index = featured.findIndex((entry) => entry.id === params.featuredId);
-    if (index >= 0) featured.splice(index, 1);
-    return new HttpResponse(null, { status: 204 });
   }),
 ];

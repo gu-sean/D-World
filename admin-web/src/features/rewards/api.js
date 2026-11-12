@@ -1,9 +1,14 @@
 import { http } from '../../api/httpClient.js';
-import { newIdempotencyKey } from '../../api/idempotency.js';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
 
 // Admin reward API (backend: points/admin-points.controller.js, admin-assets/*,
 // admin-policies/policies.controller.js). Every mutation takes the Idempotency-Key as its last
 // argument: one key per user action.
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const data = (response) => response.data;
 const withKey = (idempotencyKey) => ({ idempotencyKey });
@@ -16,11 +21,20 @@ const withKey = (idempotencyKey) => ({ idempotencyKey });
  * @param {{userId?: string, kind?: string, sourceType?: string, from?: string, to?: string,
  *   page?: number, size?: number, sort?: string}} params
  */
-export const listPointTransactions = (params) =>
-  http.get('/point-transactions', { params }).then((response) => ({
-    ...response.data,
-    pendingPoints: Number(response.headers?.['x-pending-points'] ?? 0),
-  }));
+export const listPointTransactions = ({ from, to, ...params }) =>
+  http
+    .get('/point-transactions', {
+      params: {
+        ...params,
+        // The list filter gives dates (both included, Asia/Seoul); the API takes `to` exclusive.
+        from: from ? dayjs.tz(from, 'Asia/Seoul').startOf('day').toISOString() : undefined,
+        to: to ? dayjs.tz(to, 'Asia/Seoul').add(1, 'day').startOf('day').toISOString() : undefined,
+      },
+    })
+    .then((response) => ({
+      ...response.data,
+      pendingPoints: Number(response.headers?.['x-pending-points'] ?? 0),
+    }));
 
 /**
  * M71 POST /point-adjustments
@@ -91,32 +105,3 @@ export const createPetSpecies = (body, idempotencyKey) =>
 /** M81 POST /pet-species/:id/versions */
 export const createPetSpeciesVersion = ({ id, ...body }, idempotencyKey) =>
   http.post(`/pet-species/${id}/versions`, body, withKey(idempotencyKey)).then(data);
-
-// ---- image upload (M84, M85) ----
-
-/**
- * Uploads one image in 3 steps: M84 ticket, PUT to the storage URL, M85 complete.
- * `ownerId` is the id of an existing achievement/species, or a uuid chosen in advance for a new
- * one (the same uuid must be used for every image of that new item).
- * @returns {Promise<{assetId: string, imageUrl: string}>}
- */
-export async function uploadImage({ file, assetKind, ownerId, reason }) {
-  const ticket = await http
-    .post(
-      '/assets/upload-urls',
-      { assetKind, ownerId, mimeType: file.type, sizeBytes: file.size, reason },
-      withKey(newIdempotencyKey()),
-    )
-    .then(data);
-  const put = await fetch(ticket.uploadUrl, {
-    method: 'PUT',
-    headers: ticket.uploadHeaders,
-    body: file,
-  });
-  if (!put.ok) {
-    throw new Error('이미지를 올리지 못했어요. 다시 시도해 주세요.');
-  }
-  return http
-    .post(`/assets/${ticket.assetId}/complete`, undefined, withKey(newIdempotencyKey()))
-    .then(data);
-}

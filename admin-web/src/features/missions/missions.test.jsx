@@ -9,6 +9,7 @@ let ListPage;
 let ReviewPage;
 let FormPage;
 let CatalogPage;
+let FeaturedPage;
 
 beforeAll(async () => {
   // httpClient.js reads the base URL when it is loaded, so stub it before importing.
@@ -18,6 +19,7 @@ beforeAll(async () => {
   ReviewPage = (await import('./pages/UserMissionReviewPage.jsx')).default;
   FormPage = (await import('./pages/MissionDefinitionFormPage.jsx')).default;
   CatalogPage = (await import('./pages/CategoryDifficultyPage.jsx')).default;
+  FeaturedPage = (await import('./pages/FeaturedMissionPage.jsx')).default;
 });
 
 afterAll(() => vi.unstubAllEnvs());
@@ -38,27 +40,48 @@ function renderAt(path, routePath, element) {
 }
 
 describe('missions', () => {
-  it('lists mission definitions', async () => {
+  it('lists mission definitions from the API', async () => {
     renderAt('/missions/definitions', '/missions/definitions', <ListPage />);
     expect(await screen.findByText('푸시업 20회')).toBeInTheDocument();
     expect(screen.getByText('스쿼트 30회')).toBeInTheDocument();
   });
 
-  it('approves a pending user mission after a reason is typed', async () => {
+  it('shows the server error text of a failed review', async () => {
+    const { http: mswHttp, HttpResponse } = await import('msw');
+    server.use(
+      mswHttp.post('/admin/v1/mission-definitions/:id/reviews', () =>
+        HttpResponse.json(
+          { error: { code: 'COMMON_INTERNAL', message: '잠시 후 다시 시도해 주세요.' } },
+          { status: 500 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt('/missions/reviews', '/missions/reviews', <ReviewPage />);
+    const row = (await screen.findByText('사용자 달리기')).closest('tr');
+    await user.click(within(row).getByRole('button', { name: /반려/ }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox'), '기준에 맞지 않아요');
+    await user.click(within(dialog).getByRole('button', { name: '확인' }));
+    expect(await within(dialog).findByText('잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
+  }, 20000);
+
+  it('blocks a review without a reason, then approves with one', async () => {
     const user = userEvent.setup();
     renderAt('/missions/reviews', '/missions/reviews', <ReviewPage />);
     const row = (await screen.findByText('사용자 달리기')).closest('tr');
     await user.click(within(row).getByRole('button', { name: /승인/ }));
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('button', { name: '승인' })).toBeDisabled();
+    await user.click(within(dialog).getByRole('button', { name: '확인' }));
+    expect(await within(dialog).findByText('사유를 입력해 주세요.')).toBeInTheDocument();
 
     await user.type(within(dialog).getByRole('textbox'), '기준에 맞아요');
-    await user.click(within(dialog).getByRole('button', { name: '승인' }));
+    await user.click(within(dialog).getByRole('button', { name: '확인' }));
     await waitFor(() => expect(screen.queryByText('사용자 달리기')).not.toBeInTheDocument());
-  });
+  }, 20000);
 
-  it('rejects a mismatched exercise and method before sending', async () => {
+  it('asks for the required fields of the form', async () => {
     const user = userEvent.setup();
     renderAt('/missions/definitions/new', '/missions/definitions/new', <FormPage />);
     await user.type(await screen.findByLabelText('제목'), '테스트');
@@ -69,5 +92,22 @@ describe('missions', () => {
   it('shows categories', async () => {
     renderAt('/missions/categories', '/missions/categories', <CatalogPage />);
     expect(await screen.findByText('운동')).toBeInTheDocument();
+  });
+
+  it('shows CATALOG_IN_USE when a category in use is turned off', async () => {
+    const user = userEvent.setup();
+    renderAt('/missions/categories', '/missions/categories', <CatalogPage />);
+    const row = (await screen.findByText('운동')).closest('tr');
+    await user.click(within(row).getByRole('switch'));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox'), '더 이상 쓰지 않아요');
+    await user.click(within(dialog).getByRole('button', { name: '확인' }));
+    expect(await within(dialog).findByText('사용 중이라 끌 수 없어요.')).toBeInTheDocument();
+  }, 20000);
+
+  it('shows the not-implemented panel for featured missions (ADM-17)', () => {
+    renderAt('/missions/featured', '/missions/featured', <FeaturedPage />);
+    expect(screen.getByText('준비 중인 기능이에요.')).toBeInTheDocument();
   });
 });

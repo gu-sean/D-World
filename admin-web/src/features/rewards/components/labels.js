@@ -1,29 +1,13 @@
-export const TRANSACTION_KINDS = {
-  auto_award: '자동 지급',
-  award_offset: '지급 상쇄',
-  spend: '사용',
-  refund: '환불',
-  refund_offset: '환불 상쇄',
-  recovery: '회수',
-  recovery_claim: '회수 청구',
-  recovery_settlement: '회수 정산',
-  recovery_cancel: '회수 취소',
-  reinstatement: '복원',
-  manual_grant: '수동 지급',
-  manual_recovery: '수동 회수',
-};
+import { labels } from '../../../constants/labels.js';
 
-export const SOURCE_TYPES = {
-  mission: '미션',
-  streak: '스트릭',
-  achievement: '업적',
-  challenge: '챌린지',
-  shop_order: '상점 주문',
-  admin_adjustment: '관리자 조정',
-};
+// Status texts and colors come from constants/labels.js (<StatusTag kind=... />). This file only
+// keeps what that table does not have.
 
-export const RARITIES = { common: '일반', rare: '희귀', legendary: '전설' };
-export const VERSION_STATUS = { draft: '임시 저장', public: '공개', hidden: '숨김' };
+/** Select options `{value, label}` from one kind of constants/labels.js. */
+export const optionsOf = (kind, values) =>
+  Object.entries(labels[kind])
+    .filter(([value]) => !values || values.includes(value))
+    .map(([value, { text }]) => ({ value, label: text }));
 
 export const ACHIEVEMENT_CONDITIONS = {
   first_goal_completed: '첫 목표 완료',
@@ -40,8 +24,12 @@ export const UNLOCK_CONDITIONS = {
   achievement_earned: '업적 달성',
 };
 
-export const STAGE_NAMES = { 1: '알', 2: '새끼', 3: '성체' };
-export const STREAK_TARGET_DAYS = [7, 30, 100];
+export const conditionOptions = (texts) =>
+  Object.entries(texts).map(([value, label]) => ({ value, label }));
 
+// A pet has 3 stages in this order (stage 1~3).
+export const STAGE_CODES = ['egg', 'baby', 'adult'];
+export const stageText = (stageNo) => labels.petStageCode[STAGE_CODES[stageNo - 1]].text;
+
+export const STREAK_TARGET_DAYS = [7, 30, 100];
 export const MAX_POINTS = 1_000_000;
-export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;

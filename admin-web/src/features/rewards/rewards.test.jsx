@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { delay, http as mswHttp, HttpResponse } from 'msw';
+import { http as mswHttp, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { server } from '../../test/setup.js';
 
@@ -64,7 +64,7 @@ describe('PointTransactionListPage', () => {
       ),
     );
     renderPage(<PointTransactionListPage />);
-    expect(await screen.findByText('수동 지급')).toBeInTheDocument();
+    expect(await screen.findByText('관리자 지급')).toBeInTheDocument();
     expect(screen.getByText('이벤트 보상')).toBeInTheDocument();
     expect(screen.getByText('검수 대기 중인 보상 합계')).toBeInTheDocument();
   });
@@ -76,51 +76,41 @@ describe('PointTransactionListPage', () => {
       ),
     );
     renderPage(<PointTransactionListPage />);
-    expect(await screen.findByText('조건에 맞는 결과가 없습니다.')).toBeInTheDocument();
+    expect(await screen.findByText('결과가 없어요.')).toBeInTheDocument();
   });
 });
 
-describe('PointAdjustmentPage', () => {
-  it('asks for confirmation, then sends the adjustment with an Idempotency-Key', async () => {
+// antd dialogs are slow in jsdom, and the whole suite runs in parallel: allow 20 s per test.
+describe('PointAdjustmentPage', { timeout: 20_000 }, () => {
+  // Fast input: antd inputs in jsdom are slow with per-key typing.
+  const fillForm = async (user, { amount = '100', recovery = false } = {}) => {
+    await user.click(screen.getByLabelText('회원 ID'));
+    await user.paste(USER);
+    if (recovery) await user.click(screen.getByText('회수'));
+    fireEvent.change(screen.getByLabelText('포인트'), { target: { value: amount } });
+    await user.click(screen.getByRole('button', { name: /조정하기/ }));
+    return screen.findByRole('dialog');
+  };
+
+  it('asks for a reason in the confirm dialog, then sends the adjustment with an Idempotency-Key', async () => {
     let received;
     server.use(
       mswHttp.post(`${BASE}/point-adjustments`, async ({ request }) => {
-        await delay(10);
         received = { body: await request.json(), key: request.headers.get('idempotency-key') };
-        return HttpResponse.json(
-          {
-            id: '1',
-            userId: USER,
-            kind: 'manual_grant',
-            availableDelta: 100,
-            outstandingDelta: 0,
-            balanceAfter: 100,
-            outstandingAfter: 0,
-            sourceType: 'admin_adjustment',
-            sourceId: 's',
-            reason: '이벤트',
-            createdByAdminId: 'x',
-            occurredAt: '2026-11-01T01:00:00.000Z',
-          },
-          { status: 201 },
-        );
+        return HttpResponse.json({ id: '1', balanceAfter: 100 }, { status: 201 });
       }),
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderPage(<PointAdjustmentPage />);
 
-    await user.click(screen.getByLabelText('회원 ID'));
-    await user.paste(USER);
-    await user.type(screen.getByLabelText('포인트'), '100');
-    await user.type(screen.getByLabelText('사유'), '이벤트');
-    await user.click(screen.getByRole('button', { name: /조정하기/ }));
-
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getAllByText('포인트를 조정할까요?').length).toBeGreaterThan(0);
+    const dialog = await fillForm(user);
+    expect(within(dialog).getByText('포인트를 조정할까요?')).toBeInTheDocument();
     expect(received).toBeUndefined();
-    await user.click(within(dialog).getByRole('button', { name: '확인 후 적용' }));
+    await user.click(within(dialog).getByLabelText('사유'));
+    await user.paste('이벤트');
+    await user.click(within(dialog).getByRole('button', { name: '확인' }));
 
-    expect(await screen.findByText('변경 사항을 저장했습니다.')).toBeInTheDocument();
+    await waitFor(() => expect(received).toBeDefined());
     expect(received.body).toEqual({
       userId: USER,
       kind: 'manual_grant',
@@ -128,26 +118,33 @@ describe('PointAdjustmentPage', () => {
       reason: '이벤트',
     });
     expect(received.key).toMatch(/^[0-9a-f-]{36}$/);
+    expect(await screen.findByText('처리했어요')).toBeInTheDocument();
   });
 
-  it('requires a reason before the dialog opens', async () => {
-    const user = userEvent.setup();
+  it('blocks the change when the reason is empty', async () => {
+    let called = false;
+    server.use(
+      mswHttp.post(`${BASE}/point-adjustments`, () => {
+        called = true;
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup({ delay: null });
     renderPage(<PointAdjustmentPage />);
-    await user.click(screen.getByLabelText('회원 ID'));
-    await user.paste(USER);
-    await user.type(screen.getByLabelText('포인트'), '5');
-    await user.click(screen.getByRole('button', { name: /조정하기/ }));
-    expect(await screen.findByText('사유를 입력해 주세요.')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    const dialog = await fillForm(user, { amount: '5' });
+    await user.click(within(dialog).getByRole('button', { name: '확인' }));
+    expect(await within(dialog).findByText('사유를 입력해 주세요.')).toBeInTheDocument();
+    expect(called).toBe(false);
   });
 
-  it('shows the server error and keeps the input', async () => {
+  it('shows the server error in the dialog and keeps the input', async () => {
     server.use(
       mswHttp.post(`${BASE}/point-adjustments`, () =>
         HttpResponse.json(
           {
             error: {
-              code: 'ADMIN_STATE_CONFLICT',
+              code: 'POINT_INSUFFICIENT',
               message: '가용 잔액보다 많이 회수할 수 없어요.',
               details: null,
             },
@@ -156,18 +153,18 @@ describe('PointAdjustmentPage', () => {
         ),
       ),
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderPage(<PointAdjustmentPage />);
-    await user.click(screen.getByLabelText('회원 ID'));
-    await user.paste(USER);
-    await user.click(screen.getByText('회수'));
-    await user.type(screen.getByLabelText('포인트'), '999');
-    await user.type(screen.getByLabelText('사유'), '오지급 회수');
-    await user.click(screen.getByRole('button', { name: /조정하기/ }));
-    await user.click(await screen.findByRole('button', { name: '확인 후 적용' }));
 
-    expect(await screen.findByText('가용 잔액보다 많이 회수할 수 없어요.')).toBeInTheDocument();
-    expect(screen.getByLabelText('회원 ID')).toHaveValue(USER);
+    const dialog = await fillForm(user, { amount: '999', recovery: true });
+    await user.click(within(dialog).getByLabelText('사유'));
+    await user.paste('오지급 회수');
+    await user.click(within(dialog).getByRole('button', { name: '확인' }));
+
+    expect(
+      await within(dialog).findByText('가용 잔액보다 많이 회수할 수 없어요.'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByLabelText('회원 ID')[0]).toHaveValue(USER);
   });
 });
 

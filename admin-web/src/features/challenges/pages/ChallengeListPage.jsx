@@ -1,63 +1,51 @@
-// ADM-18 Challenge operation list
+// ADM-18 챌린지 운영 목록
 import { useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
-import { App, Button, Dropdown, Select, Space, Table, Tag, Typography } from 'antd';
+import { Button, Dropdown, message, Space, Typography } from 'antd';
 import { useNavigate } from 'react-router';
-import QueryState from '../../../components/QueryState.jsx';
-import { confirmWithReason } from '../confirmWithReason.jsx';
-import { label, ORIGIN, PHASE, PUBLICATION_STATUS, SETTLEMENT_STATUS } from '../labels.js';
+import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
+import { DataTable } from '../../../components/DataTable.jsx';
+import { FilterBar } from '../../../components/FilterBar.jsx';
+import { StatusTag } from '../../../components/StatusTag.jsx';
+import { useListParams } from '../../../components/useListParams.js';
+import { labels } from '../../../constants/labels.js';
+import { label, ORIGIN, PHASE, toOptions } from '../labels.js';
 import { useChallengeAction, useChallenges, useReviewChallenge } from '../queries.js';
 
-const toOptions = (map) =>
-  Object.entries(map).map(([value, item]) => ({
-    value,
-    label: typeof item === 'object' ? item.label : item,
-  }));
+const kindOptions = (kind) =>
+  Object.entries(labels[kind]).map(([value, item]) => ({ value, label: item.text }));
 
-const SETTLEMENT_FILTER = toOptions(SETTLEMENT_STATUS);
+const FIELDS = [
+  {
+    name: 'publicationStatus',
+    type: 'select',
+    label: '공개 상태',
+    options: kindOptions('challengePublicationStatus'),
+  },
+  { name: 'phase', type: 'select', label: '진행 단계', options: toOptions(PHASE) },
+  { name: 'origin', type: 'select', label: '출처', options: toOptions(ORIGIN) },
+  {
+    name: 'settlementStatus',
+    type: 'select',
+    label: '정산 상태',
+    options: kindOptions('challengeSettlementStatus'),
+  },
+];
 
 export default function ChallengeListPage() {
   const navigate = useNavigate();
-  const { message } = App.useApp();
-  const [filters, setFilters] = useState({});
-  const [paging, setPaging] = useState({ page: 1, size: 20 });
-  const params = { ...filters, ...paging, sort: 'startDate,desc' };
-  const { data, isLoading, error, refetch, isFetching } = useChallenges(params);
+  const [params, setParams] = useListParams({ sort: 'startDate,desc' }); // API default (docs/09)
+  const query = useChallenges(params);
   const action = useChallengeAction();
   const review = useReviewChallenge();
+  const [target, setTarget] = useState(null); // {row, type: 'action'|'review', value, title, danger}
 
-  const setFilter = (name) => (value) => {
-    setFilters((prev) => ({ ...prev, [name]: value }));
-    setPaging((prev) => ({ ...prev, page: 1 }));
-  };
-
-  const runAction = (row, kind, title, danger) =>
-    confirmWithReason({
-      title,
-      description: `「${row.title}」`,
-      okText: title,
-      danger,
-      onConfirm: async (reason) => {
-        await action.mutateAsync({ id: row.id, action: kind, reason });
-        message.success('변경 사항을 저장했습니다.');
-      },
-    });
-
-  const runReview = (row, decision, title, danger) =>
-    confirmWithReason({
-      title,
-      description: `「${row.title}」`,
-      okText: title,
-      danger,
-      onConfirm: async (reason) => {
-        await review.mutateAsync({ id: row.id, decision, reason });
-        message.success('변경 사항을 저장했습니다.');
-      },
-    });
+  const ask = (row, type, value, title, danger = false) =>
+    setTarget({ row, type, value, title, danger });
 
   const menuFor = (row) => {
     const items = [];
-    if (row.origin === 'admin' && !['cancelled'].includes(row.publicationStatus)) {
+    if (row.origin === 'admin' && row.publicationStatus !== 'cancelled') {
       items.push({
         key: 'edit',
         label: '수정',
@@ -68,17 +56,21 @@ export default function ChallengeListPage() {
       items.push({
         key: 'publish',
         label: '공개',
-        onClick: () => runAction(row, 'publish', '공개'),
+        onClick: () => ask(row, 'action', 'publish', '챌린지 공개'),
       });
     }
     if (row.origin === 'user' && row.publicationStatus === 'review_pending') {
       items.push(
-        { key: 'approve', label: '검수 승인', onClick: () => runReview(row, 'approved', '승인') },
+        {
+          key: 'approve',
+          label: '검수 승인',
+          onClick: () => ask(row, 'review', 'approved', '검수 승인'),
+        },
         {
           key: 'reject',
           label: '검수 반려',
           danger: true,
-          onClick: () => runReview(row, 'rejected', '반려', true),
+          onClick: () => ask(row, 'review', 'rejected', '검수 반려', true),
         },
       );
     }
@@ -87,7 +79,7 @@ export default function ChallengeListPage() {
         key: 'hide',
         label: '숨김',
         danger: true,
-        onClick: () => runAction(row, 'hide', '숨김', true),
+        onClick: () => ask(row, 'action', 'hide', '챌린지 숨김', true),
       });
     }
     if (['public', 'hidden'].includes(row.publicationStatus)) {
@@ -95,7 +87,7 @@ export default function ChallengeListPage() {
         key: 'cancel',
         label: '취소',
         danger: true,
-        onClick: () => runAction(row, 'cancel', '챌린지 취소', true),
+        onClick: () => ask(row, 'action', 'cancel', '챌린지 취소', true),
       });
     }
     return items;
@@ -115,28 +107,27 @@ export default function ChallengeListPage() {
         </Space>
       ),
     },
-    { title: '기간', render: (_, row) => `${row.startDate} ~ ${row.endDate}` },
+    { title: '기간', key: 'period', render: (_, row) => `${row.startDate} ~ ${row.endDate}` },
     { title: '진행', dataIndex: 'phase', render: (value) => label(PHASE, value) },
     {
       title: '공개 상태',
       dataIndex: 'publicationStatus',
-      render: (value) => {
-        const item = PUBLICATION_STATUS[value];
-        return <Tag color={item?.color}>{item?.label ?? value}</Tag>;
-      },
+      render: (value) => <StatusTag kind="challengePublicationStatus" value={value} />,
     },
     {
       title: '참가자',
+      key: 'participants',
       render: (_, row) =>
         `${row.participantCount}${row.maxParticipants ? ` / ${row.maxParticipants}` : ''}`,
     },
     {
       title: '정산',
       dataIndex: 'settlementStatus',
-      render: (value) => label(SETTLEMENT_STATUS, value),
+      render: (value) => <StatusTag kind="challengeSettlementStatus" value={value} />,
     },
     {
       title: '처리',
+      key: 'actions',
       render: (_, row) => {
         const items = menuFor(row);
         return (
@@ -168,68 +159,34 @@ export default function ChallengeListPage() {
           공식 챌린지 등록
         </Button>
       </Space>
-      <Space wrap>
-        <Select
-          allowClear
-          placeholder="공개 상태"
-          style={{ width: 140 }}
-          aria-label="공개 상태"
-          options={toOptions(PUBLICATION_STATUS)}
-          onChange={setFilter('publicationStatus')}
-        />
-        <Select
-          allowClear
-          placeholder="진행 단계"
-          style={{ width: 130 }}
-          aria-label="진행 단계"
-          options={toOptions(PHASE)}
-          onChange={setFilter('phase')}
-        />
-        <Select
-          allowClear
-          placeholder="출처"
-          style={{ width: 110 }}
-          aria-label="출처"
-          options={toOptions(ORIGIN)}
-          onChange={setFilter('origin')}
-        />
-        <Select
-          allowClear
-          placeholder="정산 상태"
-          style={{ width: 130 }}
-          aria-label="정산 상태"
-          options={SETTLEMENT_FILTER}
-          onChange={setFilter('settlementStatus')}
-        />
-        <Button
-          onClick={() => {
-            setFilters({});
-            setPaging({ page: 1, size: 20 });
-          }}
-        >
-          필터 초기화
-        </Button>
-      </Space>
-      <QueryState
-        loading={isLoading}
-        error={error}
-        onRetry={refetch}
-        empty={data?.items.length === 0}
-      >
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={data?.items}
-          loading={isFetching}
-          pagination={{
-            current: paging.page,
-            pageSize: paging.size,
-            total: data?.totalCount,
-            showSizeChanger: false,
-            onChange: (page) => setPaging((prev) => ({ ...prev, page })),
-          }}
-        />
-      </QueryState>
+      <FilterBar fields={FIELDS} value={params} onChange={setParams} />
+      <DataTable query={query} columns={columns} defaultSort="startDate,desc" />
+      <ConfirmActionModal
+        open={Boolean(target)}
+        title={target?.title ?? ''}
+        summary={target ? `${target.row.title} · ${target.title}` : ''}
+        danger={target?.danger}
+        onSubmit={async ({ reason, idempotencyKey }) => {
+          if (target.type === 'review') {
+            await review.mutateAsync({
+              id: target.row.id,
+              decision: target.value,
+              reason,
+              idempotencyKey,
+            });
+          } else {
+            await action.mutateAsync({
+              id: target.row.id,
+              action: target.value,
+              reason,
+              idempotencyKey,
+            });
+          }
+          message.success('처리했어요');
+          setTarget(null);
+        }}
+        onCancel={() => setTarget(null)}
+      />
     </Space>
   );
 }

@@ -1,45 +1,23 @@
-// ADM-21 Ranking review and correction
+// ADM-21 랭킹 검토와 정정
 import { useState } from 'react';
-import { App, Button, Drawer, Space, Table, Tag, Typography } from 'antd';
+import { Button, Drawer, message, Space, Table, Tag, Typography } from 'antd';
 import { useParams } from 'react-router';
-import QueryState from '../../../components/QueryState.jsx';
-import { confirmWithReason } from '../confirmWithReason.jsx';
-import { DAY_STATUS, label } from '../labels.js';
+import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
+import { DateText } from '../../../components/DateText.jsx';
+import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
+import { StatePanel } from '../../../components/StatePanel.jsx';
+import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useChallenge, useModerate, useParticipantDays, useRankings } from '../queries.js';
 
 export default function ChallengeRankingReviewPage() {
   const { challengeId } = useParams();
-  const { message } = App.useApp();
   const challenge = useChallenge(challengeId);
   const rankings = useRankings(challengeId);
   const moderate = useModerate();
   const [selected, setSelected] = useState(null);
+  const [pending, setPending] = useState(null); // {title, summary, body, danger}
   const days = useParticipantDays(challengeId, selected?.participationId);
   const settled = challenge.data?.settlementStatus === 'confirmed';
-
-  const act = ({ title, description, body, danger = true }) =>
-    confirmWithReason({
-      title,
-      description,
-      okText: '확인 후 적용',
-      danger,
-      onConfirm: async (reason) => {
-        await moderate.mutateAsync({
-          id: challengeId,
-          participationId: selected.participationId,
-          ...body,
-          reason,
-        });
-        message.success('변경 사항을 저장했습니다.');
-      },
-    });
-
-  const disqualify = () =>
-    act({
-      title: '참가자 실격',
-      description: `${selected.nickname}님을 실격 처리해요. 순위에서 빠지고 되돌릴 수 없어요.`,
-      body: { action: 'disqualify' },
-    });
 
   const columns = [
     { title: '순위', dataIndex: 'rankNo', width: 80 },
@@ -53,6 +31,7 @@ export default function ChallengeRankingReviewPage() {
     },
     {
       title: '처리',
+      key: 'actions',
       render: (_, row) => (
         <Button size="small" onClick={() => setSelected(row)}>
           검토
@@ -63,20 +42,24 @@ export default function ChallengeRankingReviewPage() {
 
   const dayColumns = [
     { title: '날짜', dataIndex: 'date' },
-    { title: '상태', dataIndex: 'status', render: (v) => label(DAY_STATUS, v) },
+    {
+      title: '상태',
+      dataIndex: 'status',
+      render: (value) => <StatusTag kind="challengeDailyMissionStatus" value={value} />,
+    },
     {
       title: '조정',
+      key: 'adjust',
       render: (_, day) =>
         day.status === 'excluded' ? (
           <Button
             size="small"
             disabled={settled}
             onClick={() =>
-              act({
+              setPending({
                 title: '하루 복구',
-                description: `${day.date} 기록을 다시 반영해요.`,
+                summary: `${day.date} 기록을 다시 반영해요.`,
                 body: { action: 'restore_day', dailyMissionId: day.id },
-                danger: false,
               })
             }
           >
@@ -88,10 +71,11 @@ export default function ChallengeRankingReviewPage() {
             danger
             disabled={settled || day.status === 'cancelled'}
             onClick={() =>
-              act({
+              setPending({
                 title: '하루 제외',
-                description: `${day.date} 기록을 점수에서 제외해요.`,
+                summary: `${day.date} 기록을 점수에서 제외해요.`,
                 body: { action: 'exclude_day', dailyMissionId: day.id },
+                danger: true,
               })
             }
           >
@@ -112,52 +96,81 @@ export default function ChallengeRankingReviewPage() {
           {settled && ' · 정산이 확정되어 정정은 정정 정산으로 처리해야 해요.'}
         </Typography.Text>
       )}
-      <QueryState
-        loading={rankings.isLoading}
-        error={rankings.error}
-        onRetry={rankings.refetch}
-        empty={rankings.data?.entries.length === 0}
-        emptyText="참가자가 없습니다."
-      >
-        <Table
-          rowKey="participationId"
-          columns={columns}
-          dataSource={rankings.data?.entries}
-          pagination={{ pageSize: 20 }}
-        />
-        {rankings.data && (
-          <Typography.Text type="secondary">
-            계산 시각: {rankings.data.ranking.calculatedAt}
-          </Typography.Text>
-        )}
-      </QueryState>
+      <QueryBoundary query={rankings}>
+        {(data) =>
+          data.entries.length === 0 ? (
+            <StatePanel type="empty" message="참가자가 없어요." />
+          ) : (
+            <>
+              <Table
+                rowKey="participationId"
+                columns={columns}
+                dataSource={data.entries}
+                pagination={{ pageSize: 20 }}
+              />
+              <Typography.Text type="secondary">
+                계산 시각: <DateText value={data.ranking.calculatedAt} />
+              </Typography.Text>
+            </>
+          )
+        }
+      </QueryBoundary>
       <Drawer
         open={Boolean(selected)}
-        width={520}
+        size={520}
         title={selected ? `${selected.nickname} · ${selected.rankNo}위` : ''}
         onClose={() => setSelected(null)}
         extra={
-          <Button danger disabled={settled} onClick={disqualify}>
+          <Button
+            danger
+            disabled={settled}
+            onClick={() =>
+              setPending({
+                title: '참가자 실격',
+                summary: `${selected.nickname}님을 실격 처리해요. 순위에서 빠지고 되돌릴 수 없어요.`,
+                body: { action: 'disqualify' },
+                danger: true,
+              })
+            }
+          >
             실격 처리
           </Button>
         }
       >
-        <QueryState
-          loading={days.isLoading}
-          error={days.error}
-          onRetry={days.refetch}
-          empty={days.data?.items.length === 0}
-          emptyText="일별 기록이 없습니다."
-        >
-          <Table
-            rowKey="id"
-            columns={dayColumns}
-            dataSource={days.data?.items}
-            pagination={false}
-            size="small"
-          />
-        </QueryState>
+        <QueryBoundary query={days}>
+          {(data) =>
+            data.items.length === 0 ? (
+              <StatePanel type="empty" message="일별 기록이 없어요." />
+            ) : (
+              <Table
+                rowKey="id"
+                columns={dayColumns}
+                dataSource={data.items}
+                pagination={false}
+                size="small"
+              />
+            )
+          }
+        </QueryBoundary>
       </Drawer>
+      <ConfirmActionModal
+        open={Boolean(pending)}
+        title={pending?.title ?? ''}
+        summary={pending?.summary ?? ''}
+        danger={pending?.danger}
+        onSubmit={async ({ reason, idempotencyKey }) => {
+          await moderate.mutateAsync({
+            id: challengeId,
+            participationId: selected.participationId,
+            ...pending.body,
+            reason,
+            idempotencyKey,
+          });
+          message.success('처리했어요');
+          setPending(null);
+        }}
+        onCancel={() => setPending(null)}
+      />
     </Space>
   );
 }

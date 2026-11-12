@@ -1,15 +1,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  addFeatured,
   createCatalogItem,
   createDefinition,
   createRewardRate,
   fetchCatalog,
   fetchDefinition,
   fetchDefinitions,
-  fetchFeatured,
   fetchRewardRates,
-  removeFeatured,
   reviewDefinition,
   updateCatalogItem,
   updateDefinition,
@@ -20,7 +17,6 @@ export const missionKeys = {
   definitionList: (params) => ['missions', 'definitions', 'list', params],
   definition: (id) => ['missions', 'definitions', 'detail', id],
   catalog: (kind) => ['missions', 'catalog', kind],
-  featured: ['missions', 'featured'],
   rewardRates: (params) => ['missions', 'reward-rates', params],
 };
 
@@ -101,27 +97,5 @@ export const useCreateRewardRate = () => {
   return useMutation({
     mutationFn: ({ body, idempotencyKey }) => createRewardRate(body, idempotencyKey),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['missions', 'reward-rates'] }),
-  });
-};
-
-/** Featured missions (assumed API, see api.js) */
-export const useFeatured = () =>
-  useQuery({ queryKey: missionKeys.featured, queryFn: fetchFeatured });
-
-/** variables: `{body: {definitionId, reason}, idempotencyKey}` */
-export const useAddFeatured = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ body, idempotencyKey }) => addFeatured(body, idempotencyKey),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: missionKeys.featured }),
-  });
-};
-
-/** variables: `{id, body: {reason}, idempotencyKey}` */
-export const useRemoveFeatured = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, body, idempotencyKey }) => removeFeatured(id, body, idempotencyKey),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: missionKeys.featured }),
   });
 };

@@ -1,9 +1,20 @@
 // ADM-19 Official challenge create / edit
-import { useEffect, useMemo } from 'react';
-import { App, Button, DatePicker, Form, Input, InputNumber, Select, Space, Typography } from 'antd';
+import { useMemo, useState } from 'react';
+import {
+  Button,
+  DatePicker,
+  Form,
+  Input,
+  InputNumber,
+  message,
+  Select,
+  Space,
+  Typography,
+} from 'antd';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router';
-import QueryState from '../../../components/QueryState.jsx';
+import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
+import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { EXERCISE, VERIFICATION_METHOD } from '../labels.js';
 import {
   useCategories,
@@ -15,10 +26,6 @@ import {
 
 const DURATIONS = [7, 14, 30];
 const DATE_FORMAT = 'YYYY-MM-DD';
-const REASON_RULES = [
-  { required: true, whitespace: true, message: '사유를 입력해 주세요.' },
-  { max: 500, message: '사유는 500자까지 입력할 수 있어요.' },
-];
 
 const toFormValues = (c) => ({
   title: c.title,
@@ -38,7 +45,7 @@ const toFormValues = (c) => ({
 
 /** form values -> request fields (blank optional fields are left out) */
 const toBody = (values) => {
-  const { period, reason, ...rest } = values;
+  const { period, ...rest } = values;
   const body = {
     ...rest,
     startDate: period[0].format(DATE_FORMAT),
@@ -49,56 +56,36 @@ const toBody = (values) => {
   if (body.reward) {
     body.reward = Object.fromEntries(Object.entries(body.reward).filter(([, v]) => !blank(v)));
   }
-  return { body, reason };
+  return body;
 };
 
-export default function ChallengeFormPage() {
+function ChallengeForm({ challenge, categories, difficulties }) {
   const { challengeId } = useParams();
   const isEdit = Boolean(challengeId);
   const navigate = useNavigate();
-  const { message } = App.useApp();
   const [form] = Form.useForm();
-  const categories = useCategories();
-  const difficulties = useDifficultyLevels();
-  const challenge = useChallenge(challengeId);
   const create = useCreateChallenge();
   const update = useUpdateChallenge();
-  const saving = create.isPending || update.isPending;
-  const saveError = create.error ?? update.error;
+  const [pending, setPending] = useState(null); // {body} (create) or {patch} (edit)
 
-  const initial = useMemo(
-    () => (challenge.data ? toFormValues(challenge.data) : null),
-    [challenge.data],
-  );
-  useEffect(() => {
-    if (initial) form.setFieldsValue(initial);
-  }, [initial, form]);
+  const initial = useMemo(() => (challenge ? toFormValues(challenge) : null), [challenge]);
 
-  const loading = categories.isLoading || difficulties.isLoading || (isEdit && challenge.isLoading);
-  const loadError = categories.error ?? difficulties.error ?? (isEdit ? challenge.error : null);
-
-  const onFinish = async (values) => {
-    const { body, reason } = toBody(values);
-    try {
-      if (isEdit) {
-        const original = toBody({ ...initial, reason }).body;
-        const patch = Object.fromEntries(
-          Object.entries(body).filter(
-            ([key, value]) => JSON.stringify(value) !== JSON.stringify(original[key]),
-          ),
-        );
-        if (Object.keys(patch).length === 0) {
-          message.info('바꾼 항목이 없어요.');
-          return;
-        }
-        await update.mutateAsync({ id: challengeId, patch: { ...patch, reason } });
-      } else {
-        await create.mutateAsync({ body: { ...body, reason } });
+  const onFinish = (values) => {
+    const body = toBody(values);
+    if (isEdit) {
+      const original = toBody(initial);
+      const patch = Object.fromEntries(
+        Object.entries(body).filter(
+          ([key, value]) => JSON.stringify(value) !== JSON.stringify(original[key]),
+        ),
+      );
+      if (Object.keys(patch).length === 0) {
+        message.info('바꾼 항목이 없어요.');
+        return;
       }
-      message.success('변경 사항을 저장했습니다.');
-      navigate('/challenges');
-    } catch {
-      // The error is shown under the form (saveError); the typed values stay.
+      setPending({ patch });
+    } else {
+      setPending({ body });
     }
   };
 
@@ -111,16 +98,13 @@ export default function ChallengeFormPage() {
   };
 
   return (
-    <QueryState loading={loading} error={loadError}>
-      <Typography.Title level={4}>
-        {isEdit ? '공식 챌린지 수정' : '공식 챌린지 등록'}
-      </Typography.Title>
+    <>
       <Form
         form={form}
         layout="vertical"
         style={{ maxWidth: 720 }}
         onFinish={onFinish}
-        initialValues={{ reward: { points: 0, userXp: 0, petXp: 0 } }}
+        initialValues={initial ?? { reward: { points: 0, userXp: 0, petXp: 0 } }}
       >
         <Form.Item
           label="제목"
@@ -150,7 +134,7 @@ export default function ChallengeFormPage() {
           >
             <Select
               style={{ width: 200 }}
-              options={(categories.data ?? [])
+              options={categories
                 .filter((c) => c.isActive)
                 .map((c) => ({ value: c.id, label: c.name }))}
             />
@@ -162,7 +146,7 @@ export default function ChallengeFormPage() {
           >
             <Select
               style={{ width: 200 }}
-              options={(difficulties.data ?? [])
+              options={difficulties
                 .filter((d) => d.isActive)
                 .map((d) => ({ value: d.id, label: d.name }))}
             />
@@ -269,21 +253,69 @@ export default function ChallengeFormPage() {
         <Form.Item label="배지 업적 버전 ID (선택)" name={['reward', 'badgeAchievementVersionId']}>
           <Input placeholder="UUID" />
         </Form.Item>
-        <Form.Item label="변경 사유" name="reason" rules={REASON_RULES}>
-          <Input.TextArea rows={2} maxLength={500} showCount />
-        </Form.Item>
-        {saveError && (
-          <Typography.Paragraph type="danger" role="alert">
-            {saveError.message}
-          </Typography.Paragraph>
-        )}
         <Space>
           <Button onClick={() => navigate('/challenges')}>취소</Button>
-          <Button type="primary" htmlType="submit" loading={saving}>
+          <Button type="primary" htmlType="submit">
             저장
           </Button>
         </Space>
       </Form>
-    </QueryState>
+      <ConfirmActionModal
+        open={Boolean(pending)}
+        title={isEdit ? '공식 챌린지 수정' : '공식 챌린지 등록'}
+        summary={isEdit ? challenge.title : (form.getFieldValue('title') ?? '')}
+        onSubmit={async ({ reason, idempotencyKey }) => {
+          if (isEdit) {
+            await update.mutateAsync({
+              id: challengeId,
+              patch: { ...pending.patch, reason },
+              idempotencyKey,
+            });
+          } else {
+            await create.mutateAsync({ body: { ...pending.body, reason }, idempotencyKey });
+          }
+          message.success('처리했어요');
+          setPending(null);
+          navigate('/challenges');
+        }}
+        onCancel={() => setPending(null)}
+      />
+    </>
+  );
+}
+
+export default function ChallengeFormPage() {
+  const { challengeId } = useParams();
+  const categories = useCategories();
+  const difficulties = useDifficultyLevels();
+  const challenge = useChallenge(challengeId);
+
+  return (
+    <>
+      <Typography.Title level={4}>
+        {challengeId ? '공식 챌린지 수정' : '공식 챌린지 등록'}
+      </Typography.Title>
+      <QueryBoundary query={categories}>
+        {(categoryList) => (
+          <QueryBoundary query={difficulties}>
+            {(difficultyList) =>
+              challengeId ? (
+                <QueryBoundary query={challenge}>
+                  {(data) => (
+                    <ChallengeForm
+                      challenge={data}
+                      categories={categoryList}
+                      difficulties={difficultyList}
+                    />
+                  )}
+                </QueryBoundary>
+              ) : (
+                <ChallengeForm categories={categoryList} difficulties={difficultyList} />
+              )
+            }
+          </QueryBoundary>
+        )}
+      </QueryBoundary>
+    </>
   );
 }

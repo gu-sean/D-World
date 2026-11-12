@@ -84,20 +84,3 @@ export const fetchRewardRates = (params = {}) =>
 /** M75 POST /mission-reward-rates: `{categoryId, difficultyId, points, userXp, petXp, effectiveAt?, reason}` */
 export const createRewardRate = (body, idempotencyKey) =>
   http.post('/mission-reward-rates', body, { idempotencyKey }).then((response) => response.data);
-
-// ── Featured (recommended) missions ──
-// ASSUMPTION: the backend has no admin API for this yet (no controller found). The contract
-// below is a proposal, served only by the MSW mock until the backend team confirms it.
-
-/** GET /featured-missions -> `{items: [{id, definitionId, title, displayOrder}]}` */
-export const fetchFeatured = () => http.get('/featured-missions').then((response) => response.data);
-
-/** POST /featured-missions: `{definitionId, reason}` */
-export const addFeatured = (body, idempotencyKey) =>
-  http.post('/featured-missions', body, { idempotencyKey }).then((response) => response.data);
-
-/** DELETE /featured-missions/:id with `{reason}` in the body */
-export const removeFeatured = (id, body, idempotencyKey) =>
-  http
-    .delete(`/featured-missions/${id}`, { data: body, idempotencyKey })
-    .then((response) => response.data);

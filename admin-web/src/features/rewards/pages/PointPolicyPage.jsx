@@ -1,10 +1,13 @@
 // ADM-24 Point policies: monthly cap and mission reward table
 import { useState } from 'react';
 import { Button, DatePicker, Form, InputNumber, Select, Table, Tabs, Typography } from 'antd';
-import QueryState from '../../../components/QueryState.jsx';
-import { EffectiveAtItem, ErrorAlert, ReasonItem } from '../components/formBits.jsx';
-import { formatTime, toIso } from '../components/helpers.js';
+import { DateText } from '../../../components/DateText.jsx';
+import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
+import { StatePanel } from '../../../components/StatePanel.jsx';
+import { EffectiveAtItem } from '../components/EffectiveAtItem.jsx';
+import { toIso } from '../components/helpers.js';
 import { MAX_POINTS } from '../components/labels.js';
+import { useConfirmedChange } from '../components/useConfirmedChange.jsx';
 import {
   useCategories,
   useCreatePointCap,
@@ -18,55 +21,49 @@ function MonthlyCapTab() {
   const [form] = Form.useForm();
   const list = usePointCaps();
   const create = useCreatePointCap();
-  const items = list.data?.items ?? [];
+  const [ask, modal] = useConfirmedChange();
 
-  const onFinish = async ({ month, monthlyLimitPoints, reason }) => {
-    try {
-      await create.mutateAsync({
-        effectiveMonth: month.format('YYYY-MM-01'),
-        monthlyLimitPoints,
-        reason: reason.trim(),
-      });
-      form.resetFields();
-    } catch {
-      // shown under the title
-    }
-  };
+  const onFinish = ({ month, monthlyLimitPoints }) =>
+    ask({
+      title: '새 월 한도를 저장할까요?',
+      summary: `${month.format('YYYY-MM')} · ${monthlyLimitPoints.toLocaleString()} P`,
+      run: ({ reason, idempotencyKey }) =>
+        create.mutateAsync({
+          payload: { effectiveMonth: month.format('YYYY-MM-01'), monthlyLimitPoints, reason },
+          idempotencyKey,
+        }),
+      onDone: () => form.resetFields(),
+    });
 
   return (
     <>
-      <QueryState
-        loading={list.isLoading}
-        error={list.error}
-        empty={items.length === 0}
-        onRetry={list.refetch}
-      >
-        <Table
-          rowKey="id"
-          pagination={false}
-          dataSource={items}
-          columns={[
-            { title: '적용 월', dataIndex: 'effectiveMonth', render: (m) => m?.slice(0, 7) },
-            {
-              title: '월 한도',
-              dataIndex: 'monthlyLimitPoints',
-              align: 'right',
-              render: (n) => `${n.toLocaleString()} P`,
-            },
-          ]}
-        />
-      </QueryState>
+      {modal}
+      <QueryBoundary query={list}>
+        {({ items }) =>
+          items.length === 0 ? (
+            <StatePanel type="empty" />
+          ) : (
+            <Table
+              rowKey="id"
+              pagination={false}
+              dataSource={items}
+              columns={[
+                { title: '적용 월', dataIndex: 'effectiveMonth', render: (m) => m?.slice(0, 7) },
+                {
+                  title: '월 한도',
+                  dataIndex: 'monthlyLimitPoints',
+                  align: 'right',
+                  render: (n) => `${n.toLocaleString()} P`,
+                },
+              ]}
+            />
+          )
+        }
+      </QueryBoundary>
       <Typography.Title level={5} style={{ marginTop: 24 }}>
         새 월 한도 추가
       </Typography.Title>
-      <ErrorAlert error={create.error} />
-      <Form
-        form={form}
-        layout="vertical"
-        style={{ maxWidth: 420 }}
-        onFinish={onFinish}
-        onValuesChange={() => create.reset()}
-      >
+      <Form form={form} layout="vertical" style={{ maxWidth: 420 }} onFinish={onFinish}>
         <Form.Item
           name="month"
           label="적용 월"
@@ -79,10 +76,9 @@ function MonthlyCapTab() {
           label="월 한도"
           rules={[{ required: true, message: '월 한도를 입력해 주세요.' }]}
         >
-          <InputNumber min={0} max={MAX_POINTS} precision={0} addonAfter="P" />
+          <InputNumber min={0} max={MAX_POINTS} precision={0} suffix="P" />
         </Form.Item>
-        <ReasonItem />
-        <Button type="primary" htmlType="submit" loading={create.isPending}>
+        <Button type="primary" htmlType="submit">
           저장
         </Button>
       </Form>
@@ -97,23 +93,22 @@ function RewardRateTab() {
   const difficulties = useDifficultyLevels();
   const list = useRewardRates(filter);
   const create = useCreateRewardRate();
-  const items = list.data ?? [];
+  const [ask, modal] = useConfirmedChange();
 
   const nameOf = (rows, id) => rows?.find((row) => row.id === id)?.name ?? id;
   const toOptions = (rows) => (rows ?? []).map((row) => ({ value: row.id, label: row.name }));
 
-  const onFinish = async ({ effectiveAt, reason, ...values }) => {
-    try {
-      await create.mutateAsync({
-        ...values,
-        effectiveAt: toIso(effectiveAt),
-        reason: reason.trim(),
-      });
-      form.resetFields();
-    } catch {
-      // shown under the title
-    }
-  };
+  const onFinish = ({ effectiveAt, ...values }) =>
+    ask({
+      title: '새 보상표 버전을 저장할까요?',
+      summary: `${nameOf(categories.data, values.categoryId)} · ${nameOf(difficulties.data, values.difficultyId)} · ${values.points}P / 사용자 ${values.userXp}XP / 펫 ${values.petXp}XP`,
+      run: ({ reason, idempotencyKey }) =>
+        create.mutateAsync({
+          payload: { ...values, effectiveAt: toIso(effectiveAt), reason },
+          idempotencyKey,
+        }),
+      onDone: () => form.resetFields(),
+    });
 
   const numberItem = (name, label) => (
     <Form.Item
@@ -127,6 +122,7 @@ function RewardRateTab() {
 
   return (
     <>
+      {modal}
       <Form
         layout="inline"
         style={{ marginBottom: 16 }}
@@ -151,42 +147,44 @@ function RewardRateTab() {
           />
         </Form.Item>
       </Form>
-      <QueryState
-        loading={list.isLoading}
-        error={list.error}
-        empty={items.length === 0}
-        onRetry={list.refetch}
-      >
-        <Table
-          rowKey="id"
-          pagination={false}
-          dataSource={items}
-          columns={[
-            { title: '분야', dataIndex: 'categoryId', render: (id) => nameOf(categories.data, id) },
-            {
-              title: '난이도',
-              dataIndex: 'difficultyId',
-              render: (id) => nameOf(difficulties.data, id),
-            },
-            { title: '버전', dataIndex: 'versionNo', render: (v) => `v${v}` },
-            { title: '포인트', dataIndex: 'points', align: 'right' },
-            { title: '사용자 XP', dataIndex: 'userXp', align: 'right' },
-            { title: '펫 XP', dataIndex: 'petXp', align: 'right' },
-            { title: '시행 시각', dataIndex: 'effectiveAt', render: formatTime },
-          ]}
-        />
-      </QueryState>
+      <QueryBoundary query={list}>
+        {(items) =>
+          items.length === 0 ? (
+            <StatePanel type="empty" />
+          ) : (
+            <Table
+              rowKey="id"
+              pagination={false}
+              dataSource={items}
+              columns={[
+                {
+                  title: '분야',
+                  dataIndex: 'categoryId',
+                  render: (id) => nameOf(categories.data, id),
+                },
+                {
+                  title: '난이도',
+                  dataIndex: 'difficultyId',
+                  render: (id) => nameOf(difficulties.data, id),
+                },
+                { title: '버전', dataIndex: 'versionNo', render: (v) => `v${v}` },
+                { title: '포인트', dataIndex: 'points', align: 'right' },
+                { title: '사용자 XP', dataIndex: 'userXp', align: 'right' },
+                { title: '펫 XP', dataIndex: 'petXp', align: 'right' },
+                {
+                  title: '시행 시각',
+                  dataIndex: 'effectiveAt',
+                  render: (value) => <DateText value={value} />,
+                },
+              ]}
+            />
+          )
+        }
+      </QueryBoundary>
       <Typography.Title level={5} style={{ marginTop: 24 }}>
         새 보상표 버전 추가
       </Typography.Title>
-      <ErrorAlert error={create.error} />
-      <Form
-        form={form}
-        layout="vertical"
-        style={{ maxWidth: 420 }}
-        onFinish={onFinish}
-        onValuesChange={() => create.reset()}
-      >
+      <Form form={form} layout="vertical" style={{ maxWidth: 420 }} onFinish={onFinish}>
         <Form.Item
           name="categoryId"
           label="분야"
@@ -205,7 +203,6 @@ function RewardRateTab() {
         {numberItem('userXp', '사용자 XP')}
         {numberItem('petXp', '펫 XP')}
         <EffectiveAtItem />
-        <ReasonItem />
         <Button type="primary" htmlType="submit" loading={create.isPending}>
           새 버전 저장
         </Button>
