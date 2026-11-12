@@ -23,8 +23,6 @@ export const config = {
   API_BASE_URL: text(Config.API_BASE_URL, 'http://localhost:3000/api/v1').replace(/\/+$/, ''),
   /** 'development' | 'production' */
   APP_ENV: text(Config.APP_ENV, 'development'),
-  /** true면 `src/client/mock/`의 가짜 응답을 쓴다 (백엔드 없이 화면 개발). */
-  USE_MOCK_API: flag(Config.USE_MOCK_API, false),
   /** 'mock'이면 소셜 로그인이 SDK를 부르지 않는다 (12 §8.4). */
   SOCIAL_LOGIN_MODE: text(Config.SOCIAL_LOGIN_MODE, 'mock'),
   /** 러닝 파일 `device.appVersion`·A45 `clientMetrics.appVersion`에 넣는 값. */

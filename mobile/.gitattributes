@@ -1,0 +1,7 @@
+# Windows 배치 파일은 CRLF로 둬야 cmd가 제대로 읽는다 (gradlew.bat).
+*.bat text eol=crlf
+
+# 줄바꿈을 건드리면 깨지는 것들.
+*.jar binary
+*.keystore binary
+*.png binary
