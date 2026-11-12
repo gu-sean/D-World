@@ -6,7 +6,6 @@
  *  - 타임아웃 끊기
  *  - 401 `AUTH_TOKEN_EXPIRED`면 토큰을 갱신하고 **한 번만** 다시 보내기
  *  - 어떤 실패든 `AppError`로 바꿔서 던지기
- *  - `USE_MOCK_API=true`면 가짜 서버로 보내기
  *
  * 세션(`auth/session.js`)은 서로 import 하면 고리가 생기므로
  * `setAuthProvider()`로 자기를 등록한다.
@@ -36,14 +35,6 @@ export function setAuthProvider(provider) {
 /** 테스트에서 상태를 되돌릴 때 쓴다. */
 export function clearAuthProvider() {
   authProvider = null;
-}
-
-let mockServerPromise = null;
-async function getMockServer() {
-  if (!mockServerPromise) {
-    mockServerPromise = import('../mock/mockServer.js').then((m) => m.mockServer);
-  }
-  return mockServerPromise;
 }
 
 /**
@@ -115,9 +106,9 @@ async function send(opts, mayRefresh) {
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const { status, payload, getHeader } = config.USE_MOCK_API
-    ? await callMock({ method, path, query, body, headers })
-    : await callFetch({ method, url, headers, body, timeoutMs, signal });
+  const { status, payload, getHeader } = await callFetch({
+    method, url, headers, body, timeoutMs, signal,
+  });
 
   // 성공을 먼저 가른다. 본문이 없는 5xx를 성공으로 보면 안 된다.
   if (status >= 200 && status < 300) {
@@ -182,22 +173,6 @@ async function callFetch({ method, url, headers, body, timeoutMs, signal }) {
   }
 
   return { status, payload, getHeader: (name) => response.headers.get(name) };
-}
-
-/** 가짜 서버 (`USE_MOCK_API=true`). 실제처럼 보이도록 300ms 늦춘다. */
-async function callMock({ method, path, query, body, headers }) {
-  const server = await getMockServer();
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  const result = await server.handle({ method, path, query, body, headers });
-  return {
-    status: result.status,
-    payload: result.body,
-    getHeader: (name) => {
-      const want = String(name).toLowerCase();
-      const found = Object.entries(result.headers ?? {}).find(([k]) => k.toLowerCase() === want);
-      return found ? String(found[1]) : null;
-    },
-  };
 }
 
 export default request;

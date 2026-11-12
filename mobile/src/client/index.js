@@ -161,6 +161,8 @@ export { labels, labelOf } from './labels.js';
 export { parseLinkScreen } from './links.js';
 /** 권한 `check`·`request`·`openSettings` (parts/mobile-ui §8) */
 export { permissions } from './device/permissions.js';
+/** `.env`에서 읽은 설정값 (12 §8.4). 비밀값은 들어 있지 않다. */
+export { config, isDev } from './config.js';
 /** 앱 안의 유일한 오류 모양 (05 §7) */
 export { AppError } from './http/AppError.js';
 export { getErrorMessage } from './http/errorMessages.js';

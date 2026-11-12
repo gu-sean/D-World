@@ -110,6 +110,12 @@ export const challengePublicationStatus = {
   hidden: '숨김',
   cancelled: '취소',
 };
+/** 07 §14 `Challenge.phase` (11 §3.2) */
+export const challengePhase = {
+  recruiting: '모집 중',
+  ongoing: '진행 중',
+  ended: '끝남',
+};
 export const challengeSettlementStatus = {
   not_started: '정산 전',
   draft: '정산안',
@@ -130,6 +136,13 @@ export const challengeDailyMissionStatus = {
   cancelled: '취소',
 };
 
+/** 07 §2 `PolicyDocument.documentType` */
+export const policyDocumentType = {
+  terms: '서비스 이용약관',
+  privacy: '개인정보 처리방침',
+  marketing: '마케팅 정보 수신',
+};
+
 /** 04 §5 계정·운영 */
 export const userStatus = { active: '정상', withdrawal_processing: '탈퇴 처리 중' };
 export const accountActionType = { warning: '경고', restriction: '이용 제한' };
@@ -141,6 +154,19 @@ export const withdrawalStatus = {
   completed: '완료',
 };
 export const ticketType = { inquiry: '문의', report: '신고' };
+/** 07 §15 `SupportTicketInput.category` — 문의와 신고가 쓰는 값을 한 표에 모았다. */
+export const ticketCategory = {
+  account: '계정',
+  mission: '미션',
+  verification: '인증',
+  points: '포인트',
+  challenge: '챌린지',
+  abuse: '욕설·괴롭힘',
+  inappropriate_content: '부적절한 내용',
+  cheating: '부정 인증',
+  impersonation: '사칭',
+  other: '기타',
+};
 export const ticketStatus = { received: '접수', in_review: '검토 중', completed: '완료' };
 export const ticketTargetKind = {
   user: '회원',
@@ -171,6 +197,24 @@ export const recommendationStatus = {
   accepted: '수락',
   dismissed: '거절',
   expired: '만료',
+};
+/** 07 §13 `MissionRecommendation.context.weather` */
+export const weatherCode = {
+  clear: '맑음',
+  clouds: '흐림',
+  rain: '비',
+  snow: '눈',
+  hot: '더움',
+  cold: '추움',
+  dust: '미세먼지',
+  unknown: '알 수 없음',
+};
+/** 07 §13 `MissionRecommendation.context.timeSlot` */
+export const timeSlot = {
+  morning: '아침',
+  afternoon: '낮',
+  evening: '저녁',
+  night: '밤',
 };
 
 /** 04 §4 운동 종류 */
@@ -215,19 +259,24 @@ export const labels = {
   shopItemKind,
   shopOrderStatus,
   challengePublicationStatus,
+  challengePhase,
   challengeSettlementStatus,
   challengeParticipationStatus,
   challengeDailyMissionStatus,
+  policyDocumentType,
   userStatus,
   accountActionType,
   withdrawalStatus,
   ticketType,
+  ticketCategory,
   ticketStatus,
   ticketTargetKind,
   ticketOutcome,
   noticeCategory,
   noticeStatus,
   recommendationStatus,
+  weatherCode,
+  timeSlot,
   exerciseCode,
   targetUnit,
 };
