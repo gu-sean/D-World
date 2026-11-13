@@ -2,14 +2,14 @@
 
 ## 개요
 - 엔진: PostgreSQL 14+ (개발 compose는 16)
-- 규모(013 기준): 테이블 93(+`schema_migrations`), 뷰 1, 함수 82, 트리거 95, FK 201, CHECK 459, 인덱스 317
-- 스키마: `public` 단일, 마이그레이션 `001~013`을 번호 순서로 적용
+- 규모(014 기준): 테이블 93(+`schema_migrations`), 뷰 1, 함수 82, 트리거 95, FK 201, CHECK 459, 인덱스 317
+- 스키마: `public` 단일, 마이그레이션 `001~014`를 번호 순서로 적용
 - 시간 기준: 저장은 `timestamptz`, 일·월 집계(월간 한도, 스트릭)는 `Asia/Seoul`
 - 식별자: 전 테이블 `uuid` PK, 앱이 생성
 
 ```
 db/
-  migrations/   001~013 (기능별 파일, 번호 = 적용 순서)
+  migrations/   001~014 (기능별 파일, 번호 = 적용 순서)
   tests/        기능별 smoke SQL 13개 + 전역 FK 인덱스 검사 1개 (전부 ROLLBACK, 데이터 잔류 없음)
   seeds/dev/    개발용 시드 (001 기준 데이터, 002 콘텐츠·개발 사용자·공개 챌린지, assets)
   (시연용 가상 데이터는 SQL이 아니라 `backend/scripts/seed-demo.mjs`, 아래 "시연 데이터" 참고)
@@ -17,7 +17,7 @@ db/
   ops/          운영 기준·계정 분리·백업·복구 리허설·모니터링·마이그레이션 적용 절차 ([ops/README.md](ops/README.md))
   (줄바꿈 LF 고정은 저장소 루트 .gitattributes)
 ```
-- 저장소 루트 `docker-compose.yml`: 개발용 Postgres 16 + MinIO, `./db`를 `/db`로 읽기 전용 마운트
+- 저장소 루트 `docker-compose.yml`: 개발용 Postgres 16, `./db`를 `/db`로 읽기 전용 마운트. MinIO는 `--profile minio`로만 뜬다(`bitnamilegacy/minio`, 버킷 `dworld-dev` 자동 생성)
 
 ## 설계 원칙
 **소유자 무결성**
@@ -61,6 +61,7 @@ db/
 | 011 | 문의·신고 (이벤트, 처리 결과 분리) | 3 | 18 |
 | 012 | 공지, 회원별 알림, 푸시 기기 | 4 | 19 |
 | 013 | 추천 문구, AI 분석 실행(재생성)·결과(재조정 전 계획, 리포트 피드백, 생성 미션 추천), 시간별 날씨(수집 대상 격자·정시 관측, 사용자·좌표와 연결하지 않음) | 7 | 20 |
+| 014 | 표 설명(COMMENT)만 추가: 미사용 표 `challenge_score_snapshots`는 순위 뷰·최종 순위 표가 대신하므로 비어 있는 것이 정상 | 0 | |
 | 합계 | | 93 | |
 
 - 통합 이력: 보정 파일 014~017(2026-11-09)을 기능 파일 006·007·008·013에 합쳤다. 스키마는 통합 전과 동일(열·제약·인덱스·트리거·함수 2,237건 일치 확인)
@@ -108,7 +109,9 @@ for f in db/seeds/dev/*.sql;  do psql -v ON_ERROR_STOP=1 -d d_world -v admin_pas
 ```
 
 ## 시연 데이터
-- 목적: 시연·수동 테스트용으로 사용자 1명이 앱 기능을 한 번씩 쓴 상태를 만든다
+- **바로 쓰기: 시연 덤프** — `db/dumps/d_world_demo.sql`을 `cd backend && npm run demo` 한 줄로 복원·실행한다.
+  시험 계정(휴대폰 `01099999999`)과 방법은 [`db/dumps/README.md`](dumps/README.md)
+- 목적: 시연·수동 테스트용으로 사용자 1명이 앱 기능을 한 번씩 쓴 상태를 만든다 (아래는 이 데이터를 처음부터 만드는 시드 스크립트)
 - 방식: 원장·캐시·트리거 정합성을 SQL로 직접 맞추지 않고 **앱 API·서비스를 그대로 통과**시켜 생성 (`backend/scripts/seed-demo.mjs`)
 - 선행: 마이그레이션 + 개발 시드 001·002 적용, `npm run build`
 - 실행: `DEMO_USER_PASSWORD=... DATABASE_URL=... npm run db:seed:demo` (사용자가 이미 있으면 건너뜀, 다시 만들려면 DB 재생성)

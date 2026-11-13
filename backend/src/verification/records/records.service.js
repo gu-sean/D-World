@@ -233,9 +233,8 @@ export class RecordsService {
   }
 
   /**
-   * 제출 횟수(남은 제출 수)와 승인된 회차의 지급 보상을 채움
-   * 보상은 지급 기록(mission_point_awards·experience_awards)에서 읽음
-   * 레벨업·진화 여부는 지급 시점에만 알 수 있어 항상 false·null
+   * 남은 제출 수와 승인 회차의 지급 보상을 채움
+   * - 보상: 승인 때 저장한 `metrics.rewards` 우선, 없으면 지급 기록·원장에서 복원 (grantedRewards)
    */
   async attachMissionInfo(db, userId, items) {
     const missionIds = [...new Set(items.map(({ row }) => row.mission_id))];
@@ -260,15 +259,20 @@ export class RecordsService {
     }
   }
 
+  /**
+   * 승인 때 저장한 보상 요약(metrics.rewards)이 없는 이전 기록의 보상을 지급 기록·원장에서 복원한다.
+   * 레벨업·펫 진화·새 배지는 승인과 같은 트랜잭션 시각(experience_transactions.occurred_at)을 기준으로 찾는다.
+   * streakDays는 그 시점 값을 알 수 없어 현재 값을 쓴다.
+   */
   async grantedRewards(db, userId, missionId) {
     const [points, xp, streak] = await Promise.all([
       db.query(
-        `SELECT original_points, paid_points FROM mission_point_awards
+        `SELECT original_points, paid_points, awarded_at FROM mission_point_awards
           WHERE mission_id = $1 AND user_id = $2 AND status = 'active'`,
         [missionId, userId],
       ),
       db.query(
-        `SELECT recipient_pet_id, base_user_xp, base_pet_xp, bonus_pet_xp
+        `SELECT id, recipient_pet_id, base_user_xp, base_pet_xp, bonus_pet_xp, first_awarded_at
            FROM experience_awards
           WHERE user_id = $1 AND source_type = 'mission' AND source_id = $2
             AND status = 'active'`,
@@ -282,18 +286,110 @@ export class RecordsService {
     if (!points.rows[0] && !xp.rows[0]) return null;
     const point = points.rows[0];
     const award = xp.rows[0];
+    const history = await this.rewardHistory(db, userId, point, award);
     return {
       points: point ? point.paid_points : 0,
       pointsCapped: point ? point.paid_points < point.original_points : false,
       userXp: award ? award.base_user_xp : 0,
       petXp: award ? award.base_pet_xp + award.bonus_pet_xp : 0,
       petId: award?.recipient_pet_id ?? null,
+      levelUp: history.levelUp,
+      newLevelNo: history.newLevelNo,
+      petEvolved: history.petEvolved,
+      streakDays: streak.rows[0]?.current_success_days ?? 0,
+      newBadges: history.newBadges,
+    };
+  }
+
+  /** 지급 당시의 레벨업·펫 진화·새 배지 (grantedRewards 참고) */
+  async rewardHistory(db, userId, point, award) {
+    const none = {
       levelUp: false,
       newLevelNo: null,
       petEvolved: false,
-      streakDays: streak.rows[0]?.current_success_days ?? 0,
       newBadges: [],
     };
+    let userTx;
+    let petTx;
+    if (award) {
+      const { rows } = await db.query(
+        `SELECT recipient_kind, xp_delta, balance_after, occurred_at
+           FROM experience_transactions
+          WHERE experience_award_id = $1 AND kind = 'award'`,
+        [award.id],
+      );
+      userTx = rows.find((row) => row.recipient_kind === 'user');
+      petTx = rows.find((row) => row.recipient_kind === 'pet');
+    }
+    // 승인과 같은 트랜잭션에서 지급된 것들의 시각(now())이라 서로 같다
+    const approvedAt =
+      userTx?.occurred_at ??
+      petTx?.occurred_at ??
+      award?.first_awarded_at ??
+      point?.awarded_at;
+    if (!approvedAt) return none;
+
+    // 서로 독립이라 병렬 조회
+    const [level, evolved, badges] = await Promise.all([
+      userTx ? this.levelChange(db, userId, userTx) : null,
+      award?.recipient_pet_id && petTx
+        ? this.petEvolvedBy(db, award.recipient_pet_id, petTx)
+        : false,
+      db.query(
+        `SELECT ua.achievement_id, v.title, v.rarity
+           FROM user_achievements ua
+           JOIN achievement_versions v ON v.id = ua.achievement_version_id
+          WHERE ua.user_id = $1 AND ua.status = 'active' AND ua.awarded_at = $2`,
+        [userId, approvedAt],
+      ),
+    ]);
+    return {
+      levelUp: level !== null,
+      newLevelNo: level,
+      petEvolved: evolved,
+      newBadges: badges.rows.map((badge) => ({
+        achievementId: badge.achievement_id,
+        title: badge.title,
+        rarity: badge.rarity,
+        badgeImageUrl: null,
+      })),
+    };
+  }
+
+  /** 지급으로 오른 레벨(없으면 null): 계정에 고정된 레벨 정책 기준표로 지급 전·후 레벨 비교 */
+  async levelChange(db, userId, userTx) {
+    const { rows } = await db.query(
+      `SELECT (SELECT max(t.level_no) FROM user_level_thresholds t
+                 WHERE t.policy_version_id = e.level_policy_version_id
+                   AND t.min_total_xp <= $2::bigint) AS before_level,
+              (SELECT max(t.level_no) FROM user_level_thresholds t
+                 WHERE t.policy_version_id = e.level_policy_version_id
+                   AND t.min_total_xp <= $3::bigint) AS after_level
+         FROM user_experience e WHERE e.user_id = $1`,
+      [
+        userId,
+        String(BigInt(userTx.balance_after) - BigInt(userTx.xp_delta)),
+        String(userTx.balance_after),
+      ],
+    );
+    const { before_level: before, after_level: after } = rows[0] ?? {};
+    return before != null && after != null && after > before ? after : null;
+  }
+
+  /**
+   * 그 지급이 펫을 진화시켰는가.
+   * 진화 이력의 occurred_at은 clock_timestamp()라 트랜잭션 시각과 다르므로,
+   * 지급 직후 펫의 누적 XP(total_xp_after = 펫 거래의 balance_after)로 찾는다.
+   */
+  async petEvolvedBy(db, petId, petTx) {
+    const { rowCount } = await db.query(
+      `SELECT 1 FROM pet_evolution_events
+        WHERE user_pet_id = $1 AND total_xp_after = $2::bigint
+          AND occurred_at >= $3 AND to_stage_no > from_stage_no
+        LIMIT 1`,
+      [petId, String(petTx.balance_after), petTx.occurred_at],
+    );
+    return rowCount > 0;
   }
 
   /**

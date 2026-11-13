@@ -471,13 +471,21 @@ export class StreakService {
     };
   }
 
-  /** 최근 7일(오늘 포함)의 날짜별 상태, 기록이 없는 날은 오늘이면 pending 아니면 failed */
+  /**
+   * 최근 7일(오늘 포함)의 날짜별 상태.
+   * 기록이 없는 날은 가입일(KST) 이전이면 none(가입 전이라 판정 대상이 아님), 오늘이면 pending, 그 밖은 failed
+   */
   async recentStatuses(userId) {
     const { rows } = await this.database.query(
       `SELECT d::date::text AS date,
-              coalesce(s.status, CASE WHEN d::date = ${TODAY_SQL} THEN 'pending' ELSE 'failed' END) AS status
+              coalesce(s.status, CASE
+                WHEN d::date < (u.created_at AT TIME ZONE 'Asia/Seoul')::date THEN 'none'
+                WHEN d::date = ${TODAY_SQL} THEN 'pending'
+                ELSE 'failed' END) AS status
          FROM generate_series(${TODAY_SQL} - 6, ${TODAY_SQL}, interval '1 day') d
+         CROSS JOIN users u
          LEFT JOIN streak_days s ON s.user_id = $1 AND s.streak_date = d::date
+        WHERE u.id = $1
         ORDER BY d`,
       [userId],
     );

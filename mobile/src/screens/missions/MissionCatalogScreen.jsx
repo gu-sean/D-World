@@ -77,13 +77,7 @@ export default function MissionCatalogScreen({ navigation, route }) {
                 <Text style={styles.title}>{item.title}</Text>
                 {!!item.description && <Text style={styles.description}>{item.description}</Text>}
                 <Text style={styles.meta}>
-                  {format.formatTarget(item.targetValue, item.targetUnit)}
-                  {item.estimatedDurationSeconds
-                    ? ` · ${format.formatSpokenDuration(item.estimatedDurationSeconds)}`
-                    : ''}
-                  {item.rewardPreview?.points
-                    ? ` · ${format.formatPoints(item.rewardPreview.points)}`
-                    : ''}
+                  {format.formatMissionMeta({ ...item, rewardPoints: item.rewardPreview?.points })}
                 </Text>
                 <View style={styles.addButton}>
                   <Button

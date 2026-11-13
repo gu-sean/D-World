@@ -18,7 +18,7 @@ export default function TermsAgreementScreen({ navigation, route }) {
   const policies = useCurrentPolicies();
   const [granted, setGranted] = useState({});
 
-  const documents = policies.data ?? [];
+  const documents = useMemo(() => policies.data ?? [], [policies.data]);
   const allRequiredGranted = useMemo(
     () => documents.filter((d) => d.isRequired).every((d) => granted[d.id]),
     [documents, granted],

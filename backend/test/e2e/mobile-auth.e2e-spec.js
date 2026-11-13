@@ -90,6 +90,16 @@ describe.skipIf(!databaseUrl)('모바일 계정 API A01~A10 (PostgreSQL)', () =>
     );
   });
 
+  it('A04 약관 문서는 terms·privacy·marketing 순', async () => {
+    const { body } = await http
+      .get('/api/v1/policy-documents/current')
+      .expect(200);
+    const types = body.map((d) => d.documentType);
+    const order = ['terms', 'privacy', 'marketing'];
+    const known = types.filter((type) => order.includes(type));
+    expect(known).toEqual(order.filter((type) => known.includes(type)));
+  });
+
   it('A01~A06 가입 → 로그인 → 갱신 → 로그아웃', async () => {
     const phoneNumber = national();
     const confirmed = await verify(phoneNumber, 'signup');

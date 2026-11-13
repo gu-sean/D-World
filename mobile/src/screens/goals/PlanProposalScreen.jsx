@@ -103,10 +103,7 @@ export default function PlanProposalScreen({ navigation, route }) {
                         <View style={styles.missionTexts}>
                           <Text style={styles.missionTitle}>{mission.title}</Text>
                           <Text style={styles.missionTarget}>
-                            {format.formatTarget(mission.targetValue, mission.targetUnit)}
-                            {mission.estimatedDurationSeconds
-                              ? ` · ${format.formatSpokenDuration(mission.estimatedDurationSeconds)}`
-                              : ''}
+                            {format.formatMissionMeta(mission)}
                           </Text>
                         </View>
                       </View>

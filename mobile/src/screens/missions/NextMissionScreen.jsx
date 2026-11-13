@@ -57,12 +57,7 @@ export default function NextMissionScreen({ navigation }) {
                 <CategoryChip categoryCode={item.categoryCode} name={item.categoryName} size="sm" />
                 <Text style={styles.title}>{item.title}</Text>
                 {!!item.description && <Text style={styles.description}>{item.description}</Text>}
-                <Text style={styles.meta}>
-                  {format.formatTarget(item.targetValue, item.targetUnit)}
-                  {item.estimatedDurationSeconds
-                    ? ` · ${format.formatSpokenDuration(item.estimatedDurationSeconds)}`
-                    : ''}
-                </Text>
+                <Text style={styles.meta}>{format.formatMissionMeta(item)}</Text>
                 <View style={styles.addButton}>
                   <Button
                     title="오늘 할 미션으로 추가"

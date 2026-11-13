@@ -45,6 +45,7 @@ describe.skipIf(!databaseUrl)(
         const today = kstDate();
         expect(before).toMatchObject({ from: today, to: today });
         expect(Object.keys(before.queues).sort()).toEqual([
+          'aiPending',
           'appeals',
           'challengeReviews',
           'missionDefinitionReviews',
@@ -76,6 +77,13 @@ describe.skipIf(!databaseUrl)(
         );
         expect(after.queues.supportTickets.oldestAt).not.toBeNull();
         expect(typeof after.pointsGranted).toBe('number');
+        const { rows: pending } = await db.query(
+          `SELECT count(*)::int AS n FROM mission_records r
+            WHERE r.status = 'submitted'
+              AND NOT EXISTS (SELECT 1 FROM verification_results v WHERE v.record_id = r.id)`,
+        );
+        expect(after.queues.aiPending.count).toBe(pending[0].n);
+        expect(after.queues.aiPending).toHaveProperty('oldestAt');
       });
 
       it('과거 기간은 그 기간만 세고, 잘못된 기간은 400', async () => {

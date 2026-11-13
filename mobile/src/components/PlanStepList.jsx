@@ -38,12 +38,7 @@ export default function PlanStepList({ steps = [], compact = false }) {
                     {mission.title}
                   </Text>
                   {!compact && (
-                    <Text style={styles.missionMeta}>
-                      {format.formatTarget(mission.targetValue, mission.targetUnit)}
-                      {mission.estimatedDurationSeconds
-                        ? ` · ${format.formatSpokenDuration(mission.estimatedDurationSeconds)}`
-                        : ''}
-                    </Text>
+                    <Text style={styles.missionMeta}>{format.formatMissionMeta(mission)}</Text>
                   )}
                 </View>
               </View>

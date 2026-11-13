@@ -15,9 +15,8 @@ const daysBetween = (from, to) =>
 
 /**
  * 규칙 기반 계획 초안 (AI 서버 연동 전의 대체 생성기)
- * 오늘(또는 시작일) ~ 종료일을 최대 4단계로 나누고, 단계마다 주당 목표 빈도에 맞춰
- * 날짜를 고르게 뿌린다. 미션은 목표의 분야·난이도를 쓰고 카메라 인증으로 만든다.
- * 한 번에 만드는 미션은 100개 이하.
+ * - 오늘(또는 시작일) ~ 종료일을 최대 4단계로 분할, 단계마다 주당 목표 빈도에 맞춰 날짜를 고르게 배치
+ * - 미션: 목표의 분야·난이도, 카메라 인증, 한 번에 100개 이하
  *
  * @param {{title: string, startDate: string, endDate: string,
  *   targetFrequency?: number|null, dailyAvailableMinutes?: number|null}} goal

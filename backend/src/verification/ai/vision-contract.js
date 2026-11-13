@@ -38,17 +38,23 @@ export function pickMedia(files = []) {
  * @param {{mediaAccess?: 'object_key'|'signed_url'}} options
  *   signed_url이면 media에 읽기용 서명 URL(downloadUrl)을 더한다. 현재 AI 스키마(extra=forbid)는
  *   이 필드를 받지 않으므로 AI가 `downloadUrl`을 추가한 뒤에 켠다.
+ * @param {{photoEnabled?: boolean}} options photoEnabled가 false면 사진 증거는 보낼 수 없는 회차(관리자 검수)
  */
 export function toVisionAnalysisRequest(
   request,
   callbackUrl,
-  { mediaAccess = 'object_key' } = {},
+  { mediaAccess = 'object_key', photoEnabled = true } = {},
 ) {
   if (request.verificationMethod !== 'camera') {
     throw new UnsendableError('센서 인증은 I01 대상이 아님(I02 구현 전)');
   }
   const media = pickMedia(request.files);
   if (!media) throw new UnsendableError('보낼 영상·사진이 없음');
+  if (media.mediaKind === 'camera_photo' && !photoEnabled) {
+    throw new UnsendableError(
+      '사진 증거는 AI가 판정하지 않음(AI_PHOTO_ENABLED=false), 관리자 검수',
+    );
+  }
   if (!media.objectKey) throw new UnsendableError('파일의 저장소 키가 없음');
   if (!media.checksumSha256) {
     throw new UnsendableError(

@@ -56,6 +56,28 @@ export function isBodyParserError(exception) {
   );
 }
 
+/**
+ * 고정 문구(05 §7 표)로 바뀌어 응답에서 사라진 서비스 원문을 돌려준다 (서버 로그 전용, 응답 계약 불변)
+ * - 대상: 코드가 있는 예외(AppException)만
+ * - 제외: 프레임워크 404·429 등(코드 없음), 입력 검사 배열(이미 details.fields로 전달)
+ *
+ * @param {unknown} exception
+ * @param {{error: {message: string}}} body toErrorBody의 결과
+ * @returns {string|null}
+ */
+export function replacedMessage(exception, body) {
+  if (!(exception instanceof HttpException)) return null;
+  const response = exception.getResponse();
+  if (typeof response !== 'object' || typeof response.code !== 'string') {
+    return null;
+  }
+  const raw = response.message;
+  if (typeof raw !== 'string' || raw === '' || raw === body.error.message) {
+    return null;
+  }
+  return raw;
+}
+
 export function toErrorBody(exception) {
   if (exception instanceof HttpException) {
     const status = exception.getStatus();

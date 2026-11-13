@@ -110,6 +110,21 @@ describe('toVisionAnalysisRequest', () => {
     expect(wire.exerciseCode).toBeNull();
   });
 
+  it('사진은 AI_PHOTO_ENABLED가 꺼져 있으면 보낼 수 없는 회차(관리자 검수), 영상은 영향 없음', () => {
+    const video = internalRequest().files[0];
+    const photo = { ...video, mediaKind: 'camera_photo', mimeType: 'image/jpeg' };
+    expect(() =>
+      toVisionAnalysisRequest(internalRequest({ files: [photo] }), CALLBACK, {
+        photoEnabled: false,
+      }),
+    ).toThrow(UnsendableError);
+    expect(() =>
+      toVisionAnalysisRequest(internalRequest({ files: [video] }), CALLBACK, {
+        photoEnabled: false,
+      }),
+    ).not.toThrow();
+  });
+
   it('목표값·단위가 없거나 허용 밖이면 1 times로 보냄', () => {
     const wire = toVisionAnalysisRequest(
       internalRequest({ targetValue: null, targetUnit: '개' }),

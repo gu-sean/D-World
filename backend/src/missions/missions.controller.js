@@ -118,7 +118,8 @@ export class MissionsController {
             categoryId: uuid({ optional: true }),
             difficultyId: uuid({ optional: true }),
             exerciseCode: oneOf(EXERCISE_CODES, { optional: true }),
-            verificationMethod: oneOf(VERIFICATION_METHODS),
+            // 모바일 미션 만들기 폼(08 A31 MissionInput)은 인증 방식을 보내지 않음 → 생략하면 서버가 정함
+            verificationMethod: oneOf(VERIFICATION_METHODS, { optional: true }),
             targetValue: targetValue({ optional: true }),
             targetUnit: targetUnit({ optional: true }),
             estimatedDurationSeconds: duration({ optional: true }),

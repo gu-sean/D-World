@@ -29,13 +29,9 @@ const PERIODS = [
   { value: 'all', label: '전체' },
 ];
 
-/** 분야별 진행값은 단위가 달라서 (횟수·시간·일수) 단위에 맞게 적는다. */
+/** 분야별 진행은 그 기간의 완료 미션 수 / 계획 미션 수다 (07 §10 ReportSummary.categories). */
 function progressText(item) {
-  if (item.unit === 'seconds') {
-    return `${format.formatSpokenDuration(item.completedValue)} / ${format.formatSpokenDuration(item.targetValue)}`;
-  }
-  const suffix = item.unit === 'days' ? '일' : '회';
-  return `${format.formatNumber(item.completedValue)}${suffix} / ${format.formatNumber(item.targetValue)}${suffix}`;
+  return `${format.formatNumber(item.completedCount)}개 / ${format.formatNumber(item.plannedCount)}개`;
 }
 
 export default function ReportScreen({ navigation }) {
@@ -104,7 +100,7 @@ export default function ReportScreen({ navigation }) {
                       <Text style={styles.categoryValue}>{progressText(item)}</Text>
                     </View>
                     <ProgressBar
-                      rate={item.rate}
+                      rate={item.achievementRate}
                       color={categoryStyle(item.categoryCode).color}
                     />
                   </View>

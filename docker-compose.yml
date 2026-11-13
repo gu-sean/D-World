@@ -21,17 +21,20 @@ services:
       timeout: 3s
       retries: 20
 
+  # 로컬 객체 저장소(S3 호환). 기본 `docker compose up`에는 포함되지 않고 `--profile minio`로만 뜬다.
+  # quay.io/minio/minio 는 프로젝트 보관으로 더 이상 받을 수 없어, 받아지는 고정 이미지(bitnamilegacy)를 쓴다(갱신 없음, 개발 전용)
   minio:
-    image: quay.io/minio/minio:latest
-    command: server /data --console-address ":9001"
+    image: bitnamilegacy/minio:latest
+    profiles: ["minio"]
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_DEFAULT_BUCKETS: dworld-dev
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - miniodata:/data
+      - miniodata:/bitnami/minio/data
 
 volumes:
   pgdata:

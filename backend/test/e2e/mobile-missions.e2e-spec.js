@@ -79,6 +79,32 @@ describe.skipIf(!databaseUrl)('모바일 미션 API A30~A36 (PostgreSQL)', () =>
     );
   });
 
+  it('A31 인증 방식을 생략하면 서버가 정함: 일반은 camera, 러닝은 sensor', async () => {
+    // 모바일 미션 만들기 폼은 verificationMethod를 보내지 않음
+    const user = await createUserWith(app, db);
+    const { verificationMethod: _omitted, ...withoutMethod } = input();
+    const normal = await http
+      .post('/api/v1/missions')
+      .set(auth(user))
+      .send(withoutMethod)
+      .expect(201);
+    expect(normal.body.verificationMethod).toBe('camera');
+
+    const running = await http
+      .post('/api/v1/missions')
+      .set(auth(user))
+      .send({
+        ...withoutMethod,
+        title: '러닝 2km',
+        exerciseCode: 'running',
+        targetValue: 2000,
+        targetUnit: 'meters',
+        scheduledDate: day(2),
+      })
+      .expect(201);
+    expect(running.body.verificationMethod).toBe('sensor');
+  });
+
   it('A30 목록은 Page, status는 쉼표로 여러 값', async () => {
     const user = await createUserWith(app, db);
     for (const date of [day(1), day(2)]) {

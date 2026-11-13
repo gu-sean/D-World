@@ -19,6 +19,12 @@ const SOCIAL_SIGNUP_KIND = 'social-signup';
 const VERIFICATION_ID_TTL_SEC = 15 * 60;
 const SOCIAL_SIGNUP_TTL_SEC = 10 * 60;
 const REQUIRED_TYPES = ['terms', 'privacy'];
+// A04 응답 순서 (모바일 authApi.js: terms·privacy·marketing 순), 목록에 없는 종류는 뒤로
+const POLICY_ORDER = ['terms', 'privacy', 'marketing'];
+const policyRank = (type) => {
+  const index = POLICY_ORDER.indexOf(type);
+  return index === -1 ? POLICY_ORDER.length : index;
+};
 
 const verificationInvalid = () =>
   new AppException(
@@ -150,14 +156,16 @@ export class MobileAuthService {
   /** A04: 필수 여부(isRequired)를 붙인 현재 약관 */
   async currentPolicies() {
     const versions = await this.consents.currentVersions();
-    return versions.map((v) => ({
-      id: v.id,
-      documentType: v.document_type,
-      version: v.version,
-      isRequired: REQUIRED_TYPES.includes(v.document_type),
-      body: v.body,
-      effectiveAt: v.effective_at,
-    }));
+    return [...versions]
+      .sort((a, b) => policyRank(a.document_type) - policyRank(b.document_type))
+      .map((v) => ({
+        id: v.id,
+        documentType: v.document_type,
+        version: v.version,
+        isRequired: REQUIRED_TYPES.includes(v.document_type),
+        body: v.body,
+        effectiveAt: v.effective_at,
+      }));
   }
 
   /** A05: 휴대폰 가입(verificationToken) 또는 소셜 가입(socialSignupToken) */

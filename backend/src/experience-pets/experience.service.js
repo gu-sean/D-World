@@ -6,6 +6,7 @@ import {
   computeLevel,
   computeStage,
   findOriginalTransaction,
+  firstLevelUpXp,
   insertExperienceTransaction,
   lockPet,
   lockUserExperience,
@@ -588,6 +589,9 @@ export class ExperienceService {
         [user.level_policy_version_id, Number(user.level_no) + 1],
       );
       nextLevelXp = rows[0] ? num(rows[0].min_total_xp) : null;
+    } else {
+      // 첫 XP를 얻기 전: 행이 없어도 다음 레벨 기준을 알려 준다(null이면 최고 레벨로 읽힘)
+      nextLevelXp = await firstLevelUpXp(db);
     }
 
     const [{ rows: pending }, { rows: repRows }] = await Promise.all([

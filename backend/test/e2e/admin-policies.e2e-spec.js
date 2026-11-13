@@ -336,6 +336,8 @@ describe.skipIf(!databaseUrl)('관리자 핵심 정책 API (PostgreSQL)', () => 
       for (const bad of [
         { rules: [] },
         { rules: 'x' },
+        { rules: { unknownKey: 1 } },
+        { rules: { minSteps: -5 } },
         { verificationMethod: 'audio' },
         { categoryId: 'x' },
       ]) {

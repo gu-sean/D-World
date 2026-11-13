@@ -27,6 +27,7 @@ export class HttpAiDispatcher {
   async dispatch(request) {
     const body = toVisionAnalysisRequest(request, this.client.callbackUrl, {
       mediaAccess: this.client.mediaAccess,
+      photoEnabled: this.client.photoEnabled,
     });
     await this.client.post('/vision/analyses', body);
   }

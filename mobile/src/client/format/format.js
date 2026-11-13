@@ -167,6 +167,8 @@ export function formatRate(rate, options = {}) {
  * @returns {string} `20회` · `1분 30초` · `3.2km` · `8,000걸음`
  */
 export function formatTarget(value, unit) {
+  // 목표 값이 없는 미션(AI 없이 만든 계획 등)은 null로 온다. Number(null)은 0이라 "0"으로 보이므로 먼저 거른다.
+  if (value === null || value === undefined || value === '') return '';
   const n = Number(value);
   if (!Number.isFinite(n)) return '';
   switch (unit) {
@@ -186,6 +188,27 @@ export function formatTarget(value, unit) {
     default:
       return formatNumber(n);
   }
+}
+
+/**
+ * 미션 한 줄 요약. 있는 것만 ` · `로 잇는다 (목표 값이 없으면 시간만, 앞에 구분점이 남지 않는다).
+ * @param {{targetValue?: number|null, targetUnit?: string|null,
+ *          estimatedDurationSeconds?: number|null, rewardPoints?: number|null}} mission
+ * @returns {string} `20회 · 3분 · 20P` · `30분` · `` (아무 값도 없을 때)
+ */
+export function formatMissionMeta({
+  targetValue,
+  targetUnit,
+  estimatedDurationSeconds,
+  rewardPoints,
+} = {}) {
+  return [
+    formatTarget(targetValue, targetUnit),
+    estimatedDurationSeconds ? formatSpokenDuration(estimatedDurationSeconds) : '',
+    rewardPoints ? formatPoints(rewardPoints) : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /**
@@ -243,6 +266,7 @@ export const format = {
   formatNumber,
   formatRate,
   formatTarget,
+  formatMissionMeta,
   formatRelative,
 };
 

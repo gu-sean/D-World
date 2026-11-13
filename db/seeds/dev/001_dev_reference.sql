@@ -37,11 +37,14 @@ INSERT INTO difficulty_levels (id, code, name, display_order) VALUES
 ON CONFLICT (code) DO NOTHING;
 
 -- 인증 기준 v1: 빈 규칙 = AI 서버 기본값 사용 (docs/10 §5)
+-- 단, 운동 분야의 센서 인증(러닝)만 최소 5분·300m를 둔다. 키 계약은 backend/src/admin-policies/verification-rules.js
 INSERT INTO verification_criteria_versions
     (id, category_id, verification_method, version_no, rules_json,
      effective_at, created_by_admin_id)
 SELECT gen_random_uuid(), c.id, m.method, 1,
-       '{}'::jsonb,
+       CASE WHEN c.code = 'exercise' AND m.method = 'sensor'
+            THEN '{"minDurationSeconds": 300, "minDistanceMeters": 300}'::jsonb
+            ELSE '{}'::jsonb END,
        timestamptz '2026-01-01 00:00:00+09',
        'd0000000-0000-4000-8000-000000000001'
   FROM goal_categories c

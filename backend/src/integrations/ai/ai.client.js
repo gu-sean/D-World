@@ -1,8 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import { Dependencies, Injectable } from '@nestjs/common';
+import { Dependencies, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 export const DEFAULT_AI_TIMEOUT_MS = 10_000;
+
+/** 운영 + AI 사용 + 저장소 키 방식이면 true (경고 대상) */
+export function warnsObjectKeyInProduction(config) {
+  return (
+    config.get('NODE_ENV') === 'production' &&
+    Boolean(config.get('AI_SERVICE_URL') && config.get('INTERNAL_API_TOKEN')) &&
+    (config.get('AI_MEDIA_ACCESS') ?? 'object_key') === 'object_key'
+  );
+}
 
 /** AI 호출 실패. permanent=true면 다시 보내도 같은 결과(요청이 잘못됨), false면 나중에 재시도 */
 export class AiRequestError extends Error {
@@ -46,8 +55,19 @@ export function baseUrlOf(url) {
 @Injectable()
 @Dependencies(ConfigService)
 export class AiClient {
+  logger = new Logger('AiClient');
+
   constructor(config) {
     this.config = config;
+  }
+
+  /** 운영에서 AI를 켜 둔 채 파일을 저장소 키로 알리면 AI에 R2 읽기 키가 있어야 하므로 경고 */
+  onModuleInit() {
+    if (warnsObjectKeyInProduction(this.config)) {
+      this.logger.warn(
+        '운영에서 AI_MEDIA_ACCESS=object_key: AI 서버가 R2 키를 직접 가져야 함. AI가 downloadUrl을 받을 수 있게 되면 signed_url로 전환하세요',
+      );
+    }
   }
 
   get enabled() {
@@ -60,6 +80,11 @@ export class AiClient {
   /** 기본 호출 타임아웃(판정·리포트·재조정 접수) */
   get requestTimeoutMs() {
     return this.config.get('AI_REQUEST_TIMEOUT_MS') ?? 10_000;
+  }
+
+  /** 사진 증거도 AI에 보낼지(기본 false: 사진은 관리자 검수) */
+  get photoEnabled() {
+    return this.config.get('AI_PHOTO_ENABLED') === true;
   }
 
   /** 판정 요청에 파일을 알려 주는 방식 */

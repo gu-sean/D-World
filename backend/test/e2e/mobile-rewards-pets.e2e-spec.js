@@ -190,6 +190,32 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
        VALUES ($1,$2,$3,'x')`,
       [adminId, `mr_${RUN}`, `${adminId}@example.com`],
     );
+
+    // 펫을 고르려면 발효된 펫 레벨 정책이 있어야 한다. 시드된 DB에는 있지만 새로 마이그레이션한 DB에는 없으므로,
+    // 없을 때만 넣는다. 다른 e2e 파일이 만드는 정책(1일 전)이 항상 더 최신이 되도록 아주 오래된 시각으로 둔다.
+    const hasPetPolicy = await db.query(
+      `SELECT 1 FROM pet_level_policy_versions WHERE effective_at <= now() LIMIT 1`,
+    );
+    if (hasPetPolicy.rowCount === 0) {
+      const policyId = randomUUID();
+      await db.query(
+        `INSERT INTO pet_level_policy_versions (id, version_no, effective_at, created_by_admin_id)
+         VALUES ($1, $3, now() - interval '30 days', $2)`,
+        [policyId, adminId, randomInt(1, 1_000_000_000)],
+      );
+      for (const [level, xp] of [
+        [1, 0],
+        [2, 40],
+        [3, 120],
+        [4, 400],
+      ]) {
+        await db.query(
+          `INSERT INTO pet_level_thresholds (policy_version_id, level_no, min_total_xp)
+           VALUES ($1, $2, $3)`,
+          [policyId, level, xp],
+        );
+      }
+    }
   });
 
   afterAll(async () => {

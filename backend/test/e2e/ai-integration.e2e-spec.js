@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { randomInt, randomUUID } from 'node:crypto';
 import { addDays, kstDate } from '../../src/common/time/kst.js';
 import { AiClient } from '../../src/integrations/ai/ai.client.js';
+import { firstLevelUpXp } from '../../src/experience-pets/experience-ledger.js';
 import { OBJECT_STORAGE } from '../../src/media/storage/object-storage.js';
 import { AiDispatchService } from '../../src/verification/ai/ai-dispatch.service.js';
 import { HttpAiDispatcher } from '../../src/verification/ai/ai-dispatcher.js';
@@ -12,6 +13,48 @@ const databaseUrl = process.env.DATABASE_URL;
 const RUN = randomInt(100_000, 999_999);
 const SECRET = process.env.INTERNAL_API_TOKEN;
 const CHECKSUM = 'ab'.repeat(32);
+
+/**
+ * 승인(경험치 지급)에는 발효된 사용자·펫 레벨 정책이 필요하다. 마이그레이션만 한 빈 DB에는 없으므로 없을 때만 넣는다.
+ * 다른 e2e 파일이 만드는 정책(1일 전)이 항상 더 최신이 되도록 오래된 시각(30일 전)으로 둔다.
+ */
+async function ensureLevelPolicies(db, adminId) {
+  for (const [table, thresholds] of [
+    [
+      'user_level',
+      [
+        [1, 0],
+        [2, 100],
+      ],
+    ],
+    [
+      'pet_level',
+      [
+        [1, 0],
+        [2, 40],
+        [3, 120],
+        [4, 400],
+      ],
+    ],
+  ]) {
+    const { rowCount } = await db.query(
+      `SELECT 1 FROM ${table}_policy_versions WHERE effective_at <= now() LIMIT 1`,
+    );
+    if (rowCount > 0) continue;
+    const policyId = randomUUID();
+    await db.query(
+      `INSERT INTO ${table}_policy_versions (id, version_no, effective_at, created_by_admin_id)
+       VALUES ($1, $2, now() - interval '30 days', $3)`,
+      [policyId, randomInt(1, 1_000_000_000), adminId],
+    );
+    for (const [level, xp] of thresholds) {
+      await db.query(
+        `INSERT INTO ${table}_thresholds (policy_version_id, level_no, min_total_xp) VALUES ($1, $2, $3)`,
+        [policyId, level, xp],
+      );
+    }
+  }
+}
 
 describe.skipIf(!databaseUrl)(
   'AI 서버 연동 I01 (PostgreSQL + 가짜 AI 서버)',
@@ -82,6 +125,7 @@ describe.skipIf(!databaseUrl)(
        VALUES ($1,$2,'camera',1,'{"minReps":5}'::jsonb, now() - interval '30 days', $3)`,
         [randomUUID(), category, adminId],
       );
+      await ensureLevelPolicies(db, adminId);
     });
 
     afterAll(async () => {
@@ -407,6 +451,58 @@ describe.skipIf(!databaseUrl)(
         [ctx.record.id],
       );
       expect(stored.rows[0].xp).toBe('10');
+    });
+
+    it('이전 기록(metrics.rewards 없음)의 rewards는 원장에서 복원되고, 승인 때 저장한 값과 같음(레벨업 포함)', async () => {
+      const ctx = await startedRecord();
+      // 이 승인 한 번(userXp 10)으로 레벨 2가 되도록 다음 레벨 기준에서 5 모자란 상태로 만든다
+      const next = await firstLevelUpXp(db);
+      if (next === null) {
+        throw new Error(
+          '레벨 정책(user_level_policy_versions)이 있는 DB가 필요함',
+        );
+      }
+      const policy = await db.query(
+        `SELECT id FROM user_level_policy_versions
+          WHERE effective_at <= now() ORDER BY effective_at DESC LIMIT 1`,
+      );
+      await db.query(
+        `INSERT INTO user_experience (user_id, level_policy_version_id, total_xp, level_no)
+         VALUES ($1, $2, $3, 1)`,
+        [ctx.user.id, policy.rows[0].id, next - 5],
+      );
+
+      await uploadAndSubmit(ctx);
+      await callback('/internal/v1/ai-callbacks', {
+        ingestKey: `vision:${ctx.record.id}:1`,
+        recordId: ctx.record.id,
+        status: 'completed',
+        decision: 'approved',
+        confidence: 0.95,
+        engineVersion: 'vision-rule@0.1.0',
+      }).expect(200);
+
+      const read = async () =>
+        (
+          await http
+            .get(`/api/v1/mission-records/${ctx.record.id}`)
+            .set(auth(ctx.user))
+            .expect(200)
+        ).body.rewards;
+      const stored = await read();
+      expect(stored).toMatchObject({
+        userXp: 10,
+        levelUp: true,
+        newLevelNo: 2,
+      });
+
+      // 저장분을 지우면 지급 기록·원장에서 다시 만들고, 결과가 승인 때 저장한 값과 같아야 함
+      await db.query(
+        `UPDATE mission_records SET metrics = metrics - 'rewards' WHERE id = $1`,
+        [ctx.record.id],
+      );
+      const restored = await read();
+      expect(restored).toEqual(stored);
     });
 
     it('콜백: 분석 실패(status=failed)는 판정 없이 관리자 검수로, 재전송·늦은 도착은 무시', async () => {

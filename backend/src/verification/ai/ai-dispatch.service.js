@@ -1,4 +1,5 @@
 import { Dependencies, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../../database/database.service.js';
 import { MediaService } from '../../media/media.service.js';
 import { AI_DISPATCHER } from './ai-dispatcher.js';
@@ -14,12 +15,13 @@ const MAX_ATTEMPTS = 8;
  * 재시작 시 처음부터 재요청, AI 쪽은 ingestKey·회차 상태 검사로 중복 요청에 안전해야 함
  */
 @Injectable()
-@Dependencies(DatabaseService, MediaService, AI_DISPATCHER)
+@Dependencies(DatabaseService, MediaService, AI_DISPATCHER, ConfigService)
 export class AiDispatchService {
   logger = new Logger(AiDispatchService.name);
   attempts = new Map(); // recordId → { count, nextAt }
 
-  constructor(database, media, dispatcher) {
+  constructor(database, media, dispatcher, config) {
+    this.config = config;
     this.database = database;
     this.media = media;
     this.dispatcher = dispatcher;
@@ -40,7 +42,11 @@ export class AiDispatchService {
     );
     const fileRequests = [];
     for (const file of files) {
-      const signed = await this.media.signedUrlForAdmin(file.id);
+      // AI용 서명 URL은 요청마다 새로 발급하고 짧게(기본 10분) 유효
+      const signed = await this.media.signedUrlForAi(
+        file.id,
+        this.config.get('AI_SIGNED_URL_TTL_SEC') ?? 600,
+      );
       fileRequests.push({
         id: file.id,
         mediaKind: file.media_kind,

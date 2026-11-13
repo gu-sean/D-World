@@ -71,23 +71,18 @@ export class AiReportsService {
         LIMIT $4`,
       [period.start, period.end, runType, limit],
     );
-    let created = 0;
-    for (const { user_id: userId } of rows) {
-      const id = randomUUID();
-      try {
-        await this.database.query(
-          `INSERT INTO ai_analysis_runs
-                  (id, user_id, run_type, period_start, period_end, ingest_key)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [id, userId, runType, period.start, period.end, `report:${id}`],
-        );
-        created += 1;
-      } catch (error) {
-        // 동시에 다른 인스턴스가 만든 경우(고유 인덱스)는 건너뜀
-        if (error?.code !== '23505') throw error;
-      }
-    }
-    return created;
+    if (rows.length === 0) return 0;
+    // 한 번에 삽입, 동시에 다른 인스턴스가 만든 행(고유 인덱스 충돌)은 건너뜀
+    const ids = rows.map(() => randomUUID());
+    const { rowCount } = await this.database.query(
+      `INSERT INTO ai_analysis_runs
+              (id, user_id, run_type, period_start, period_end, ingest_key)
+       SELECT t.id, t.user_id, $3, $4::date, $5::date, 'report:' || t.id
+         FROM unnest($1::uuid[], $2::uuid[]) AS t(id, user_id)
+       ON CONFLICT DO NOTHING`,
+      [ids, rows.map((row) => row.user_id), runType, period.start, period.end],
+    );
+    return rowCount;
   }
 
   async sendRequested(result, limit) {

@@ -135,6 +135,10 @@ const SCHEMA = z.object({
     z.enum(['object_key', 'signed_url']),
     'object_key',
   ),
+  /** 사진 증거를 AI에 보낼지. 현재 AI는 영상만 판정하므로 기본 false: 사진은 AI를 거치지 않고 바로 관리자 검수로 넘어감(업로드는 허용) */
+  AI_PHOTO_ENABLED: withDefault(boolean, false),
+  /** AI 판정 요청에 실리는 서명 URL의 유효 시간(초), 요청·재시도마다 새로 발급 */
+  AI_SIGNED_URL_TTL_SEC: withDefault(integer(60, 3600), 600),
   AI_REQUEST_TIMEOUT_MS: withDefault(integer(1000, 120_000), 10_000),
   /** 계획 생성(I03) 타임아웃(ms), 앱은 70초까지 기다림 */
   AI_PLAN_TIMEOUT_MS: withDefault(integer(1000, 120_000), 60_000),

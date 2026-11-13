@@ -39,7 +39,7 @@ export default function MonthlyCalendarScreen({ navigation, route }) {
   const [picked, setPicked] = useState(null);
 
   const calendar = useCalendar(month);
-  const days = calendar.data ?? [];
+  const days = useMemo(() => calendar.data ?? [], [calendar.data]);
 
   const pickedDay = useMemo(() => days.find((d) => d.date === picked) ?? null, [days, picked]);
 

@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Dependencies,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service.js';
 import { sha256Hex } from '../crypto/crypto.js';
 import { AppException } from '../errors/app-exception.js';
@@ -21,15 +26,20 @@ export function stableStringify(value) {
   return JSON.stringify(value) ?? 'null';
 }
 
-/** Idempotency-Key 헤더 값 검증 */
+/**
+ * Idempotency-Key 헤더 값 검증 (앱·관리자 공용)
+ * 응답은 400 COMMON_VALIDATION_FAILED 그대로이고, 헤더가 없는지 형식이 틀린지는
+ * details.fields["Idempotency-Key"]로 알려 준다 (공백 없는 출력 가능 ASCII 8~128자, UUID일 필요는 없음)
+ */
 export function readIdempotencyKey(request) {
   const key = request.headers?.['idempotency-key'];
+  if (key === undefined || key === '') {
+    throw new BadRequestException(['Idempotency-Key: 헤더가 필요함']);
+  }
   if (typeof key !== 'string' || !KEY_PATTERN.test(key)) {
-    throw new AppException(
-      HttpStatus.BAD_REQUEST,
-      'idempotency_key_required',
-      'Idempotency-Key 헤더가 필요해요.',
-    );
+    throw new BadRequestException([
+      'Idempotency-Key: 공백 없는 영문·숫자·기호 8~128자여야 함',
+    ]);
   }
   return key;
 }

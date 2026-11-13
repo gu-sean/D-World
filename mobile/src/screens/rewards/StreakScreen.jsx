@@ -1,9 +1,13 @@
 // STREAK-01 연속 달성
 //
 // 며칠째 이어 오고 있는지, 최고 기록은 얼마인지 보여 준다.
-// 이번 주 일곱 칸은 날마다 성공·실패·판정 대기를 색으로 구분한다.
+// 최근 7일(오늘 포함)은 날마다 성공·실패·판정 대기를 색으로 구분하고,
+// 가입 전 날짜(none)는 회색으로 둔다.
 //
 // 아래에는 7·30·100일 구간 보상이 있고, 이미 받은 것은 받은 날짜가 함께 보인다.
+//
+// 서버 응답은 07 §StreakStatus: currentSuccessDays·bestSuccessDays·lastSuccessDate·recentDays.
+// 구간 보상 목록은 서버가 더해 주는 milestones(status: locked·active·revoked)를 쓴다.
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -11,15 +15,30 @@ import { format, useStreak } from '../../client';
 import { Card, Icon, QueryState, Screen, SectionTitle } from '../../components';
 import { colors, radius, spacing, typography } from '../../theme';
 
-const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일'];
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 const STATUS_COLOR = {
   success: colors.success,
   failed: colors.danger,
   pending: colors.warning,
   none: colors.border,
-  future: colors.background,
 };
+
+/** 'YYYY-MM-DD'(KST 날짜)의 요일 글자. 서버가 준 날짜 문자열 그대로 계산한다. */
+function weekdayOf(date) {
+  const [year, month, day] = date.split('-').map(Number);
+  return WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+}
+
+/** 서버 milestones를 화면용으로 바꾼다. active만 받은 것이다(locked는 아직, revoked는 회수됨). */
+function milestoneRows(data) {
+  return (data.milestones ?? []).map((m) => ({
+    targetDays: m.targetDays,
+    achieved: m.status === 'active',
+    achievedDate: m.firstAchievedDate,
+    points: m.rewardPoints,
+  }));
+}
 
 export default function StreakScreen({ navigation }) {
   const streak = useStreak();
@@ -31,9 +50,9 @@ export default function StreakScreen({ navigation }) {
           <ScrollView contentContainerStyle={styles.body}>
             <Card style={styles.hero}>
               <Icon name="flame" size={44} color={colors.warning} />
-              <Text style={styles.days}>{data.currentDays}일</Text>
+              <Text style={styles.days}>{data.currentSuccessDays}일</Text>
               <Text style={styles.label}>지금 연속 달성 중</Text>
-              <Text style={styles.best}>최고 기록 {data.longestDays}일</Text>
+              <Text style={styles.best}>최고 기록 {data.bestSuccessDays}일</Text>
               {!!data.lastSuccessDate && (
                 <Text style={styles.best}>
                   마지막 성공 {format.formatDate(data.lastSuccessDate)}
@@ -42,12 +61,12 @@ export default function StreakScreen({ navigation }) {
             </Card>
 
             <View>
-              <SectionTitle title="이번 주" />
+              <SectionTitle title="최근 7일" />
               <Card>
                 <View style={styles.week}>
-                  {(data.week ?? []).map((day, index) => (
+                  {(data.recentDays ?? []).map((day) => (
                     <View key={day.date} style={styles.dayCell}>
-                      <Text style={styles.weekday}>{WEEKDAYS[index]}</Text>
+                      <Text style={styles.weekday}>{weekdayOf(day.date)}</Text>
                       <View
                         style={[styles.dayDot, { backgroundColor: STATUS_COLOR[day.status] }]}
                       />
@@ -61,7 +80,7 @@ export default function StreakScreen({ navigation }) {
             <View>
               <SectionTitle title="구간 보상" />
               <Card style={styles.milestones}>
-                {(data.milestones ?? []).map((milestone) => (
+                {milestoneRows(data).map((milestone) => (
                   <View key={milestone.targetDays} style={styles.milestoneRow}>
                     <Icon
                       name={milestone.achieved ? 'check' : 'gift'}

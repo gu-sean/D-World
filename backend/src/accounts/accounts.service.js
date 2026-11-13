@@ -2,6 +2,7 @@ import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
 import { AppException } from '../common/errors/app-exception.js';
 import { rethrowConstraint } from '../common/errors/constraint.js';
+import { firstLevelUpXp } from '../experience-pets/experience-ledger.js';
 import { ConsentService } from './consent.service.js';
 import { RestrictionService } from './restriction.service.js';
 
@@ -133,10 +134,12 @@ export class AccountsService {
     return {
       levelNo: level?.level_no ?? 1,
       totalXp: Number(level?.total_xp ?? 0),
-      nextLevelXp:
-        level?.next_level_xp === null || level?.next_level_xp === undefined
+      // 경험치 행이 없는(첫 XP 전) 사용자는 정책의 2레벨 기준을 준다. null이면 앱이 최고 레벨로 읽는다
+      nextLevelXp: level
+        ? level.next_level_xp === null || level.next_level_xp === undefined
           ? null
-          : Number(level.next_level_xp),
+          : Number(level.next_level_xp)
+        : await firstLevelUpXp(this.database),
       availablePoints: Number(wallet.rows[0]?.available_points ?? 0),
       streakDays: streak.rows[0]?.current_success_days ?? 0,
       representativePet: representativePet

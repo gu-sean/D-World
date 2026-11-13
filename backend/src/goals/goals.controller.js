@@ -163,15 +163,23 @@ export class GoalsController {
   }
 
   updateFields(userId, goalId, body) {
+    // 모바일 08 A22: 시작일·분야는 만든 뒤 바꿀 수 없다 (분야는 미션·보상표와 묶이고,
+    // 시작일은 단계·연속 기록 기간의 기준이라서). 인터셉터가 categoryCode를 categoryId로 바꿔 주므로 둘 다 막는다.
+    const locked = [
+      ['startDate', 'startDate'],
+      ['categoryId', 'categoryCode'],
+    ]
+      .filter(([key]) => body?.[key] !== undefined)
+      .map(([, name]) => `${name}: 수정할 수 없음`);
+    if (locked.length > 0) throw new BadRequestException(locked);
+
     return this.goals.updateGoal(
       userId,
       goalId,
       validateBody(body, {
         title: title({ optional: true }),
         description: description(),
-        categoryId: uuid({ optional: true }),
         difficultyId: uuid({ optional: true }),
-        startDate: dateString({ optional: true }),
         endDate: dateString({ optional: true }),
         targetFrequency: integer({ min: 1, max: 7, optional: true }),
         dailyAvailableMinutes: integer({ min: 5, max: 240, optional: true }),

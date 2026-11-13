@@ -63,6 +63,7 @@ export class AdminDashboardController {
       withdrawals,
       definitions,
       challenges,
+      aiPending,
     ] = await Promise.all([
       this.database.query(
         `SELECT count(*) AS n FROM users WHERE created_at >= $1 AND created_at < $2`,
@@ -122,6 +123,13 @@ export class AdminDashboardController {
               ORDER BY created_at DESC LIMIT 1) r ON true
           WHERE c.publication_status = 'review_pending'`,
       ),
+      // AI 판정을 기다리는 회차(제출됐고 판정 행이 아직 없음). 오래 쌓이면 AI 장애 신호
+      this.database.query(
+        `SELECT count(*) AS count, min(submitted_at) AS oldest_at
+           FROM mission_records r
+          WHERE r.status = 'submitted'
+            AND NOT EXISTS (SELECT 1 FROM verification_results v WHERE v.record_id = r.id)`,
+      ),
     ]);
 
     const decided = Object.fromEntries(
@@ -145,6 +153,7 @@ export class AdminDashboardController {
         withdrawals: queue(withdrawals.rows[0]),
         missionDefinitionReviews: queue(definitions.rows[0]),
         challengeReviews: queue(challenges.rows[0]),
+        aiPending: queue(aiPending.rows[0]),
       },
     };
   }

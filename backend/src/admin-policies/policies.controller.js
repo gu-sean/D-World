@@ -14,6 +14,7 @@ import {
 import { CatalogService } from './catalog.service.js';
 import { GrowthPoliciesService } from './growth-policies.service.js';
 import { RewardPoliciesService } from './reward-policies.service.js';
+import { assertRules } from './verification-rules.js';
 import {
   BadRequestException,
   Bind,
@@ -225,6 +226,7 @@ export class PoliciesController {
       effectiveAt: effectiveAtRule(),
       reason: reasonRule(),
     });
+    assertRules(input.rules);
     return this.rewards.createCriteria(
       request.auth.adminId,
       input,

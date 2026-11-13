@@ -415,6 +415,16 @@ export class MediaService {
   }
 
   /** 관리자 검수용 조회 URL, 호출하는 쪽이 관리자 권한을 확인해야 함 */
+  /** AI 판정 요청용: 관리자 조회보다 짧게 유효(요청마다 새로 발급) */
+  async signedUrlForAi(mediaId, ttlSec) {
+    const { rows } = await this.database.query(
+      `SELECT ${COLUMNS} FROM media_files WHERE id = $1`,
+      [mediaId],
+    );
+    if (!rows[0]) throw mediaNotFound();
+    return this.downloadUrl(rows[0], ttlSec);
+  }
+
   async signedUrlForAdmin(mediaId) {
     const { rows } = await this.database.query(
       `SELECT ${COLUMNS} FROM media_files WHERE id = $1`,
@@ -424,7 +434,7 @@ export class MediaService {
     return this.downloadUrl(rows[0]);
   }
 
-  async downloadUrl(row) {
+  async downloadUrl(row, ttlSec = DOWNLOAD_URL_TTL_SEC) {
     if (row.upload_status !== 'uploaded') {
       throw conflict(
         'media_not_uploaded',
@@ -436,13 +446,11 @@ export class MediaService {
     }
     const url = await this.storage.presignGet({
       key: row.object_key,
-      expiresInSec: DOWNLOAD_URL_TTL_SEC,
+      expiresInSec: ttlSec,
     });
     return {
       url,
-      expiresAt: new Date(
-        Date.now() + DOWNLOAD_URL_TTL_SEC * 1000,
-      ).toISOString(),
+      expiresAt: new Date(Date.now() + ttlSec * 1000).toISOString(),
     };
   }
 
@@ -552,21 +560,22 @@ export class MediaService {
 
   /** 확인된 파일은 deleting을 거쳐서, 그렇지 않은 파일은 객체를 지운 뒤 deleted로 */
   async purgeRows(rows) {
-    let deleted = 0;
+    if (rows.length === 0) return { deleted: 0 };
+    await this.database.query(
+      `UPDATE media_files SET upload_status = 'deleting', updated_at = now()
+        WHERE id = ANY($1::uuid[]) AND upload_status = 'uploaded'`,
+      [rows.map((row) => row.id)],
+    );
+    const removed = [];
     for (const row of rows) {
-      await this.database.query(
-        `UPDATE media_files SET upload_status = 'deleting', updated_at = now()
-          WHERE id = $1 AND upload_status = 'uploaded'`,
-        [row.id],
-      );
-      if (!(await this.deleteObjectQuietly(row.object_key))) continue;
-      const { rowCount } = await this.database.query(
-        `UPDATE media_files SET upload_status = 'deleted', deleted_at = now(), updated_at = now()
-          WHERE id = $1 AND upload_status <> 'deleted'`,
-        [row.id],
-      );
-      deleted += rowCount;
+      if (await this.deleteObjectQuietly(row.object_key)) removed.push(row.id);
     }
-    return { deleted };
+    if (removed.length === 0) return { deleted: 0 };
+    const { rowCount } = await this.database.query(
+      `UPDATE media_files SET upload_status = 'deleted', deleted_at = now(), updated_at = now()
+        WHERE id = ANY($1::uuid[]) AND upload_status <> 'deleted'`,
+      [removed],
+    );
+    return { deleted: rowCount };
   }
 }

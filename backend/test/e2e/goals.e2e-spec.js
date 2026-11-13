@@ -471,26 +471,88 @@ describe.skipIf(!databaseUrl)('목표·단계 (PostgreSQL)', () => {
         .set(auth(user.token))
         .send({ endDate: '2026-11-21' })
         .expect(200);
+      // 종료일이 시작일보다 앞서면 거절 (시작일은 수정할 수 없으므로 종료일로 확인)
       const reversed = await http
         .patch(`/api/v1/goals/${goal2.id}`)
         .set(auth(user.token))
-        .send({ startDate: '2026-12-01' })
+        .send({ endDate: '2000-01-01' })
         .expect(400);
       expect(reversed.body.error.code).toBe('GOAL_INVALID_PERIOD');
     });
 
-    it('카테고리·난이도를 바꿀 수 있고 비활성 값은 거절, 남의 목표는 404', async () => {
+    it('A22 시작일·분야는 수정할 수 없음(400, details.fields), 나머지는 수정됨', async () => {
+      const user = await createUser();
+      const goal = await createGoal(user);
+      const fresh = await createReference();
+
+      const startDate = await http
+        .patch(`/api/v1/goals/${goal.id}`)
+        .set(auth(user.token))
+        .send({ startDate: '2026-12-01' })
+        .expect(400);
+      expect(startDate.body.error.code).toBe('COMMON_VALIDATION_FAILED');
+      expect(startDate.body.error.details.fields).toEqual({
+        startDate: '수정할 수 없음',
+      });
+
+      // 분야는 categoryId로 보내든 categoryCode로 보내든 같다 (인터셉터가 코드를 id로 바꿈)
+      for (const body of [
+        { categoryId: fresh.category },
+        { categoryCode: fresh.categoryCode },
+      ]) {
+        const category = await http
+          .patch(`/api/v1/goals/${goal.id}`)
+          .set(auth(user.token))
+          .send(body)
+          .expect(400);
+        expect(category.body.error.details.fields).toEqual({
+          categoryCode: '수정할 수 없음',
+        });
+      }
+
+      // 둘 다 보내면 필드마다 안내하고, 같이 보낸 다른 값도 반영되지 않는다
+      const both = await http
+        .patch(`/api/v1/goals/${goal.id}`)
+        .set(auth(user.token))
+        .send({
+          startDate: '2026-12-01',
+          categoryId: fresh.category,
+          title: '바뀌면 안 됨',
+        })
+        .expect(400);
+      expect(Object.keys(both.body.error.details.fields).sort()).toEqual([
+        'categoryCode',
+        'startDate',
+      ]);
+      const unchanged = await http
+        .get(`/api/v1/goals/${goal.id}`)
+        .set(auth(user.token))
+        .expect(200);
+      expect(unchanged.body.title).not.toBe('바뀌면 안 됨');
+
+      // 제목은 그대로 수정된다
+      await http
+        .patch(`/api/v1/goals/${goal.id}`)
+        .set(auth(user.token))
+        .send({ title: '제목만 바꿈' })
+        .expect(200);
+    });
+
+    it('난이도는 바꿀 수 있고 비활성 값은 거절, 분야는 그대로, 남의 목표는 404', async () => {
       const user = await createUser();
       const other = await createUser();
       const goal = await createGoal(user);
       const fresh = await createReference();
+      const before = (
+        await http.get(`/api/v1/goals/${goal.id}`).set(auth(user.token))
+      ).body;
       const changed = await http
         .patch(`/api/v1/goals/${goal.id}`)
         .set(auth(user.token))
-        .send({ categoryId: fresh.category, difficultyId: fresh.difficulty })
+        .send({ difficultyId: fresh.difficulty })
         .expect(200);
       expect(changed.body).toMatchObject({
-        categoryCode: fresh.categoryCode,
+        categoryCode: before.categoryCode,
         difficultyCode: fresh.difficultyCode,
       });
 
@@ -498,7 +560,7 @@ describe.skipIf(!databaseUrl)('목표·단계 (PostgreSQL)', () => {
       await http
         .patch(`/api/v1/goals/${goal.id}`)
         .set(auth(user.token))
-        .send({ categoryId: inactive.category })
+        .send({ difficultyId: inactive.difficulty })
         .expect(422);
       await http
         .patch(`/api/v1/goals/${goal.id}`)

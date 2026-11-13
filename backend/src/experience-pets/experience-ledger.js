@@ -17,6 +17,25 @@ async function latestPolicy(tx, table) {
   return rows[0]?.id ?? null;
 }
 
+/**
+ * 아직 경험치 행이 없는(첫 XP를 얻기 전) 사용자의 "다음 레벨까지 필요한 누적 XP".
+ * 첫 XP를 얻을 때 행이 latestPolicy로 만들어지므로 같은 정책의 2레벨 기준값을 돌려준다.
+ * 정책이 없으면 null. 읽기 전용이라 트랜잭션 없이 호출해도 된다.
+ * @param {{query: Function}} db
+ * @returns {Promise<number|null>}
+ */
+export async function firstLevelUpXp(db) {
+  const { rows } = await db.query(
+    `SELECT t.min_total_xp
+       FROM user_level_thresholds t
+      WHERE t.level_no = 2
+        AND t.policy_version_id = (
+          SELECT id FROM user_level_policy_versions
+           WHERE effective_at <= now() ORDER BY effective_at DESC LIMIT 1)`,
+  );
+  return rows[0] ? toNumber(rows[0].min_total_xp) : null;
+}
+
 /** total_xp 이하인 가장 높은 임곗값의 레벨, table은 고정 문자열만 전달 */
 export async function computeLevel(tx, table, policyVersionId, totalXp) {
   const { rows } = await tx.query(

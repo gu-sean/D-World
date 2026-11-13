@@ -29,7 +29,7 @@ export function consecutiveMissedDays({ lastDone, goalStart, today }) {
  * - low_completion: 달성률 50% 미만 (value = 달성률)
  * - overload: 실패 3건 이상이면서 달성률 70% 미만 (value = 실패 비율)
  * - missed_days: 3일 이상 연속으로 빠짐 (value = 일수)
- * 지난주 계획이 3건 미만이면 판단하지 않는다
+ * 지난주 계획이 3건 미만이면 판단 안 함
  */
 export function adjustmentCauses({ planned, done, failed, missedDays }) {
   if (planned < MIN_PLANNED) return [];

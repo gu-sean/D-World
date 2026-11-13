@@ -291,7 +291,10 @@ export class MissionsService {
           targetValue: input.targetValue ?? null,
           targetUnit: input.targetUnit ?? null,
           estimatedDurationSeconds: input.estimatedDurationSeconds ?? null,
-          verificationMethod: input.verificationMethod,
+          // 생략하면 DB 제약(exercise_code='running' ⇔ sensor)에 맞춰 러닝만 sensor, 그 밖은 camera
+          verificationMethod:
+            input.verificationMethod ??
+            (input.exerciseCode === 'running' ? 'sensor' : 'camera'),
           exerciseCode: input.exerciseCode ?? null,
         };
         if (!spec.categoryId || !spec.difficultyId) {

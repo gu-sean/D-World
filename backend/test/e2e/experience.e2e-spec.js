@@ -8,6 +8,7 @@ import { AccessTokenService } from '../../src/common/auth/access-token.service.j
 import { SessionsService } from '../../src/common/auth/sessions.service.js';
 import { DatabaseService } from '../../src/database/database.service.js';
 import { ExperienceService } from '../../src/experience-pets/experience.service.js';
+import { RecordsService } from '../../src/verification/records/records.service.js';
 
 // DATABASE_URL이 있을 때만 실행, 마이그레이션 적용 필요(007·017 포함)
 const databaseUrl = process.env.DATABASE_URL;
@@ -207,7 +208,10 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
     await db.query(
       `INSERT INTO verification_criteria_versions
               (id, category_id, verification_method, version_no, rules_json, effective_at, created_by_admin_id)
-       VALUES ($1,$2,'sensor',1,'{}'::jsonb, now() - interval '1 day', $3)`,
+       VALUES ($1,$2,'sensor',
+               (SELECT COALESCE(max(version_no), 0) + 1 FROM verification_criteria_versions
+                 WHERE category_id = $2 AND verification_method = 'sensor'),
+               '{}'::jsonb, now() - interval '1 day', $3)`,
       [ids.criteria, ids.category, adminId],
     );
     await db.query(
@@ -567,6 +571,49 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
         { from_stage_no: 2, to_stage_no: 3, reason: 'growth' },
       ]);
     });
+
+    it('이전 기록(metrics.rewards 없음)의 보상 복원: 어느 지급이 펫을 진화시켰는지 정확히 구분', async () => {
+      // 진화 이력의 occurred_at은 clock_timestamp()라 트랜잭션 시각과 다르다.
+      // 복원은 "지급 직후 펫의 누적 XP"로 그 지급이 만든 진화만 찾아야 한다
+      const user = await createUser();
+      const pet = await createPet(user);
+      await setRepresentative(user, pet);
+      const records = app.get(RecordsService);
+      const recipientOf = (source) => ({
+        petId: pet,
+        stageNo: source.snapshot.reward_pet_stage_no,
+        bonusBasisPoints: source.snapshot.reward_pet_bonus_basis_points,
+      });
+
+      // 1) 작은 지급: 진화 없음
+      const small = await createMissionSource(user, {
+        userXp: 1,
+        petXp: 1,
+        categoryId: speciesCategoryId,
+      });
+      await award(user, small, {
+        userXp: 1,
+        petXp: 1,
+        recipient: recipientOf(small),
+      });
+      // 2) 큰 지급: 1단계에서 3단계까지 진화
+      const big = await createMissionSource(user, {
+        userXp: 1,
+        petXp: ADULT_XP + 10,
+        categoryId: speciesCategoryId,
+      });
+      await award(user, big, {
+        userXp: 1,
+        petXp: ADULT_XP + 10,
+        recipient: recipientOf(big),
+      });
+      expect((await petState(pet)).stage_no).toBe(3);
+
+      const first = await records.grantedRewards(db, user, small.sourceId);
+      const second = await records.grantedRewards(db, user, big.sourceId);
+      expect(first.petEvolved).toBe(false);
+      expect(second.petEvolved).toBe(true);
+    });
   });
 
   describe('회수·복구', () => {
@@ -737,6 +784,26 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
       const session = await tx((t) => sessions.create(t, 'user', userId));
       return tokens.issue('user', userId, session.sessionId);
     }
+
+    it('첫 XP를 얻기 전(경험치 행 없음)에도 다음 레벨 기준을 줌: null이면 앱이 최고 레벨로 읽음', async () => {
+      const user = await createUser();
+      const token = await login(user);
+
+      const experience = await request(app.getHttpServer())
+        .get('/api/v1/me/experience')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(experience.body).toMatchObject({ totalXp: 0, levelNo: 1 });
+      expect(experience.body.nextLevelXp).toBeGreaterThan(0);
+
+      // 마이 화면이 읽는 GET /me도 같은 값
+      const me = await request(app.getHttpServer())
+        .get('/api/v1/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(me.body).toMatchObject({ totalXp: 0, levelNo: 1 });
+      expect(me.body.nextLevelXp).toBe(experience.body.nextLevelXp);
+    });
 
     it('누적 XP·레벨·다음 레벨까지·대표 펫·보류 펫 XP', async () => {
       const user = await createUser();

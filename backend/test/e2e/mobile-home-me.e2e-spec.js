@@ -367,6 +367,10 @@ describe.skipIf(!databaseUrl)(
         date: kstDate(),
         status: 'pending',
       });
+      // 오늘 가입한 사용자의 가입 전 6일은 판정 대상이 아니라 none (failed로 세지 않음)
+      expect(
+        streak.body.recentDays.slice(0, 6).map((day) => day.status),
+      ).toEqual(Array(6).fill('none'));
       expect(streak.body.nextMilestone).toMatchObject({ targetSuccessDays: 7 });
 
       const achievements = await http
