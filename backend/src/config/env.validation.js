@@ -139,6 +139,10 @@ const SCHEMA = z.object({
   AI_PHOTO_ENABLED: withDefault(boolean, false),
   /** AI 판정 요청에 실리는 서명 URL의 유효 시간(초), 요청·재시도마다 새로 발급 */
   AI_SIGNED_URL_TTL_SEC: withDefault(integer(60, 3600), 600),
+  /** 러닝 센서 인증(I02)을 AI에 보낼지. AI의 센서 라우터가 준비되기 전까지 false: 센서 인증은 바로 관리자 검수 */
+  AI_SENSOR_ENABLED: withDefault(boolean, false),
+  /** 센서 판정(I02) 동기 호출 타임아웃(ms) */
+  AI_SENSOR_TIMEOUT_MS: withDefault(integer(1000, 120_000), 30_000),
   AI_REQUEST_TIMEOUT_MS: withDefault(integer(1000, 120_000), 10_000),
   /** 계획 생성(I03) 타임아웃(ms), 앱은 70초까지 기다림 */
   AI_PLAN_TIMEOUT_MS: withDefault(integer(1000, 120_000), 60_000),

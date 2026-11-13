@@ -1,11 +1,10 @@
 
-from collections import defaultdict
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import ValidationError
 
 from app.core.auth import require_internal_token
 from app.llm.gemini import generate_json
+from app.llm.plan_validation import PlanInvalidError, check_plan
 from app.schemas.contracts import (
     GoalPlanRequest,
     GoalPlanResponse,
@@ -111,88 +110,17 @@ def create_goal_plan(data: GoalPlanRequest):
             detail="Gemini 목표 단계 수가 올바르지 않습니다.",
         )
 
-    allowed = {
-        item.code: item for item in data.exercise_types
-    }
-
-    minutes_per_day = defaultdict(int)
-    mission_count = 0
-
-    for step in proposal.steps:
-        if not (
-            data.goal.start_date
-            <= step.due_date
-            <= data.goal.end_date
-        ):
-            raise HTTPException(
-                status_code=502,
-                detail="계획 단계의 날짜가 목표 기간을 벗어났습니다.",
-            )
-
-        for mission in step.missions:
-            mission_count += 1
-
-            if not (
-                data.goal.start_date
-                <= mission.scheduled_date
-                <= data.goal.end_date
-            ):
-                raise HTTPException(
-                    status_code=502,
-                    detail="미션 날짜가 목표 기간을 벗어났습니다.",
-                )
-
-            if mission.category_code != data.goal.category_code:
-                raise HTTPException(
-                    status_code=502,
-                    detail="미션 카테고리가 목표와 다릅니다.",
-                )
-
-            if mission.exercise_code is not None:
-                exercise = allowed.get(mission.exercise_code)
-
-                if exercise is None:
-                    raise HTTPException(
-                        status_code=502,
-                        detail="허용되지 않은 운동이 생성되었습니다.",
-                    )
-
-                if (
-                    mission.verification_method
-                    != exercise.verification_method
-                    or mission.target_unit != exercise.target_unit
-                    or not (
-                        exercise.min_target
-                        <= mission.target_value
-                        <= exercise.max_target
-                    )
-                ):
-                    raise HTTPException(
-                        status_code=502,
-                        detail="운동별 수행 조건이 올바르지 않습니다.",
-                    )
-
-            minutes_per_day[mission.scheduled_date] += (
-                mission.estimated_duration_seconds
-            )
-
-    if mission_count == 0 or mission_count > 10:
-        raise HTTPException(
-            status_code=502,
-            detail="생성된 미션 수가 올바르지 않습니다.",
+    try:
+        check_plan(
+            proposal.steps,
+            category_code=data.goal.category_code,
+            period=(data.goal.start_date, data.goal.end_date),
+            exercise_types=data.exercise_types,
+            max_missions=10,
+            daily_available_minutes=data.goal.daily_available_minutes,
         )
-
-    if data.goal.daily_available_minutes is not None:
-        daily_limit = data.goal.daily_available_minutes * 60
-
-        if any(
-            seconds > daily_limit
-            for seconds in minutes_per_day.values()
-        ):
-            raise HTTPException(
-                status_code=502,
-                detail="하루 가용 시간을 초과하는 계획입니다.",
-            )
+    except PlanInvalidError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return GoalPlanResponse(
         ingest_key=data.ingest_key,

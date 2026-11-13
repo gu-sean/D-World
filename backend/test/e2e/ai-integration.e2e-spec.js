@@ -87,7 +87,7 @@ describe.skipIf(!databaseUrl)(
             headers: request.headers,
             body: raw ? JSON.parse(raw) : null,
           });
-          const { status, body } = aiRespond();
+          const { status, body } = aiRespond(raw ? JSON.parse(raw) : null);
           response.writeHead(status, { 'content-type': 'application/json' });
           response.end(JSON.stringify(body));
         });
@@ -123,6 +123,13 @@ describe.skipIf(!databaseUrl)(
               (id, category_id, verification_method, version_no, rules_json, effective_at,
                created_by_admin_id)
        VALUES ($1,$2,'camera',1,'{"minReps":5}'::jsonb, now() - interval '30 days', $3)`,
+        [randomUUID(), category, adminId],
+      );
+      await db.query(
+        `INSERT INTO verification_criteria_versions
+              (id, category_id, verification_method, version_no, rules_json, effective_at,
+               created_by_admin_id)
+       VALUES ($1,$2,'sensor',1,'{"minDurationSeconds":300}'::jsonb, now() - interval '30 days', $3)`,
         [randomUUID(), category, adminId],
       );
       await ensureLevelPolicies(db, adminId);
@@ -251,6 +258,195 @@ describe.skipIf(!databaseUrl)(
         targetUnit: 'meters',
       });
       await http.get('/api/v1/exercise-types').expect(401);
+    });
+
+    /** 러닝 센서 회차: 센서 미션(러닝 3km), 시작·기록 파일 업로드·제출 */
+    async function submittedRun() {
+      const user = await createUserWith(app, db);
+      const mission = await http
+        .post('/api/v1/missions')
+        .set(auth(user))
+        .send({
+          title: '러닝 3km',
+          categoryCode,
+          difficultyCode: `aid${RUN}`,
+          exerciseCode: 'running',
+          verificationMethod: 'sensor',
+          targetValue: 3000,
+          targetUnit: 'meters',
+          scheduledDate: kstDate(),
+        })
+        .expect(201);
+      const record = await http
+        .post(`/api/v1/missions/${mission.body.id}/records`)
+        .set(auth(user))
+        .expect(201);
+      const ticket = await http
+        .post(`/api/v1/mission-records/${record.body.id}/media`)
+        .set(auth(user))
+        .send({
+          mediaKind: 'sensor_raw',
+          mimeType: 'application/gzip',
+          sizeBytes: MB,
+          checksumSha256: CHECKSUM,
+        })
+        .expect(201);
+      const { rows } = await db.query(
+        'SELECT object_key FROM media_files WHERE id = $1',
+        [ticket.body.mediaId],
+      );
+      storage.simulateUpload(rows[0].object_key, {
+        size: MB,
+        contentType: 'application/gzip',
+        checksumSha256: CHECKSUM,
+      });
+      await http
+        .post(`/api/v1/media/${ticket.body.mediaId}/complete`)
+        .set(auth(user))
+        .expect(200);
+      await http
+        .post(`/api/v1/mission-records/${record.body.id}/submit`)
+        .set(auth(user))
+        .send({
+          evidenceKind: 'sensor_raw',
+          clientMetrics: {
+            distanceMeters: 3100,
+            activeSeconds: 1200,
+            appVersion: '1.0.0',
+          },
+        })
+        .expect(202);
+      return {
+        user,
+        mission: mission.body,
+        record: record.body,
+        mediaId: ticket.body.mediaId,
+        objectKey: rows[0].object_key,
+      };
+    }
+
+    const sensorDispatcher = (enabled) => {
+      service.dispatcher = new HttpAiDispatcher(
+        new AiClient({
+          get: (key) =>
+            ({
+              AI_SERVICE_URL: `http://127.0.0.1:${aiPort}`,
+              INTERNAL_API_TOKEN: SECRET,
+              PORT: 3000,
+              BACKEND_PUBLIC_URL: 'http://backend.test',
+              AI_SENSOR_ENABLED: enabled,
+            })[key],
+        }),
+      );
+    };
+    const recordStatus = async (recordId) =>
+      (
+        await db.query('SELECT status FROM mission_records WHERE id = $1', [
+          recordId,
+        ])
+      ).rows[0].status;
+    const sensorAnswer = (req, decision, confidence = 0) => ({
+      status: 200,
+      body: {
+        ingestKey: req.ingestKey,
+        decision,
+        confidence,
+        reason: '개발용 규칙 결과',
+        engineVersion: 'sensor-run-dev@0.1.0',
+        metrics: { exerciseCode: 'running', distanceMeters: 3050, flags: [] },
+      },
+    });
+
+    it('I02 센서: AI_SENSOR_ENABLED가 꺼져 있으면 AI를 부르지 않고 관리자 검수', async () => {
+      const ctx = await submittedRun();
+      sensorDispatcher(false);
+      await service.dispatchPending({ limit: 1000 });
+      expect(aiCalls.some((c) => c.body?.recordId === ctx.record.id)).toBe(
+        false,
+      );
+      expect(await recordStatus(ctx.record.id)).toBe('review_required');
+    });
+
+    it('I02 센서: 계약 본문으로 동기 호출하고 응답을 판정으로 저장', async () => {
+      const ctx = await submittedRun();
+      sensorDispatcher(true);
+      aiRespond = (req) => sensorAnswer(req, 'review_required');
+      await service.dispatchPending({ limit: 1000 });
+
+      const call = aiCalls.find((c) => c.body?.recordId === ctx.record.id);
+      expect(call.url).toBe('/internal/v1/sensor/evaluations');
+      expect(call.headers['x-internal-token']).toBe(SECRET);
+      expect(call.body).toEqual({
+        ingestKey: `sensor:${ctx.record.id}:1`,
+        recordId: ctx.record.id,
+        exerciseCode: 'running',
+        targetValue: 3000,
+        targetUnit: 'meters',
+        media: [
+          {
+            mediaId: ctx.mediaId,
+            objectKey: ctx.objectKey,
+            mimeType: 'application/gzip',
+            mediaKind: 'sensor_raw',
+            sizeBytes: MB,
+            checksumSha256: CHECKSUM,
+          },
+        ],
+        recordStartedAt: expect.any(String),
+        submittedAt: expect.any(String),
+        clientMetrics: {
+          distanceMeters: 3100,
+          activeSeconds: 1200,
+          appVersion: '1.0.0',
+        },
+        duplicateOfMediaId: null,
+        criteria: {
+          versionId: expect.any(String),
+          rules: { minDurationSeconds: 300 },
+        },
+      });
+      const { rows } = await db.query(
+        'SELECT source, decision, engine_version FROM verification_results WHERE record_id = $1',
+        [ctx.record.id],
+      );
+      expect(rows).toEqual([
+        {
+          source: 'ai',
+          decision: 'review_required',
+          engine_version: 'sensor-run-dev@0.1.0',
+        },
+      ]);
+      expect(await recordStatus(ctx.record.id)).toBe('review_required');
+    });
+
+    it('I02 센서: 승인 응답이면 미션이 완료됨', async () => {
+      const ctx = await submittedRun();
+      sensorDispatcher(true);
+      aiRespond = (req) => sensorAnswer(req, 'approved', 0.9);
+      await service.dispatchPending({ limit: 1000 });
+      const mission = await http
+        .get(`/api/v1/missions/${ctx.mission.id}`)
+        .set(auth(ctx.user))
+        .expect(200);
+      expect(mission.body.status).toBe('completed');
+    });
+
+    it('I02 센서: AI 오류·계약과 다른 응답은 관리자 검수 (판정 행 없음)', async () => {
+      for (const respond of [
+        () => ({ status: 404, body: { detail: 'Not Found' } }),
+        () => ({ status: 200, body: { decision: 'maybe' } }),
+      ]) {
+        const ctx = await submittedRun();
+        sensorDispatcher(true);
+        aiRespond = respond;
+        await service.dispatchPending({ limit: 1000 });
+        expect(await recordStatus(ctx.record.id)).toBe('review_required');
+        const { rows } = await db.query(
+          'SELECT 1 FROM verification_results WHERE record_id = $1',
+          [ctx.record.id],
+        );
+        expect(rows).toHaveLength(0);
+      }
     });
 
     it('I01 요청: AI 경로·헤더·계약 본문으로 보냄', async () => {

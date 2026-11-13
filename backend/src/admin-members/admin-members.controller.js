@@ -62,9 +62,38 @@ const withdrawalView = (row) => ({
   reviewedAt: row.reviewed_at,
   reason: row.reason,
   completedAt: row.completed_at,
+  dataScope: {
+    deleteCount: Number(row.delete_count ?? 0),
+    anonymizeCount: Number(row.anonymize_count ?? 0),
+    retainCount: Number(row.retain_count ?? 0),
+  },
 });
 
-const WITHDRAWAL_SELECT = `SELECT w.*, p.nickname
+/**
+ * 탈퇴 처리 때 데이터가 어떻게 되는지의 예상 건수 (회원 삭제 시 하위 데이터는 연쇄 삭제)
+ * - 삭제: 회원 소유 목표·미션·인증·원본 파일·포인트/XP 거래·알림·챌린지 참여·업적
+ * - 익명화: 접수한 문의·신고, 확정 챌린지 순위 (개인 식별만 지우고 보존)
+ * - 보존: 이 회원을 대상으로 한 관리자 감사 로그
+ */
+const DATA_SCOPE_COLUMNS = `
+  (SELECT (SELECT count(*) FROM goals WHERE user_id = w.user_id)
+        + (SELECT count(*) FROM missions WHERE user_id = w.user_id)
+        + (SELECT count(*) FROM mission_records WHERE user_id = w.user_id)
+        + (SELECT count(*) FROM media_files WHERE user_id = w.user_id)
+        + (SELECT count(*) FROM point_transactions WHERE user_id = w.user_id)
+        + (SELECT count(*) FROM experience_transactions WHERE user_id = w.user_id)
+        + (SELECT count(*) FROM user_notifications WHERE user_id = w.user_id)
+        + (SELECT count(*) FROM challenge_participations WHERE user_id = w.user_id)
+        + (SELECT count(*) FROM user_achievements WHERE user_id = w.user_id)
+  ) AS delete_count,
+  (SELECT (SELECT count(*) FROM support_tickets WHERE reporter_user_id = w.user_id)
+        + (SELECT count(*) FROM challenge_final_rankings f
+            JOIN challenge_participations cp ON cp.id = f.participation_id
+           WHERE cp.user_id = w.user_id)
+  ) AS anonymize_count,
+  (SELECT count(*) FROM admin_audit_logs WHERE target_user_id = w.user_id) AS retain_count`;
+
+const WITHDRAWAL_SELECT = `SELECT w.*, p.nickname, ${DATA_SCOPE_COLUMNS}
    FROM account_withdrawal_requests w
    LEFT JOIN profiles p ON p.user_id = w.user_id`;
 
@@ -129,7 +158,16 @@ export class AdminMembersController {
     const [{ rows }, count] = await Promise.all([
       this.database.query(
         `SELECT u.id, u.status, u.created_at, p.nickname,
-                ${restrictedNow} AS restricted
+                ${restrictedNow} AS restricted,
+                (SELECT phone_e164 FROM phone_credentials WHERE user_id = u.id) AS phone_e164,
+                (SELECT email FROM user_identities
+                  WHERE user_id = u.id AND email IS NOT NULL
+                  ORDER BY linked_at LIMIT 1) AS email,
+                (SELECT jsonb_build_object('actionId', a.id, 'endsAt', a.ends_at)
+                   FROM account_actions a
+                  WHERE a.user_id = u.id AND a.action_type = 'restriction'
+                    AND a.lifted_at IS NULL AND a.starts_at <= now() AND a.ends_at > now()
+                  ORDER BY a.ends_at DESC LIMIT 1) AS restriction
            ${from} WHERE ${where}
           ORDER BY ${paging.orderBy} LIMIT $7 OFFSET $8`,
         [...params, paging.size, paging.offset],
@@ -146,6 +184,11 @@ export class AdminMembersController {
         status: row.status,
         restricted: row.restricted,
         joinedAt: row.created_at,
+        // 관리자 웹 형식 (위 필드는 기존 호환으로 유지)
+        createdAt: row.created_at,
+        maskedPhoneNumber: maskPhone(row.phone_e164),
+        maskedEmail: row.email ? maskEmail(row.email) : null,
+        restriction: row.restriction,
       })),
       paging,
       count.rows[0].n,
@@ -159,7 +202,13 @@ export class AdminMembersController {
     const id = idOf(userId);
     const { rows } = await this.database.query(
       `SELECT u.id, u.status, u.created_at, p.nickname, p.notification_enabled,
-              c.phone_e164
+              c.phone_e164,
+              (SELECT available_points FROM point_wallets WHERE user_id = u.id) AS available_points,
+              (SELECT level_no FROM user_experience WHERE user_id = u.id) AS level_no,
+              (SELECT current_success_days FROM streak_states WHERE user_id = u.id) AS streak_days,
+              (SELECT count(*) FROM goals WHERE user_id = u.id AND deleted_at IS NULL) AS goal_count,
+              (SELECT count(*) FROM missions WHERE user_id = u.id AND status = 'completed') AS completed_mission_count,
+              (SELECT max(submitted_at) FROM mission_records WHERE user_id = u.id) AS last_activity_at
          FROM users u
          LEFT JOIN profiles p ON p.user_id = u.id
          LEFT JOIN phone_credentials c ON c.user_id = u.id
@@ -189,6 +238,13 @@ export class AdminMembersController {
     const user = rows[0];
     const now = Date.now();
     const accountActions = actions.rows.map(accountActionView);
+    const inForce = (action) =>
+      action.actionType === 'restriction' &&
+      !action.liftedAt &&
+      new Date(action.startsAt).getTime() <= now &&
+      new Date(action.endsAt).getTime() > now;
+    const activeRestriction = accountActions.find(inForce);
+    const firstEmail = identities.rows.find((row) => row.email)?.email;
     return {
       id: user.id,
       nickname: user.nickname,
@@ -196,6 +252,23 @@ export class AdminMembersController {
       joinedAt: user.created_at,
       notificationEnabled: user.notification_enabled,
       phone: maskPhone(user.phone_e164),
+      // 관리자 웹 형식 (위 필드는 기존 호환으로 유지)
+      createdAt: user.created_at,
+      maskedPhoneNumber: maskPhone(user.phone_e164),
+      maskedEmail: firstEmail ? maskEmail(firstEmail) : null,
+      restriction: activeRestriction
+        ? { actionId: activeRestriction.id, endsAt: activeRestriction.endsAt }
+        : null,
+      providers: [
+        ...(user.phone_e164 ? ['phone'] : []),
+        ...identities.rows.map((row) => row.provider),
+      ],
+      availablePoints: Number(user.available_points ?? 0),
+      levelNo: user.level_no ?? 1,
+      streakDays: user.streak_days ?? 0,
+      goalCount: Number(user.goal_count),
+      completedMissionCount: Number(user.completed_mission_count),
+      lastActivityAt: user.last_activity_at,
       identities: identities.rows.map((row) => ({
         provider: row.provider,
         email: maskEmail(row.email),
@@ -226,20 +299,21 @@ export class AdminMembersController {
     });
     const source = `(
       SELECT 'verification' AS type, r.id, r.submitted_at AS occurred_at,
-             r.status AS summary
+             r.status AS summary, r.status AS result
         FROM mission_records r
        WHERE r.user_id = $1 AND r.submitted_at IS NOT NULL
       UNION ALL
-      SELECT t.ticket_type, t.id, t.received_at, t.subject
+      SELECT t.ticket_type, t.id, t.received_at, t.subject, t.status
         FROM support_tickets t WHERE t.reporter_user_id = $1
       UNION ALL
-      SELECT 'point', x.id, x.occurred_at, x.kind
+      SELECT 'point', x.id, x.occurred_at, x.kind,
+             CASE WHEN x.available_delta > 0 THEN '+' ELSE '' END || x.available_delta || ' P'
         FROM point_transactions x WHERE x.user_id = $1
     ) a WHERE ($2::text IS NULL OR a.type = $2)`;
     const params = [id, type ?? null];
     const [{ rows }, count] = await Promise.all([
       this.database.query(
-        `SELECT type, id, occurred_at, summary FROM ${source}
+        `SELECT type, id, occurred_at, summary, result FROM ${source}
           ORDER BY ${paging.orderBy} LIMIT $3 OFFSET $4`,
         [...params, paging.size, paging.offset],
       ),
@@ -251,6 +325,8 @@ export class AdminMembersController {
         id: row.id,
         occurredAt: row.occurred_at,
         summary: row.summary,
+        targetId: row.id,
+        result: row.result,
       })),
       paging,
       count.rows[0].n,

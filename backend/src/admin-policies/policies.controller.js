@@ -38,7 +38,7 @@ const MAX_POINTS = 1_000_000;
 const MAX_XP = 1_000_000_000_000;
 const MAX_LEVELS = 100;
 
-// 팀 문서의 정책 목록은 { items } 없이 배열로 응답
+// 보상표·인증 기준 목록은 { items } 없이 배열, 월 한도·스트릭 마일스톤·레벨 정책은 { items } (관리자 웹 형식)
 const unwrapItems = (result) => result.items;
 const reasonRule = () =>
   string({
@@ -238,7 +238,7 @@ export class PoliciesController {
 
   @Get('streak-milestone-policies')
   listStreakMilestones() {
-    return this.growth.listStreakMilestones().then(unwrapItems);
+    return this.growth.listStreakMilestones();
   }
 
   @Post('streak-milestone-policies')
@@ -268,7 +268,7 @@ export class PoliciesController {
 
   @Get('point-cap-policies')
   listMonthlyCaps() {
-    return this.growth.listMonthlyCaps().then(unwrapItems);
+    return this.growth.listMonthlyCaps();
   }
 
   @Post('point-cap-policies')

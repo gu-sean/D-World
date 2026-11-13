@@ -64,6 +64,8 @@ export class AdminDashboardController {
       definitions,
       challenges,
       aiPending,
+      ticketsByType,
+      missions,
     ] = await Promise.all([
       this.database.query(
         `SELECT count(*) AS n FROM users WHERE created_at >= $1 AND created_at < $2`,
@@ -130,8 +132,26 @@ export class AdminDashboardController {
           WHERE r.status = 'submitted'
             AND NOT EXISTS (SELECT 1 FROM verification_results v WHERE v.record_id = r.id)`,
       ),
+      // 문의·신고를 나눠 센 대기 건수 (관리자 웹 queues용)
+      this.database.query(
+        `SELECT ticket_type, count(*) AS count, min(received_at) AS oldest_at
+           FROM support_tickets WHERE status <> 'completed' GROUP BY ticket_type`,
+      ),
+      this.database.query(
+        `SELECT count(*) AS n FROM missions
+          WHERE scheduled_date BETWEEN $1::date AND $2::date
+            AND deleted_at IS NULL AND status <> 'cancelled'`,
+        [from, to],
+      ),
     ]);
 
+    const ticketQueue = (type) =>
+      queue(
+        ticketsByType.rows.find((row) => row.ticket_type === type) ?? {
+          count: 0,
+          oldest_at: null,
+        },
+      );
     const decided = Object.fromEntries(
       decisions.rows.map((row) => [row.decision, Number(row.n)]),
     );
@@ -146,7 +166,21 @@ export class AdminDashboardController {
       reviewRequiredRecords: decided.review_required ?? 0,
       pointsGranted: Number(points.rows[0].granted),
       pointsSpent: Number(points.rows[0].spent),
-      queues: {
+      // 관리자 웹 형식: 업무별 대기 목록과 요약 숫자
+      activeUserCount: Number(records.rows[0].active_users),
+      missionCount: Number(missions.rows[0].n),
+      pendingVerificationCount: Number(review.rows[0].count),
+      openReportCount: ticketQueue('report').count,
+      aggregatedAt: new Date().toISOString(),
+      queues: [
+        { type: 'verification', ...queue(review.rows[0]) },
+        { type: 'report', ...ticketQueue('report') },
+        { type: 'inquiry', ...ticketQueue('inquiry') },
+        { type: 'withdrawal', ...queue(withdrawals.rows[0]) },
+        { type: 'appeal', ...queue(appeals.rows[0]) },
+      ],
+      // 위 queues에 없는 대기열까지 포함한 전체 (객체 형식)
+      queueStats: {
         verificationReview: queue(review.rows[0]),
         appeals: queue(appeals.rows[0]),
         supportTickets: queue(tickets.rows[0]),

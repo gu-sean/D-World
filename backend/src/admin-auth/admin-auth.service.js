@@ -34,7 +34,9 @@ export class AdminAuthService {
     this.audit = audit;
   }
 
+  /** 로그인·갱신 응답. admin·expiresAt은 관리자 웹(AdminSession) 형식, 나머지는 기존 필드 유지 */
   async tokenResponse(adminId, session) {
+    const expiresIn = this.tokens.ttlFor(SessionKind.Admin);
     return {
       tokenType: 'Bearer',
       accessToken: await this.tokens.issue(
@@ -42,7 +44,9 @@ export class AdminAuthService {
         adminId,
         session.sessionId,
       ),
-      expiresIn: this.tokens.ttlFor(SessionKind.Admin),
+      expiresIn,
+      expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+      admin: await this.me(adminId),
       refreshToken: session.refreshToken,
       refreshExpiresAt: session.refreshExpiresAt,
     };

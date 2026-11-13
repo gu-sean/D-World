@@ -52,6 +52,13 @@ const view = (row, userIds) => ({
   linkScreen: row.link_screen,
   audienceType: row.audience_type,
   recipientCount: Number(row.recipient_count),
+  // 푸시 발송 결과 집계 (앱 알림함 행의 push_status 기준)
+  pushStats: {
+    pending: Number(row.push_pending),
+    sent: Number(row.push_sent),
+    failed: Number(row.push_failed),
+    skipped: Number(row.push_skipped),
+  },
   ...(userIds ? { userIds } : {}),
   showInList: row.show_in_list,
   sendPush: row.send_push,
@@ -67,7 +74,11 @@ const view = (row, userIds) => ({
 });
 
 const SELECT = `SELECT n.*,
-    (SELECT count(*) FROM notice_recipients r WHERE r.notice_id = n.id) AS recipient_count
+    (SELECT count(*) FROM notice_recipients r WHERE r.notice_id = n.id) AS recipient_count,
+    (SELECT count(*) FROM user_notifications u WHERE u.notice_id = n.id AND u.push_status = 'pending') AS push_pending,
+    (SELECT count(*) FROM user_notifications u WHERE u.notice_id = n.id AND u.push_status = 'sent') AS push_sent,
+    (SELECT count(*) FROM user_notifications u WHERE u.notice_id = n.id AND u.push_status = 'failed') AS push_failed,
+    (SELECT count(*) FROM user_notifications u WHERE u.notice_id = n.id AND u.push_status = 'skipped') AS push_skipped
   FROM notices n`;
 
 const contentRules = (optional) => ({

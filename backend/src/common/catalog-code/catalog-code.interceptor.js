@@ -5,6 +5,7 @@ import { DatabaseService } from '../../database/database.service.js';
 // 분야·난이도는 환경마다 UUID가 다르므로 API에서는 code로 주고받음 (팀 문서 03 §7)
 //   요청: categoryCode / difficultyCode → 서비스 안쪽에서 쓰는 categoryId / difficultyId (UUID)
 //   응답: categoryId / difficultyId (UUID) → categoryCode / difficultyCode
+//        (관리자 API는 화면의 폼·필터가 UUID를 쓰므로 categoryId / difficultyId도 함께 유지)
 const PAIRS = [
   { code: 'categoryCode', id: 'categoryId', table: 'goal_categories' },
   { code: 'difficultyCode', id: 'difficultyId', table: 'difficulty_levels' },
@@ -42,7 +43,9 @@ export class CatalogCodeInterceptor {
     if (path.startsWith('/internal/')) return next.handle();
     return from(this.toInternal(request)).pipe(
       mergeMap(() => next.handle()),
-      mergeMap((body) => from(this.toExternal(body))),
+      mergeMap((body) =>
+        from(this.toExternal(body, path.startsWith('/admin/'))),
+      ),
     );
   }
 
@@ -70,7 +73,7 @@ export class CatalogCodeInterceptor {
     }
   }
 
-  async toExternal(body) {
+  async toExternal(body, keepIds = false) {
     if (
       !hasKey(
         body,
@@ -78,12 +81,14 @@ export class CatalogCodeInterceptor {
       )
     )
       return body;
-    return this.walk(body, 'out');
+    return this.walk(body, 'out', keepIds);
   }
 
-  async walk(value, direction) {
+  async walk(value, direction, keepIds = false) {
     if (Array.isArray(value)) {
-      return Promise.all(value.map((item) => this.walk(item, direction)));
+      return Promise.all(
+        value.map((item) => this.walk(item, direction, keepIds)),
+      );
     }
     if (!value || typeof value !== 'object' || value instanceof Date) {
       return value;
@@ -96,16 +101,18 @@ export class CatalogCodeInterceptor {
       // 응답에서 값이 없는 categoryId: null도 categoryCode: null로 맞춤 (키가 값 유무에 따라 달라지지 않게)
       if (pair && item === null && direction === 'out') {
         result[pair.code] = null;
+        if (keepIds) result[pair.id] = null;
         continue;
       }
       if (!pair || typeof item !== 'string') {
-        result[key] = await this.walk(item, direction);
+        result[key] = await this.walk(item, direction, keepIds);
         continue;
       }
       if (direction === 'in') {
         result[pair.id] = await this.codeToId(pair, item);
       } else {
         result[pair.code] = await this.idToCode(pair, item);
+        if (keepIds) result[pair.id] = item;
       }
     }
     return result;

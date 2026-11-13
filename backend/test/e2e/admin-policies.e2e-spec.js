@@ -376,7 +376,7 @@ describe.skipIf(!databaseUrl)('관리자 핵심 정책 API (PostgreSQL)', () => 
       expect(second.body.versionNo).toBe(first.body.versionNo + 1);
 
       const list = await get('/admin/v1/streak-milestone-policies').expect(200);
-      const mine = list.body.filter((i) =>
+      const mine = list.body.items.filter((i) =>
         [first.body.id, second.body.id].includes(i.id),
       );
       expect(mine.map((i) => i.points)).toEqual([400, 300]);
@@ -430,7 +430,7 @@ describe.skipIf(!databaseUrl)('관리자 핵심 정책 API (PostgreSQL)', () => 
       expect(dup.body.error.code).toBe('POLICY_EXISTS');
 
       const list = await get('/admin/v1/point-cap-policies').expect(200);
-      expect(list.body.some((i) => i.id === created.body.id)).toBe(true);
+      expect(list.body.items.some((i) => i.id === created.body.id)).toBe(true);
 
       for (const effectiveMonth of ['2999-13-01', '2999-01-02', 'next', 5]) {
         await post('/admin/v1/point-cap-policies', {

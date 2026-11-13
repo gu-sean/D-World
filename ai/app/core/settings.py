@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     R2_ACCESS_KEY_ID: str = "minioadmin"
     R2_SECRET_ACCESS_KEY: str = "minioadmin"
 
+    # 판정할 영상을 어디서 읽는가: local = samples/ 폴더(개발 전용), r2 = 위 R2/MinIO 버킷(objectKey)
+    VISION_MEDIA_SOURCE: Literal["local", "r2"] = "local"
     VISION_ENGINE: Literal["fixed", "mediapipe"] = "fixed"
     SENSOR_ENGINE: Literal["fixed", "run"] = "fixed"
     POSE_MODEL_PATH: str = "models/pose_landmarker_lite.task"

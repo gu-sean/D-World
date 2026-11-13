@@ -44,7 +44,22 @@ describe.skipIf(!databaseUrl)(
         const before = (await summary().expect(200)).body;
         const today = kstDate();
         expect(before).toMatchObject({ from: today, to: today });
-        expect(Object.keys(before.queues).sort()).toEqual([
+        expect(before.queues.map((q) => q.type)).toEqual([
+          'verification',
+          'report',
+          'inquiry',
+          'withdrawal',
+          'appeal',
+        ]);
+        expect(before).toMatchObject({
+          activeUserCount: expect.any(Number),
+          missionCount: expect.any(Number),
+          pendingVerificationCount: expect.any(Number),
+          openReportCount: expect.any(Number),
+          aggregatedAt: expect.any(String),
+        });
+        const stat = (body, type) => body.queues.find((q) => q.type === type);
+        expect(Object.keys(before.queueStats).sort()).toEqual([
           'aiPending',
           'appeals',
           'challengeReviews',
@@ -69,21 +84,24 @@ describe.skipIf(!databaseUrl)(
 
         const after = (await summary().expect(200)).body;
         expect(after.newUsers).toBe(before.newUsers + 1);
-        expect(after.queues.supportTickets.count).toBe(
-          before.queues.supportTickets.count + 1,
+        expect(after.queueStats.supportTickets.count).toBe(
+          before.queueStats.supportTickets.count + 1,
         );
-        expect(after.queues.withdrawals.count).toBe(
-          before.queues.withdrawals.count + 1,
+        expect(stat(after, 'inquiry').count).toBe(
+          stat(before, 'inquiry').count + 1,
         );
-        expect(after.queues.supportTickets.oldestAt).not.toBeNull();
+        expect(stat(after, 'withdrawal').count).toBe(
+          stat(before, 'withdrawal').count + 1,
+        );
+        expect(stat(after, 'inquiry').oldestAt).not.toBeNull();
         expect(typeof after.pointsGranted).toBe('number');
         const { rows: pending } = await db.query(
           `SELECT count(*)::int AS n FROM mission_records r
             WHERE r.status = 'submitted'
               AND NOT EXISTS (SELECT 1 FROM verification_results v WHERE v.record_id = r.id)`,
         );
-        expect(after.queues.aiPending.count).toBe(pending[0].n);
-        expect(after.queues.aiPending).toHaveProperty('oldestAt');
+        expect(after.queueStats.aiPending.count).toBe(pending[0].n);
+        expect(after.queueStats.aiPending).toHaveProperty('oldestAt');
       });
 
       it('과거 기간은 그 기간만 세고, 잘못된 기간은 400', async () => {

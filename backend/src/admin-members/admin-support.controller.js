@@ -52,6 +52,11 @@ const listItemView = (row) => ({
   assignedAdminId: row.assigned_admin_id,
   receivedAt: row.received_at,
   completedAt: row.completed_at,
+  assignedAdminLoginId: row.assigned_login_id ?? null,
+  reporterNickname: row.reporter_nickname ?? null,
+  targetId: targetIdOf(row),
+  targetSummary: row.target_label ?? null,
+  sameTargetOpenCount: Number(row.same_target_open_count ?? 0),
 });
 
 const eventView = (row) => ({
@@ -59,15 +64,35 @@ const eventView = (row) => ({
   eventType: row.event_type,
   visibility: row.visibility,
   adminId: row.admin_id,
+  adminLoginId: row.admin_login_id ?? null,
   body: row.body,
   createdAt: row.created_at,
 });
+
+const targetIdOf = (row) =>
+  row.target_user_id ??
+  row.target_mission_definition_id ??
+  row.target_challenge_id ??
+  null;
 
 /** 티켓 응답용 대상 이름: 대상 행이 지워졌으면 null */
 const TARGET_LABEL = `COALESCE(
   (SELECT nickname FROM profiles WHERE user_id = t.target_user_id),
   (SELECT title FROM mission_definitions WHERE id = t.target_mission_definition_id),
   (SELECT title FROM challenges WHERE id = t.target_challenge_id))`;
+
+/** 목록·상세 공통 열: 접수자 닉네임, 담당자 아이디, 대상 이름, 같은 대상의 다른 미처리 건수 */
+const TICKET_COLUMNS = `t.*, ${TARGET_LABEL} AS target_label,
+  rp.nickname AS reporter_nickname,
+  aa.login_id AS assigned_login_id,
+  (SELECT count(*) FROM support_tickets o
+    WHERE t.target_kind IS NOT NULL AND o.id <> t.id AND o.status <> 'completed'
+      AND o.target_kind = t.target_kind
+      AND COALESCE(o.target_user_id, o.target_mission_definition_id, o.target_challenge_id)
+        = COALESCE(t.target_user_id, t.target_mission_definition_id, t.target_challenge_id)
+  ) AS same_target_open_count`;
+const TICKET_JOINS = `LEFT JOIN profiles rp ON rp.user_id = t.reporter_user_id
+  LEFT JOIN admin_accounts aa ON aa.id = t.assigned_admin_id`;
 
 /** 관리자 문의·신고 API: 목록·상세(M20·M21), 담당 지정(M22), 답변·메모(M23), 처리 완료(M24) */
 @Controller('admin/v1/support-tickets')
@@ -115,7 +140,8 @@ export class AdminSupportController {
            OR ($4 = 'none' AND t.assigned_admin_id IS NULL))`;
     const [{ rows }, count] = await Promise.all([
       this.database.query(
-        `SELECT t.* FROM support_tickets t WHERE ${where}
+        `SELECT ${TICKET_COLUMNS} FROM support_tickets t ${TICKET_JOINS}
+          WHERE ${where}
           ORDER BY ${paging.orderBy} LIMIT $6 OFFSET $7`,
         [...params, paging.size, paging.offset],
       ),
@@ -432,12 +458,7 @@ export class AdminSupportController {
 
   async detail(db, id) {
     const { rows } = await db.query(
-      `SELECT t.*, ${TARGET_LABEL} AS target_label,
-              rp.nickname AS reporter_nickname,
-              aa.login_id AS assigned_login_id
-         FROM support_tickets t
-         LEFT JOIN profiles rp ON rp.user_id = t.reporter_user_id
-         LEFT JOIN admin_accounts aa ON aa.id = t.assigned_admin_id
+      `SELECT ${TICKET_COLUMNS} FROM support_tickets t ${TICKET_JOINS}
         WHERE t.id = $1`,
       [id],
     );
@@ -446,8 +467,11 @@ export class AdminSupportController {
     }
     const [events, resolution] = await Promise.all([
       db.query(
-        `SELECT * FROM support_ticket_events WHERE ticket_id = $1
-          ORDER BY created_at, id`,
+        `SELECT e.*, a.login_id AS admin_login_id
+           FROM support_ticket_events e
+           LEFT JOIN admin_accounts a ON a.id = e.admin_id
+          WHERE e.ticket_id = $1
+          ORDER BY e.created_at, e.id`,
         [id],
       ),
       db.query(
@@ -463,15 +487,10 @@ export class AdminSupportController {
       ...listItemView(row),
       body: row.body,
       reporterUserId: row.reporter_user_id,
-      reporterNickname: row.reporter_nickname ?? null,
-      assignedAdminLoginId: row.assigned_login_id ?? null,
       target: row.target_kind
         ? {
             kind: row.target_kind,
-            id:
-              row.target_user_id ??
-              row.target_mission_definition_id ??
-              row.target_challenge_id,
+            id: targetIdOf(row),
             label: row.target_label ?? null,
           }
         : null,
@@ -481,6 +500,7 @@ export class AdminSupportController {
             outcome: done.outcome,
             userReply: done.user_reply,
             contentAction: done.content_action,
+            accountActionId: done.account_action_id ?? null,
             accountAction: done.account_action_id
               ? accountActionView({ ...done, id: done.account_action_id })
               : null,

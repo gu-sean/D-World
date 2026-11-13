@@ -85,6 +85,8 @@ npm run start:dev
 | `AI_REQUEST_TIMEOUT_MS` | AI 서버 호출 기본 타임아웃(판정 접수 기준) | 10000 |
 | `AI_MEDIA_ACCESS` | 판정 요청에 파일을 알리는 방식 `object_key`(키만)/`signed_url`(키+`downloadUrl`). `signed_url`은 AI 스키마가 `downloadUrl`을 받게 된 뒤에만 사용 | object_key |
 | `AI_SIGNED_URL_TTL_SEC` | `signed_url` 방식일 때 AI 판정 요청에 실리는 서명 URL의 유효 시간(초), 요청·재시도마다 새로 발급 | 600 |
+| `AI_SENSOR_ENABLED` | 러닝 센서 인증(I02)을 AI에 동기 호출로 보낼지. AI의 `POST /sensor/evaluations`가 준비되면 켠다. `false`면 센서 인증은 AI 없이 바로 관리자 검수 | false |
+| `AI_SENSOR_TIMEOUT_MS` | 센서 판정(I02) 동기 호출 타임아웃 | 30000 |
 | `AI_PHOTO_ENABLED` | 사진 증거를 AI에 보낼지. 현재 AI는 영상만 판정(`AI_UNSUPPORTED_MEDIA`)하므로 `false`면 사진은 AI를 거치지 않고 바로 관리자 검수(`review_required`)로 넘어감. 업로드는 사진·영상 모두 허용 | false |
 | `AI_PLAN_TIMEOUT_MS` | 계획 생성(I03) 타임아웃, 앱은 70초까지 기다림 | 60000 |
 | `AI_RECOMMEND_TIMEOUT_MS` | 상황 추천(I04) 타임아웃, 넘으면 규칙 기반으로 대체 | 15000 |
@@ -119,7 +121,7 @@ npm run db:reset -- --db d_world_test                     # 없으면 생성 후
 npm run test:e2e                                          # 통합 (test/e2e), DATABASE_URL 없으면 건너뜀
 ```
 
-- 현황(2026-11-13): 단위 228개, e2e 554개(49개 파일) 통과, **마이그레이션만 한 빈 DB**에서도 통과 (시드가 필요한 테스트는 필요한 정책·기준 데이터를 스스로 생성)
+- 현황(2026-11-13): 단위 237개, e2e 566개(50개 파일) 통과, **마이그레이션만 한 빈 DB**에서도 통과 (시드가 필요한 테스트는 필요한 정책·기준 데이터를 스스로 생성)
 - **`.env` 없이 돌려도, 불러와서 돌려도 같은 결과**: `test/config/e2e-env.cjs`가 JWT 키·내부 토큰·`JOBS_DISABLED`·날씨 설정을 테스트용 값으로 채운다.
   `.env.example`에서 복사한 빈 값(`INTERNAL_API_TOKEN=`)이나 운영용 값(`JOBS_DISABLED=false`)이 들어와도 덮어쓴다 (셸에서 명시한 값은 존중)
 - 새 e2e를 쓸 때: 시드된 DB에만 있는 데이터(레벨 정책, 분야 등)에 기대지 않는다. 필요하면 파일 안에서 만들고, 이미 있으면 건드리지 않는다
@@ -217,8 +219,8 @@ test/                  unit/(모듈별 단위), e2e/(실제 PostgreSQL, 파일�
 | 계획 생성 A25 (I03) | **AI 연동 완료**. AI 설정이 없을 때만 규칙 기반 (`ai-proposals/rule-planner.js`, `rule-plan@0.1.0`) | |
 | 상황 추천 A90 (I04) | **AI 연동 완료**. AI 설정이 없거나 실패하면 규칙 기반 (`rule-rec@0.1.0`) | |
 | 판정 요청 I01 | AI 계약대로 연동 (`vision-contract.js`), 영상만 AI 판정, 사진·센서는 관리자 검수 | AI 판정 정확도 검증 후 |
-| 리포트 I05 · 재조정 I06 | **백엔드 구현 완료** (요청 경로 `/llm/reports`, `/llm/plan-adjustments`는 AI 라우터가 없어 임의로 정함 → AI와 확정 필요) | AI 쪽 라우터 |
-| 러닝 판정 I02 | 미구현 (AI 라우터 없음) → 센서 인증은 요청 없이 바로 관리자 검수 | `AiDispatchService` |
+| 리포트 I05 · 재조정 I06 | **백엔드·AI 구현 완료** (경로 `/llm/reports`, `/llm/plan-adjustments` 확정, 백엔드 요청·AI 콜백이 서로의 검증을 통과함을 확인). 실제 생성은 AI의 `GEMINI_API_KEY` 필요 | |
+| 러닝 판정 I02 | **백엔드 구현 완료** (`verification/ai/sensor-contract.js`, `AI_SENSOR_ENABLED=true`). AI의 `POST /internal/v1/sensor/evaluations` 라우터와 앱 러닝 파일 형식 어댑터는 AI 파트 작업 → 그 전에는 꺼 두고 센서 인증은 관리자 검수 | AI 라우터 |
 
 - 목표 수정(A22): `startDate`·분야(`categoryCode`/`categoryId`)는 만든 뒤 바꿀 수 없다. 보내면 400 `COMMON_VALIDATION_FAILED`와
   `details.fields`(`startDate`·`categoryCode`: "수정할 수 없음"). 제목·설명·종료일·난이도·주당 횟수·하루 시간은 수정할 수 있다
@@ -228,6 +230,23 @@ test/                  unit/(모듈별 단위), e2e/(실제 PostgreSQL, 파일�
   `streakDays`만 그 시점 값을 알 수 없어 현재 값을 쓴다 (`records.service.js`의 `grantedRewards`, e2e로 저장값과 일치함을 검증)
 - 미해결
   - 모바일 멱등 요청은 헤더가 있으면 모두 재생 처리(`optional`), 서버가 키를 강제하지는 않음(기존 클라이언트 호환)
+
+## 관리자 웹 계약 (`admin-web`)
+
+- 기준: 관리자 웹이 화면에서 읽는 필드 (목 데이터 `admin-web/src/features/*/mocks.js`)
+- 방식: 웹이 기대하는 필드를 **추가**로 내려줌 (기존 필드는 유지)
+- 검증: `test/e2e/admin-web-contract.e2e-spec.js` (필드 존재만 확인)
+- 호출 경로: 웹이 부르는 74개 경로는 모두 백엔드에 있음
+- 맞춘 응답
+  - 로그인·갱신: `{ admin, accessToken, expiresAt }` (+ 기존 `tokenType`, `expiresIn`), 리프레시는 쿠키로만
+  - 대시보드: `queues`는 `[{type, count, oldestAt}]` 배열(verification·report·inquiry·withdrawal·appeal) + `activeUserCount`·`missionCount`·`pendingVerificationCount`·`openReportCount`·`aggregatedAt`, 전체 대기열은 `queueStats` 객체
+  - 회원: 목록·상세에 `createdAt`·`maskedPhoneNumber`·`maskedEmail`·`restriction`, 상세에 `providers`·`availablePoints`·`levelNo`·`streakDays`·`goalCount`·`completedMissionCount`·`lastActivityAt`
+  - 활동 `targetId`·`result`, 탈퇴 요청 `dataScope`(삭제·익명화·보존 예상 건수)
+  - 문의·신고: `reporterNickname`·`assignedAdminLoginId`·`sameTargetOpenCount`·`targetId`·`targetSummary`, 이벤트 `adminLoginId`, 처리 `accountActionId`
+  - 공지 `pushStats`(pending·sent·failed·skipped)
+  - 월 한도·스트릭 마일스톤 목록은 `{ items }` (보상표·인증 기준은 배열 그대로)
+  - 관리자 응답의 분야·난이도는 `categoryCode`와 `categoryId`(UUID)를 함께 (앱 API는 code만)
+- 미확인: 변경(POST·PATCH) 응답 모양, 데이터가 있어야 보이는 중첩 필드(인증 결과 상세·챌린지 순위 등)
 
 ## AI 서버 연동 (I01)
 
@@ -254,6 +273,10 @@ test/                  unit/(모듈별 단위), e2e/(실제 PostgreSQL, 파일�
   - 이미 열린 제안이 있거나 남은 예정 미션이 없는 목표는 제외, `ingestKey=plan-adjust:{runId}:{goalId}`
   - 콜백 `POST /internal/v1/ai-callbacks/plan-adjustments`: 완료면 제안(`proposed`, 7일 유효) 저장 → 실행 완료 → 알림(`plan-adjustments/{id}`), 30분 안에 안 오면 실패, 기한이 지난 제안은 `expired`
   - 제안 `proposal_json`은 `{ steps: proposedPlan }`, `before_plan`은 `{ steps }`(콜백 시점의 남은 계획)
+- 러닝 센서 I02: **동기 호출** `POST {AI_SERVICE_URL}/internal/v1/sensor/evaluations` (`SensorEvaluationRequest`, `ingestKey=sensor:{recordId}:{submissionNo}`, 파일은 저장소 키로 AI가 내려받음)
+  - 응답 `SensorEvaluationResponse`를 콜백과 같은 `DecisionService` 경로로 저장, 계약과 다른 응답·AI 오류는 영구 실패 → 관리자 검수
+  - `clientMetrics`는 앱 기록 지표(`distanceMeters`·`activeSeconds`·`steps`…) 중 계약에 있는 키만, `criteria.rules`(최소 시간·거리 등)를 그대로 전달
+  - 켜는 조건: `AI_SENSOR_ENABLED=true` (AI 라우터 준비 후)
 - 미디어: 카메라 증거는 사진·영상 합쳐 회차당 1개 (AI는 `media` 1개만 받음). **사진은 `AI_PHOTO_ENABLED=false`(기본)일 때 AI로 보내지 않고 바로 관리자 검수** — AI가 사진 판정을 구현하면 켠다
 - 맞춰야 할 설정: `INTERNAL_API_TOKEN`(양쪽 동일), AI의 `BACKEND_CALLBACK_URL` = `{BACKEND_PUBLIC_URL}/internal/v1/ai-callbacks`
 - 계획 생성 I03: `POST /internal/v1/llm/goal-plans` (동기, 60초)
@@ -271,6 +294,7 @@ test/                  unit/(모듈별 단위), e2e/(실제 PostgreSQL, 파일�
   - 시드: 운동 분야 센서 인증만 `{minDurationSeconds: 300, minDistanceMeters: 300}`, 나머지는 `{}`
   - **AI 서버(`analyze_run.py`)는 아직 rules를 읽지 않고 임계값(정확도 25m·공백 10초·8m/s)을 코드에 둔다** → 읽기 전까지 판정 동작은 바뀌지 않음(AI 파트 작업)
 - **AI의 파일 접근(I01)**: 기본은 `AI_MEDIA_ACCESS=object_key`(AI가 저장소 키로 R2를 직접 읽음 → AI에 R2 읽기 키 필요). 운영에서는 `signed_url`로 바꾸는 것을 목표로 한다.
+  - 현재 AI는 `VISION_MEDIA_SOURCE=r2`로 `objectKey`를 R2/MinIO에서 직접 내려받음 (AI README "영상 저장소"), 이때 AI에 R2 읽기 키 필요
   - 백엔드 준비 완료: `signed_url`이면 `media.downloadUrl`에 읽기 전용 서명 URL을 싣는다. 유효 시간은 `AI_SIGNED_URL_TTL_SEC`(기본 600초, 관리자 조회용 1시간과 별개), 요청·재시도마다 새로 발급
   - **AI 파트에 필요한 변경**: `VisionAnalysisRequest.media`에 선택 필드 `downloadUrl`(문자열) 추가(현재 `extra=forbid`라 켜면 400), 값이 있으면 R2 키 없이 그 URL로 내려받고 체크섬을 확인
   - 적용 뒤 백엔드 `AI_MEDIA_ACCESS=signed_url`로 전환. 운영(`NODE_ENV=production`)에서 AI를 켠 채 `object_key`면 시작 로그에 경고(시작을 막지는 않음)

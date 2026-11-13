@@ -2,6 +2,8 @@ import { Dependencies, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../../database/database.service.js';
 import { MediaService } from '../../media/media.service.js';
+import { DecisionService } from '../decision.service.js';
+import { sensorResponseToDecisionInput } from './sensor-contract.js';
 import { AI_DISPATCHER } from './ai-dispatcher.js';
 
 const FIRST_DELAY_MS = 30_000;
@@ -15,12 +17,19 @@ const MAX_ATTEMPTS = 8;
  * 재시작 시 처음부터 재요청, AI 쪽은 ingestKey·회차 상태 검사로 중복 요청에 안전해야 함
  */
 @Injectable()
-@Dependencies(DatabaseService, MediaService, AI_DISPATCHER, ConfigService)
+@Dependencies(
+  DatabaseService,
+  MediaService,
+  AI_DISPATCHER,
+  ConfigService,
+  DecisionService,
+)
 export class AiDispatchService {
   logger = new Logger(AiDispatchService.name);
   attempts = new Map(); // recordId → { count, nextAt }
 
-  constructor(database, media, dispatcher, config) {
+  constructor(database, media, dispatcher, config, decisions) {
+    this.decisions = decisions;
     this.config = config;
     this.database = database;
     this.media = media;
@@ -83,6 +92,29 @@ export class AiDispatchService {
     };
   }
 
+  /**
+   * AI의 동기 응답을 판정으로 저장 (콜백 수신과 같은 DecisionService 경로)
+   * 응답 형식이 계약과 다르면 BadRequestException → 호출한 쪽에서 영구 실패로 처리
+   */
+  async applySyncResult(recordId, response) {
+    let input;
+    try {
+      input = sensorResponseToDecisionInput(recordId, response);
+    } catch (error) {
+      error.permanent = true; // 같은 요청을 다시 보내도 같은 응답이므로 관리자 검수로
+      throw error;
+    }
+    await this.database.withTransaction((tx) =>
+      this.decisions.applyDecision(tx, {
+        ...input,
+        source: 'ai',
+        allowedStatuses: ['submitted'],
+        ignoreIfNotJudgeable: true,
+      }),
+    );
+    this.attempts.delete(recordId);
+  }
+
   next(state, now) {
     const count = (state?.count ?? 0) + 1;
     const delay = Math.min(FIRST_DELAY_MS * 2 ** (count - 1), MAX_DELAY_MS);
@@ -141,7 +173,15 @@ export class AiDispatchService {
       }
       if (state && state.nextAt > now) continue;
       try {
-        await this.dispatcher.dispatch(await this.buildRequest(candidate));
+        const sent = await this.dispatcher.dispatch(
+          await this.buildRequest(candidate),
+        );
+        if (sent?.result) {
+          // 동기 판정(I02): 응답을 콜백과 같은 경로로 반영
+          await this.applySyncResult(candidate.id, sent.result);
+          result.sent += 1;
+          continue;
+        }
         // 결과가 오지 않으면 같은 백오프로 다시 요청
         this.attempts.set(candidate.id, this.next(state, now));
         result.sent += 1;

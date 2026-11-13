@@ -87,6 +87,16 @@ export class AiClient {
     return this.config.get('AI_PHOTO_ENABLED') === true;
   }
 
+  /** 러닝 센서 인증도 AI에 보낼지(기본 false: 관리자 검수) */
+  get sensorEnabled() {
+    return this.config.get('AI_SENSOR_ENABLED') === true;
+  }
+
+  /** 센서 판정(I02) 동기 호출 타임아웃 */
+  get sensorTimeoutMs() {
+    return this.config.get('AI_SENSOR_TIMEOUT_MS') ?? 30_000;
+  }
+
   /** 판정 요청에 파일을 알려 주는 방식 */
   get mediaAccess() {
     return this.config.get('AI_MEDIA_ACCESS') ?? 'object_key';

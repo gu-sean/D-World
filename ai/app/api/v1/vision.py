@@ -14,6 +14,7 @@ from pydantic import Field
 from app.core.auth import require_internal_token
 from app.core.errors import AiError
 from app.core.settings import get_settings
+from app.storage import r2
 from app.schemas.contracts import (
     AcceptedResponse,
     ApiModel,
@@ -30,6 +31,7 @@ _lock = threading.Lock()
 # Process-local development ledger; no eviction to avoid accidental duplicate execution.
 _jobs: dict[str, dict] = {}
 _active = 0
+MAX_MEDIA_BYTES = 100 * 1024 * 1024
 
 
 def require_local_mode():
@@ -112,7 +114,8 @@ def send_callback(url: str, payload: dict):
                 time.sleep(0.25 * (attempt + 1))
 
 
-def run_job(request: VisionAnalysisRequest, path: Path):
+def run_job(request: VisionAnalysisRequest, path: Path | None):
+    """path가 None이면 R2에서 내려받아 쓰고 끝나면 임시 파일을 지운다."""
     global _active
     callback = VisionAnalysisCallback(
         ingest_key=request.ingest_key,
@@ -120,13 +123,18 @@ def run_job(request: VisionAnalysisRequest, path: Path):
         status="failed",
         engine_version=ENGINE,
     )
+    temp: Path | None = None
     try:
+        if path is None:
+            temp = path = r2.download(
+                request.media[0].object_key, MAX_MEDIA_BYTES
+            )
         digest = hashlib.sha256()
         size = 0
         with path.open("rb") as stream:
             while chunk := stream.read(1024 * 1024):
                 size += len(chunk)
-                if size > 100 * 1024 * 1024:
+                if size > MAX_MEDIA_BYTES:
                     raise ValueError("size")
                 digest.update(chunk)
         media = request.media[0]
@@ -147,8 +155,14 @@ def run_job(request: VisionAnalysisRequest, path: Path):
             )
     except FileNotFoundError:
         callback.failure_reason = "AI_MODEL_OR_MEDIA_NOT_FOUND"
+    except AiError as error:  # R2 내려받기 오류(없음·너무 큼·허용 안 되는 키)
+        callback.failure_reason = error.code
     except Exception:  # noqa: BLE001 - isolate third-party analysis and delivery failures
+        log.exception("Vision analysis failed")
         callback.failure_reason = "AI_VIDEO_ANALYSIS_FAILED"
+    finally:
+        if temp is not None:
+            temp.unlink(missing_ok=True)
     payload = callback.model_dump(mode="json", by_alias=True)
     try:
         with _lock:
@@ -168,7 +182,9 @@ def run_job(request: VisionAnalysisRequest, path: Path):
 @router.post("/vision/analyses", status_code=202, response_model=AcceptedResponse)
 def submit(request: VisionAnalysisRequest, background: BackgroundTasks):
     global _active
-    require_local_mode()
+    use_r2 = get_settings().VISION_MEDIA_SOURCE == "r2"
+    if not use_r2:
+        require_local_mode()
     if request.callback_url != get_settings().BACKEND_CALLBACK_URL:
         raise AiError(
             "AI_INVALID_CALLBACK", 400, "설정된 백엔드 콜백 주소만 사용할 수 있습니다."
@@ -194,7 +210,12 @@ def submit(request: VisionAnalysisRequest, background: BackgroundTasks):
             return AcceptedResponse(ingest_key=request.ingest_key)
         if _active >= get_settings().MAX_CONCURRENT_ANALYSES or len(_jobs) >= 1000:
             raise AiError("AI_VISION_BUSY", 503, "개발 분석 용량이 가득 찼습니다.")
-        path = local_file(media.object_key)
+        # r2면 키만 검사하고, 내려받기는 백그라운드(run_job)에서 한다
+        if use_r2:
+            r2.check_object_key(media.object_key)
+            path = None
+        else:
+            path = local_file(media.object_key)
         _jobs[request.ingest_key] = {"fingerprint": fingerprint, "state": "accepted"}
         _active += 1
     background.add_task(run_job, request, path)
