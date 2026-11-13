@@ -1,7 +1,8 @@
 import { createTestApp } from '../support/app.js';
 import { testNickname } from '../support/users.js';
 import { adminApi } from '../support/admin-api.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -33,7 +34,7 @@ describe.skipIf(!databaseUrl)('챌린지 참가·일별 미션 (PostgreSQL)', ()
     });
 
   async function createUser() {
-    const id = randomUUID();
+    const id = newId();
     await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
     await db.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
       id,
@@ -108,10 +109,10 @@ describe.skipIf(!databaseUrl)('챌린지 참가·일별 미션 (PostgreSQL)', ()
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `cp_${RUN}`, `${adminId}@example.com`],
+      [adminId, `cp_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await tx((t) =>
       app.get(SessionsService).create(t, 'admin', adminId),
@@ -119,8 +120,8 @@ describe.skipIf(!databaseUrl)('챌린지 참가·일별 미션 (PostgreSQL)', ()
     adminToken = await app
       .get(AccessTokenService)
       .issue('admin', adminId, session.sessionId);
-    categoryId = randomUUID();
-    difficultyId = randomUUID();
+    categoryId = newId();
+    difficultyId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [categoryId, `cpc${RUN}`, `참가카테고리${RUN}`],
@@ -242,7 +243,7 @@ describe.skipIf(!databaseUrl)('챌린지 참가·일별 미션 (PostgreSQL)', ()
       }).expect(201)
     ).body;
     await join(user, draft.id).expect(404);
-    await join(user, randomUUID()).expect(404);
+    await join(user, newId()).expect(404);
 
     const started = await publicChallenge();
     await shiftDays(started.id, 2); // 시작일이 오늘이 됨
@@ -260,7 +261,7 @@ describe.skipIf(!databaseUrl)('챌린지 참가·일별 미션 (PostgreSQL)', ()
     await db.query(
       `INSERT INTO account_actions (id, user_id, admin_id, action_type, reason, starts_at, ends_at)
        VALUES ($1,$2,$3,'restriction','테스트', now() - interval '1 minute', now() + interval '1 day')`,
-      [randomUUID(), restricted.id, adminId],
+      [newId(), restricted.id, adminId],
     );
     expect((await join(restricted, open.id).expect(403)).body.error.code).toBe(
       'AUTH_ACCOUNT_RESTRICTED',

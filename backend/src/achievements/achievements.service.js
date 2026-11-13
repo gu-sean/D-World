@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -202,7 +202,7 @@ export class AchievementsService {
            JOIN verification_results vr ON vr.record_id = mr.id
           WHERE m.user_id = $1 AND m.status = 'completed'
             AND m.source_type <> 'challenge'
-            AND ($2::uuid IS NULL OR m.category_id = $2)
+            AND ($2::short_id IS NULL OR m.category_id = $2)
             AND vr.decision = 'approved' AND vr.is_current
           ORDER BY vr.decided_at ASC LIMIT $3`,
         [userId, candidate.categoryId, candidate.targetCount],
@@ -239,7 +239,7 @@ export class AchievementsService {
       `SELECT count(DISTINCT m.id) AS n FROM missions m
         WHERE m.user_id = $1 AND m.status = 'completed'
           AND m.source_type <> 'challenge'
-          AND ($2::uuid IS NULL OR m.category_id = $2)
+          AND ($2::short_id IS NULL OR m.category_id = $2)
           AND EXISTS (
               SELECT 1 FROM mission_records mr
               JOIN verification_results vr ON vr.record_id = mr.id
@@ -251,7 +251,7 @@ export class AchievementsService {
 
   /** 신규 획득: 지급 행 삽입 → 포인트·XP(해당하면) → 이벤트. userAchievementId 반환 */
   async grantOne(tx, userId, candidate, source) {
-    const id = randomUUID();
+    const id = newId();
     const sourceType = SOURCE_TYPE_BY_CONDITION[candidate.conditionType];
     const shared = SHARED_REWARD_CONDITIONS.has(candidate.conditionType);
     // paid_points는 월 한도로 줄어들 수 있어 낙관적으로 넣고 필요하면 보정(마이그레이션 018)
@@ -320,7 +320,7 @@ export class AchievementsService {
     );
 
     const shared = SHARED_REWARD_CONDITIONS.has(candidate.conditionType);
-    const resultId = randomUUID();
+    const resultId = newId();
     if (!shared) {
       if (num(existing.awarded_points) > 0) {
         await this.points.reinstateAutoPoints(tx, {
@@ -358,7 +358,7 @@ export class AchievementsService {
       [row.id],
     );
 
-    const resultId = randomUUID();
+    const resultId = newId();
     if (!SHARED_REWARD_CONDITIONS.has(row.condition_type)) {
       await this.points.revokeAutoPoints(tx, {
         userId,
@@ -406,7 +406,7 @@ export class AchievementsService {
                reason, idempotency_key)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
       [
-        randomUUID(),
+        newId(),
         userAchievementId,
         userId,
         eventType,
@@ -453,7 +453,7 @@ export class AchievementsService {
     if (!found) return { processed: 0, earned: 0, lastUserId: afterUserId };
 
     const { rows: users } = await tx.query(
-      `SELECT id FROM users WHERE ($1::uuid IS NULL OR id > $1) ORDER BY id LIMIT $2`,
+      `SELECT id FROM users WHERE ($1::short_id IS NULL OR id > $1) ORDER BY id LIMIT $2`,
       [afterUserId, limit],
     );
 

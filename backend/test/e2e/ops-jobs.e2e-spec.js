@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { testNickname } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
 import { JobsService } from '../../src/jobs/jobs.service.js';
@@ -18,7 +19,7 @@ describe.skipIf(!databaseUrl)('운영 정기 작업 (PostgreSQL)', () => {
   let originalSend;
 
   async function createUser() {
-    const id = randomUUID();
+    const id = newId();
     await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
     await db.query(
       'INSERT INTO profiles (user_id, nickname, notification_enabled) VALUES ($1, $2, true)',
@@ -27,8 +28,8 @@ describe.skipIf(!databaseUrl)('운영 정기 작업 (PostgreSQL)', () => {
     return id;
   }
 
-  async function addDevice(userId, token = `tok-${randomUUID()}`) {
-    const id = randomUUID();
+  async function addDevice(userId, token = `tok-${newId()}`) {
+    const id = newId();
     await db.query(
       `INSERT INTO push_devices (id, user_id, platform, token) VALUES ($1, $2, 'android', $3)`,
       [id, userId, token],
@@ -37,7 +38,7 @@ describe.skipIf(!databaseUrl)('운영 정기 작업 (PostgreSQL)', () => {
   }
 
   async function addNotification(userId) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO user_notifications
          (id, user_id, kind, event_key, title, body, push_status)
@@ -60,10 +61,10 @@ describe.skipIf(!databaseUrl)('운영 정기 작업 (PostgreSQL)', () => {
     jobs = app.get(JobsService);
     sender = app.get(PUSH_SENDER);
     originalSend = sender.send;
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `oj_${RUN}`, `${adminId}@example.com`],
+      [adminId, `oj_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
   });
 
@@ -130,8 +131,8 @@ describe.skipIf(!databaseUrl)('운영 정기 작업 (PostgreSQL)', () => {
 
     it('기기 하나가 실패해도 다른 기기가 받으면 sent', async () => {
       const userId = await createUser();
-      const bad = await addDevice(userId, `bad-${randomUUID()}`);
-      await addDevice(userId, `good-${randomUUID()}`);
+      const bad = await addDevice(userId, `bad-${newId()}`);
+      await addDevice(userId, `good-${newId()}`);
       const id = await addNotification(userId);
       sender.send = async ({ token }) => {
         if (token === bad.token) throw new Error('down');
@@ -145,7 +146,7 @@ describe.skipIf(!databaseUrl)('운영 정기 작업 (PostgreSQL)', () => {
     it('7일 지난 미사용 티켓과 파일만 지우고, 사용된 티켓·최근 티켓은 남김', async () => {
       const storage = app.get(OBJECT_STORAGE);
       const insert = async (ageDays, consumed) => {
-        const id = randomUUID();
+        const id = newId();
         const key = `dev/assets/badges/${id}/v1.png`;
         await db.query(
           `INSERT INTO admin_asset_uploads
@@ -155,7 +156,7 @@ describe.skipIf(!databaseUrl)('운영 정기 작업 (PostgreSQL)', () => {
                    now() - make_interval(days => $5),
                    now() - make_interval(days => $5),
                    CASE WHEN $6 THEN now() - make_interval(days => $5) END)`,
-          [id, randomUUID(), key, adminId, ageDays, consumed],
+          [id, newId(), key, adminId, ageDays, consumed],
         );
         storage.simulateUpload(key, { size: 10, contentType: 'image/png' });
         return { id, key };
@@ -184,7 +185,7 @@ describe.skipIf(!databaseUrl)('운영 정기 작업 (PostgreSQL)', () => {
   describe('withdrawal-complete', () => {
     async function createWithdrawal(status = 'processing') {
       const userId = await createUser();
-      const requestId = randomUUID();
+      const requestId = newId();
       await db.query(
         `INSERT INTO account_withdrawal_requests
            (id, user_id, status, reviewed_by, reviewed_at)

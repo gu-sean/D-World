@@ -1,6 +1,7 @@
 import { createUser as createUserWith } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
@@ -30,8 +31,8 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
 
   async function createReference({ rate = true, isActive = true } = {}) {
     const tag = next();
-    const category = randomUUID();
-    const difficulty = randomUUID();
+    const category = newId();
+    const difficulty = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order, is_active) VALUES ($1,$2,$3,1,$4)`,
       [category, `dc${tag}`, `원형카테고리${tag}`, isActive],
@@ -46,7 +47,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
                 (id, category_id, difficulty_id, version_no, points, user_xp, pet_xp,
                  effective_at, created_by_admin_id)
          VALUES ($1,$2,$3,1,60,6,3, now() - interval '1 day', $4)`,
-        [randomUUID(), category, difficulty, adminId],
+        [newId(), category, difficulty, adminId],
       );
     }
     return {
@@ -87,7 +88,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
     return definition;
   }
 
-  const adminPost = (path, payload, key = randomUUID()) => {
+  const adminPost = (path, payload, key = newId()) => {
     const req = http.post(path).set(auth(adminToken));
     if (key !== null) req.set('Idempotency-Key', key);
     return req.send(payload ?? {});
@@ -126,10 +127,10 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `df_${RUN}`, `${adminId}@example.com`],
+      [adminId, `df_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await tx((t) =>
       app.get(SessionsService).create(t, 'admin', adminId),
@@ -211,7 +212,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
         `INSERT INTO mission_definitions
                 (id, origin, created_by_user_id, title, category_id, difficulty_id,
                  verification_method, publication_status)
-         SELECT gen_random_uuid(), 'user', $1, '채우기 ' || n, $2, $3, 'camera', 'private'
+         SELECT new_short_id(), 'user', $1, '채우기 ' || n, $2, $3, 'camera', 'private'
            FROM generate_series(1, 99) AS n`,
         [user.id, ref.category, ref.difficulty],
       );
@@ -251,7 +252,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
         .delete(`/api/v1/me/mission-definitions/${deletedOne.id}`)
         .set(auth(owner.token))
         .expect(204);
-      const adminTemplate = randomUUID();
+      const adminTemplate = newId();
       await db.query(
         `INSERT INTO mission_definitions
                 (id, origin, title, category_id, difficulty_id, verification_method,
@@ -707,13 +708,13 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
       await approve(done.id).expect(409);
       await reject(done.id).expect(409);
 
-      await approve(randomUUID()).expect(404);
+      await approve(newId()).expect(404);
       await adminPost('/admin/v1/mission-definitions/not-a-uuid/reviews', {
         decision: 'approved',
         reason: '승인',
       }).expect(400);
       // 관리자 템플릿은 검수 대상이 아님
-      const template = randomUUID();
+      const template = newId();
       await db.query(
         `INSERT INTO mission_definitions
                 (id, origin, title, category_id, difficulty_id, verification_method, publication_status)
@@ -783,7 +784,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
       await http
         .post(`/admin/v1/mission-definitions/${definition.id}/reviews`)
         .set(auth(user.token))
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .expect(401);
       await http.get('/admin/v1/mission-definitions').expect(401);
       // 사용자 API에는 관리자 토큰을 쓸 수 없음
@@ -811,7 +812,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
       const owner = await createUser();
       const ref = await createReference();
       const definition = await pendingDefinition(owner, ref);
-      const key = randomUUID();
+      const key = newId();
 
       const first = await approve(definition.id, key).expect(200);
       const second = await approve(definition.id, key).expect(200);
@@ -828,7 +829,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
       expect(rows).toEqual([{ status: 'completed', response_status: 200 }]);
 
       // 새 키로 같은 처리를 보내면 상태 전이 오류
-      await approve(definition.id, randomUUID()).expect(409);
+      await approve(definition.id, newId()).expect(409);
     });
 
     it('같은 키로 다른 요청을 보내면 409', async () => {
@@ -836,7 +837,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
       const ref = await createReference();
       const a = await pendingDefinition(owner, ref);
       const b = await pendingDefinition(owner, ref);
-      const key = randomUUID();
+      const key = newId();
       await approve(a.id, key).expect(200);
 
       for (const call of [
@@ -853,7 +854,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
       const owner = await createUser();
       const ref = await createReference();
       const definition = await createDefinition(owner, ref); // private라 승인 불가
-      const key = randomUUID();
+      const key = newId();
 
       const first = await approve(definition.id, key).expect(409);
       // 상태가 바뀐 뒤에도 같은 키는 처음 응답을 재생
@@ -877,7 +878,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
       const owner = await createUser();
       const ref = await createReference();
       const definition = await pendingDefinition(owner, ref);
-      const key = randomUUID();
+      const key = newId();
       const results = await Promise.all(
         [1, 2, 3, 4].map(() => approve(definition.id, key)),
       );
@@ -908,16 +909,16 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
           `INSERT INTO admin_idempotency_keys
                   (id, admin_id, idempotency_key, operation, request_hash, created_at)
            VALUES ($1,$2,$3,'mission_definition.review',$4, now() - $5::interval)`,
-          [randomUUID(), adminId, key, requestHash, age],
+          [newId(), adminId, key, requestHash, age],
         );
 
-      const recent = randomUUID();
+      const recent = newId();
       await insertInProgress(recent, hashOf(definition.id), '1 minute');
       const busy = await approve(definition.id, recent).expect(409);
       expect(busy.body.error.code).toBe('COMMON_REQUEST_IN_PROGRESS');
       expect(await statusOf(definition.id)).toBe('review_pending');
 
-      const stale = randomUUID();
+      const stale = newId();
       await insertInProgress(stale, hashOf(definition.id), '10 minutes');
       await approve(definition.id, stale).expect(200);
       expect(await statusOf(definition.id)).toBe('public');
@@ -929,7 +930,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
 
       // 요청 내용이 다르면 오래된 행이라도 재사용 거절
       const other = await pendingDefinition(owner, ref);
-      const mismatch = randomUUID();
+      const mismatch = newId();
       await insertInProgress(mismatch, hashOf(definition.id), '10 minutes');
       await approve(other.id, mismatch).expect(409);
     });
@@ -938,16 +939,16 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
       const owner = await createUser();
       const ref = await createReference();
       const definition = await pendingDefinition(owner, ref);
-      const key = randomUUID();
-      const other = randomUUID();
+      const key = newId();
+      const other = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-        [other, `df2_${next()}`, `${other}@example.com`],
+        [other, `df2_${next()}`, `${other.toLowerCase()}@example.com`],
       );
       await db.query(
         `INSERT INTO admin_idempotency_keys (id, admin_id, idempotency_key, operation, request_hash)
          VALUES ($1,$2,$3,'mission_definition.review','x')`,
-        [randomUUID(), other, key],
+        [newId(), other, key],
       );
       // 다른 관리자가 같은 키를 이미 썼어도 영향 없음
       await approve(definition.id, key).expect(200);
@@ -964,7 +965,7 @@ describe.skipIf(!databaseUrl)('미션 원형·공개 검수 (PostgreSQL)', () =>
         `INSERT INTO account_actions
                 (id, user_id, admin_id, action_type, reason, starts_at, ends_at)
          VALUES ($1,$2,$3,'restriction','사유', now() - interval '1 hour', now() + interval '1 hour')`,
-        [randomUUID(), user.id, adminId],
+        [newId(), user.id, adminId],
       );
 
       for (const call of [

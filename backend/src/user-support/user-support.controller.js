@@ -21,7 +21,7 @@ import {
   object,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { UserSupportService } from './user-support.service.js';
@@ -52,7 +52,7 @@ export class UserSupportController {
         target: object(
           {
             kind: oneOf(['user', 'mission_definition', 'challenge']),
-            id: uuid(),
+            id: shortId(),
           },
           { optional: true },
         ),

@@ -3,7 +3,7 @@
 BEGIN;
 
 CREATE TABLE goal_categories (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     code varchar(40) NOT NULL UNIQUE CHECK (code ~ '^[a-z][a-z0-9_]*$'),
     name varchar(80) NOT NULL UNIQUE CHECK (length(btrim(name)) > 0),
     display_order integer NOT NULL CHECK (display_order >= 0),
@@ -16,7 +16,7 @@ CREATE INDEX goal_categories_visible_idx
     ON goal_categories (is_active, display_order, id);
 
 CREATE TABLE difficulty_levels (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     code varchar(40) NOT NULL UNIQUE CHECK (code ~ '^[a-z][a-z0-9_]*$'),
     name varchar(80) NOT NULL UNIQUE CHECK (length(btrim(name)) > 0),
     display_order integer NOT NULL CHECK (display_order >= 0),
@@ -29,10 +29,10 @@ CREATE INDEX difficulty_levels_visible_idx
     ON difficulty_levels (is_active, display_order, id);
 
 CREATE TABLE goals (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    category_id uuid NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
-    difficulty_id uuid NOT NULL REFERENCES difficulty_levels(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category_id short_id NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
+    difficulty_id short_id NOT NULL REFERENCES difficulty_levels(id) ON DELETE RESTRICT,
     title varchar(200) NOT NULL CHECK (length(btrim(title)) > 0),
     description text,
     start_date date NOT NULL,
@@ -57,8 +57,8 @@ CREATE INDEX goals_user_list_idx
     WHERE deleted_at IS NULL;
 
 CREATE TABLE goal_steps (
-    id uuid PRIMARY KEY,
-    goal_id uuid NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY,
+    goal_id short_id NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
     step_no integer NOT NULL CHECK (step_no > 0),
     title varchar(200) NOT NULL CHECK (length(btrim(title)) > 0),
     description text,
@@ -74,13 +74,13 @@ CREATE TABLE goal_steps (
 );
 
 CREATE TABLE mission_definitions (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     origin varchar(20) NOT NULL CHECK (origin IN ('admin', 'user')),
-    created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    created_by_user_id short_id REFERENCES users(id) ON DELETE SET NULL,
     title varchar(200) NOT NULL CHECK (length(btrim(title)) > 0),
     description text,
-    category_id uuid NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
-    difficulty_id uuid NOT NULL REFERENCES difficulty_levels(id) ON DELETE RESTRICT,
+    category_id short_id NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
+    difficulty_id short_id NOT NULL REFERENCES difficulty_levels(id) ON DELETE RESTRICT,
     estimated_duration_seconds integer
         CHECK (estimated_duration_seconds > 0),
     target_value numeric(10,2) CHECK (target_value > 0),
@@ -117,10 +117,10 @@ CREATE INDEX mission_definitions_owner_idx
     WHERE created_by_user_id IS NOT NULL;
 
 CREATE TABLE mission_publication_reviews (
-    id uuid PRIMARY KEY,
-    definition_id uuid NOT NULL REFERENCES mission_definitions(id) ON DELETE CASCADE,
-    requested_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-    reviewed_by_admin_id uuid REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY,
+    definition_id short_id NOT NULL REFERENCES mission_definitions(id) ON DELETE CASCADE,
+    requested_by_user_id short_id REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_by_admin_id short_id REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     decision varchar(20) NOT NULL
         CHECK (decision IN ('submitted', 'approved', 'rejected', 'hidden')),
     reason text,
@@ -137,9 +137,9 @@ CREATE INDEX mission_publication_reviews_definition_idx
     ON mission_publication_reviews (definition_id, created_at DESC);
 
 CREATE TABLE ai_plan_proposals (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    goal_id uuid NOT NULL,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    goal_id short_id NOT NULL,
     generation_no integer NOT NULL CHECK (generation_no > 0),
     status varchar(20) NOT NULL DEFAULT 'draft'
         CHECK (status IN ('draft', 'accepted', 'rejected', 'expired')),
@@ -164,18 +164,18 @@ CREATE INDEX ai_plan_proposals_goal_idx
     ON ai_plan_proposals (goal_id, generated_at DESC);
 
 CREATE TABLE missions (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    goal_id uuid,
-    goal_step_id uuid,
-    definition_id uuid REFERENCES mission_definitions(id) ON DELETE RESTRICT,
-    source_proposal_id uuid,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    goal_id short_id,
+    goal_step_id short_id,
+    definition_id short_id REFERENCES mission_definitions(id) ON DELETE RESTRICT,
+    source_proposal_id short_id,
     source_type varchar(20) NOT NULL
         CHECK (source_type IN ('user', 'template', 'ai')),
     title varchar(200) NOT NULL CHECK (length(btrim(title)) > 0),
     description text,
-    category_id uuid NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
-    difficulty_id uuid NOT NULL REFERENCES difficulty_levels(id) ON DELETE RESTRICT,
+    category_id short_id NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
+    difficulty_id short_id NOT NULL REFERENCES difficulty_levels(id) ON DELETE RESTRICT,
     target_value numeric(10,2) CHECK (target_value > 0),
     target_unit varchar(20),
     estimated_duration_seconds integer
@@ -273,7 +273,7 @@ FOR EACH ROW EXECUTE FUNCTION lock_started_mission_rules();
 CREATE FUNCTION validate_mission_source() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
-    definition_owner uuid;
+    definition_owner short_id;
     definition_status varchar(24);
     proposal_status varchar(20);
 BEGIN

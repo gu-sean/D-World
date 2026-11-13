@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -79,7 +79,7 @@ export class StepsService {
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, goal_id, step_no, title, description, due_date, status, completed_at`,
         [
-          randomUUID(),
+          newId(),
           goalId,
           num(info[0].last) + 1,
           data.title,

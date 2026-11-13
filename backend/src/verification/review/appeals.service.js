@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../../admin-auth/audit.service.js';
 import { adminPage } from '../../common/pagination/admin-page.js';
@@ -139,7 +139,7 @@ export class AppealsService {
                   (id, record_id, filed_by_user_id, original_result_id, reason)
            VALUES ($1, $2, $3, $4, $5)
            RETURNING id, record_id, original_result_id, status, reason, filed_at, resolved_at`,
-          [randomUUID(), recordId, userId, current.id, reason],
+          [newId(), recordId, userId, current.id, reason],
         );
         return this.toView(created[0]);
       });

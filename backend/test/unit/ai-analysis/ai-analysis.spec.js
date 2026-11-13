@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../../../src/common/ids.js';
 import {
   adjustmentCauses,
   adjustmentKey,
@@ -119,8 +119,8 @@ describe('adjustment input', () => {
   });
 
   it('ingestKey 만들기와 읽기', () => {
-    const run = randomUUID();
-    const goal = randomUUID();
+    const run = newId();
+    const goal = newId();
     const key = adjustmentKey(run, goal);
     expect(parseAdjustmentKey(key)).toEqual({ runId: run, goalId: goal });
     expect(parseAdjustmentKey('plan-adjust:x:y')).toBeNull();
@@ -182,8 +182,8 @@ describe('adjustment input', () => {
 
 describe('callback parsing', () => {
   const base = () => ({
-    ingestKey: `report:${randomUUID()}`,
-    runId: randomUUID(),
+    ingestKey: `report:${newId()}`,
+    runId: newId(),
     engineVersion: 'gemini-report@0.1.0',
   });
 
@@ -213,9 +213,9 @@ describe('callback parsing', () => {
   });
 
   it('재조정: 완료는 proposedPlan 필수', () => {
-    const run = randomUUID();
+    const run = newId();
     const body = {
-      ingestKey: adjustmentKey(run, randomUUID()),
+      ingestKey: adjustmentKey(run, newId()),
       runId: run,
       engineVersion: 'v',
     };

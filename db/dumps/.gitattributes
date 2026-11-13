@@ -1,3 +1,0 @@
-# 덤프는 줄바꿈을 바꾸지 않는다 (SHA256.txt와 대조하기 때문)
-*.sql -text
-SHA256.txt -text

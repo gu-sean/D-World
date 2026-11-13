@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { addDays, kstDate } from '../../src/common/time/kst.js';
 import { createTestApp } from '../support/app.js';
 import { createUser as createUserWith } from '../support/users.js';
@@ -18,13 +19,13 @@ describe.skipIf(!databaseUrl)('모바일 미션 API A30~A36 (PostgreSQL)', () =>
 
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `mm_${RUN}`, `${adminId}@example.com`],
+      [adminId, `mm_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
-    const category = randomUUID();
-    const difficulty = randomUUID();
+    const category = newId();
+    const difficulty = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [category, `mmc${RUN}`, `모바일미션${RUN}`],
@@ -38,7 +39,7 @@ describe.skipIf(!databaseUrl)('모바일 미션 API A30~A36 (PostgreSQL)', () =>
               (id, category_id, difficulty_id, version_no, points, user_xp, pet_xp,
                effective_at, created_by_admin_id)
        VALUES ($1,$2,$3,1,100,10,5, now() - interval '1 day', $4)`,
-      [randomUUID(), category, difficulty, adminId],
+      [newId(), category, difficulty, adminId],
     );
     ref = { categoryCode: `mmc${RUN}`, difficultyCode: `mmd${RUN}` };
   });
@@ -178,7 +179,7 @@ describe.skipIf(!databaseUrl)('모바일 미션 API A30~A36 (PostgreSQL)', () =>
       .expect(201);
     const url = `/api/v1/missions/${made.body.id}`;
 
-    const patchKey = randomUUID();
+    const patchKey = newId();
     const patch = (body) =>
       http
         .patch(url)
@@ -196,7 +197,7 @@ describe.skipIf(!databaseUrl)('모바일 미션 API A30~A36 (PostgreSQL)', () =>
     expect(replay.body).toEqual(first.body);
     await patch({ title: '다른 본문' }).expect(409);
 
-    const cancelKey = randomUUID();
+    const cancelKey = newId();
     const cancel = () =>
       http
         .post(`${url}/cancel`)
@@ -211,7 +212,7 @@ describe.skipIf(!databaseUrl)('모바일 미션 API A30~A36 (PostgreSQL)', () =>
 
   it('A35 틀 목록과 A36 추천', async () => {
     const user = await createUserWith(app, db);
-    const definitionId = randomUUID();
+    const definitionId = newId();
     await db.query(
       `INSERT INTO mission_definitions
               (id, origin, title, category_id, difficulty_id, estimated_duration_seconds,

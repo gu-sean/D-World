@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { createTestApp } from '../support/app.js';
 import { createUser } from '../support/users.js';
 
@@ -33,8 +34,8 @@ describe.skipIf(!databaseUrl)('앱 API 멱등 키 (PostgreSQL)', () => {
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
     user = await createUser(app, db);
-    categoryId = randomUUID();
-    difficultyId = randomUUID();
+    categoryId = newId();
+    difficultyId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order, is_active) VALUES ($1,$2,$3,1,true)`,
       [categoryId, `ik${RUN}`, `멱등카테고리${RUN}`],
@@ -60,7 +61,7 @@ describe.skipIf(!databaseUrl)('앱 API 멱등 키 (PostgreSQL)', () => {
   });
 
   it('같은 키·같은 본문은 저장된 응답을 그대로 재생(중복 생성 없음)', async () => {
-    const key = randomUUID();
+    const key = newId();
     const first = await create(key).expect(201);
     const replay = await create(key).expect(201);
     expect(replay.body).toEqual(first.body);
@@ -81,14 +82,14 @@ describe.skipIf(!databaseUrl)('앱 API 멱등 키 (PostgreSQL)', () => {
   });
 
   it('같은 키에 다른 본문이면 409 COMMON_IDEMPOTENCY_KEY_REUSED', async () => {
-    const key = randomUUID();
+    const key = newId();
     await create(key).expect(201);
     const res = await create(key, body({ title: '다른 목표' })).expect(409);
     expect(res.body.error.code).toBe('COMMON_IDEMPOTENCY_KEY_REUSED');
   });
 
   it('실패한 요청은 키를 지워 같은 키로 다시 시도할 수 있음', async () => {
-    const key = randomUUID();
+    const key = newId();
     const bad = await create(key, body({ endDate: '2026-10-01' }));
     expect(bad.status).toBeGreaterThanOrEqual(400);
     const { rows } = await db.query(
@@ -99,7 +100,7 @@ describe.skipIf(!databaseUrl)('앱 API 멱등 키 (PostgreSQL)', () => {
   });
 
   it('처리 중인 같은 키는 409 COMMON_REQUEST_IN_PROGRESS', async () => {
-    const key = randomUUID();
+    const key = newId();
     const first = create(key, body({ title: '동시 목표' })).then((r) => r);
     const second = create(key, body({ title: '동시 목표' })).then((r) => r);
     const [a, b] = await Promise.all([first, second]);
@@ -117,10 +118,10 @@ describe.skipIf(!databaseUrl)('앱 API 멱등 키 (PostgreSQL)', () => {
     expect(rows[0].n).toBe(1);
   });
   it('목표 수정·삭제: 키가 있으면 재생, 없으면 그대로 실행(선택 멱등)', async () => {
-    const created = await create(randomUUID(), body({ title: '선택 멱등' }));
+    const created = await create(newId(), body({ title: '선택 멱등' }));
     const goalId = created.body.id;
 
-    const key = randomUUID();
+    const key = newId();
     const patch = () =>
       http
         .patch(`/api/v1/goals/${goalId}`)
@@ -151,7 +152,7 @@ describe.skipIf(!databaseUrl)('앱 API 멱등 키 (PostgreSQL)', () => {
     expect(reused.body.error.code).toBe('COMMON_IDEMPOTENCY_KEY_REUSED');
 
     // 삭제 재전송은 두 번째도 204(첫 응답 재생)
-    const delKey = randomUUID();
+    const delKey = newId();
     const del = () =>
       http
         .delete(`/api/v1/goals/${goalId}`)

@@ -4,8 +4,8 @@ import { Link } from 'react-router';
 import { useConfirmedChange } from '../components/useConfirmedChange.jsx';
 import { MAX_POINTS } from '../components/labels.js';
 import { useAdjustPoints } from '../queries.js';
+import { ID_PATTERN } from '../../../api/ids.js';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACTION_TEXT = { manual_grant: '지급', manual_recovery: '회수' };
 
 export default function PointAdjustmentPage() {
@@ -49,7 +49,7 @@ export default function PointAdjustmentPage() {
             { required: true, whitespace: true, message: '회원 ID를 입력해 주세요.' },
             {
               validator: (_, v) =>
-                !v?.trim() || UUID.test(v.trim())
+                !v?.trim() || ID_PATTERN.test(v.trim())
                   ? Promise.resolve()
                   : Promise.reject(new Error('회원 ID 형식을 확인해 주세요.')),
             },

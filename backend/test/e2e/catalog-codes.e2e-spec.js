@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { createTestApp } from '../support/app.js';
 import { createUser } from '../support/users.js';
 
@@ -12,7 +13,7 @@ describe.skipIf(!databaseUrl)('분야·난이도 code 변환 (PostgreSQL)', () =
   let http;
   let user;
   const codes = { category: `cc${RUN}`, difficulty: `cd${RUN}` };
-  const ids = { category: randomUUID(), difficulty: randomUUID() };
+  const ids = { category: newId(), difficulty: newId() };
   const auth = () => ({ Authorization: `Bearer ${user.token}` });
 
   beforeAll(async () => {

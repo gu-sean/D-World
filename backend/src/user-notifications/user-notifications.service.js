@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable } from '@nestjs/common';
 import { notFound } from '../common/errors/http-errors.js';
 import { decodeCursor, encodeCursor } from '../common/pagination/cursor.js';
@@ -47,7 +47,7 @@ export class UserNotificationsService {
         WHERE n.user_id = $1 AND ${VISIBLE}
           AND ($2::boolean IS NOT TRUE OR n.read_at IS NULL)
           AND ($3::timestamptz IS NULL
-               OR (n.created_at, n.id) < ($3::timestamptz, $4::uuid))
+               OR (n.created_at, n.id) < ($3::timestamptz, $4::short_id))
         ORDER BY n.created_at DESC, n.id DESC
         LIMIT $5`,
       [userId, unreadOnly, after.t, after.id, limit + 1],
@@ -115,7 +115,7 @@ export class UserNotificationsService {
           SET user_id = EXCLUDED.user_id, platform = EXCLUDED.platform,
               is_active = true, last_seen_at = now()
        RETURNING *`,
-      [randomUUID(), userId, platform, token],
+      [newId(), userId, platform, token],
     );
     return deviceView(rows[0]);
   }
@@ -165,7 +165,7 @@ export class UserNotificationsService {
          FROM notices n
         WHERE ${this.visibleNotices('$1')}
           AND ($2::timestamptz IS NULL
-               OR (n.published_at, n.id) < ($2::timestamptz, $3::uuid))
+               OR (n.published_at, n.id) < ($2::timestamptz, $3::short_id))
         ORDER BY n.published_at DESC, n.id DESC
         LIMIT $4`,
       [userId, after.t, after.id, limit + 1],

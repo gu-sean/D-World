@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AdminMutationService } from '../admin-auth/admin-mutation.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -85,7 +85,7 @@ export class ScoringService {
           AND (r.submitted_at AT TIME ZONE 'Asia/Seoul')::date = d.challenge_date
          JOIN verification_results v ON v.record_id = r.id
           AND v.is_current AND v.decision = 'approved'
-        WHERE d.id = ANY($1::uuid[])
+        WHERE d.id = ANY($1::short_id[])
         ORDER BY d.id, r.submitted_at, r.id`,
       [ids],
     );
@@ -95,7 +95,7 @@ export class ScoringService {
          JOIN mission_records r ON r.mission_id = d.mission_id
           AND (r.submitted_at AT TIME ZONE 'Asia/Seoul')::date = d.challenge_date
           AND r.status IN ('submitted', 'review_required')
-        WHERE d.id = ANY($1::uuid[])`,
+        WHERE d.id = ANY($1::short_id[])`,
       [ids],
     );
     const won = new Map(winners.map((row) => [row.day_id, row]));
@@ -368,7 +368,7 @@ export class ScoringService {
         await tx.query(
           `INSERT INTO challenge_moderation_actions (id, participation_id, admin_id, action, reason)
            VALUES ($1,$2,$3,'disqualify',$4)`,
-          [randomUUID(), participationId, adminId, reason],
+          [newId(), participationId, adminId, reason],
         );
         return {
           targetUserId: participation.user_id,
@@ -419,7 +419,7 @@ export class ScoringService {
                   (id, participation_id, daily_mission_id, admin_id, action, reason, evidence_result_id)
            VALUES ($1,$2,$3,$4,'exclude_day',$5,$6)`,
           [
-            randomUUID(),
+            newId(),
             participationId,
             dailyId,
             adminId,
@@ -470,7 +470,7 @@ export class ScoringService {
           `INSERT INTO challenge_moderation_actions
                   (id, participation_id, daily_mission_id, admin_id, action, reason)
            VALUES ($1,$2,$3,$4,'restore_day',$5)`,
-          [randomUUID(), participationId, dailyId, adminId, reason],
+          [newId(), participationId, dailyId, adminId, reason],
         );
         await this.recalculateParticipation(tx, participationId);
         const { rows } = await tx.query(

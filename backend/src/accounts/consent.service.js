@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
 import { AppException } from '../common/errors/app-exception.js';
@@ -71,7 +71,7 @@ export class ConsentService {
       await tx.query(
         `INSERT INTO consent_records (id, user_id, document_version_id, granted)
          VALUES ($1, $2, $3, $4)`,
-        [randomUUID(), userId, consent.documentVersionId, consent.granted],
+        [newId(), userId, consent.documentVersionId, consent.granted],
       );
     }
   }

@@ -18,7 +18,7 @@ import {
   idOf,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { PHASES } from './challenges.constants.js';
@@ -56,7 +56,7 @@ export class ChallengesController {
   list(request, query) {
     const filters = validateBody(query, {
       phase: oneOf(PHASES, { optional: true }),
-      categoryId: uuid({ optional: true }),
+      categoryId: shortId({ optional: true }),
       cursor: string({ min: 1, max: 500, optional: true }),
     });
     return this.challenges.listPublic(request.auth.userId, {

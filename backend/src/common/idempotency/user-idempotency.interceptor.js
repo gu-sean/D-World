@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../ids.js';
 import {
   Dependencies,
   HttpStatus,
@@ -103,7 +103,7 @@ export class UserIdempotencyInterceptor {
   }
 
   async begin(userId, key, operation, requestHash) {
-    const id = randomUUID();
+    const id = newId();
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const inserted = await this.database.query(
         `INSERT INTO user_idempotency_keys

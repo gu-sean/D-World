@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { createTestApp } from '../support/app.js';
 import { createUser } from '../support/users.js';
 import { PointsService } from '../../src/points/points.service.js';
@@ -24,7 +25,7 @@ describe.skipIf(!databaseUrl)('포인트 상점 (PostgreSQL)', () => {
   };
 
   async function createItem(code, kind, price, extra = {}) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO shop_items (id, code, name, item_kind, display_order, is_active)
        VALUES ($1, $2, $3, $4, 900, $5)`,
@@ -35,7 +36,7 @@ describe.skipIf(!databaseUrl)('포인트 상점 (PostgreSQL)', () => {
          (id, item_id, version_no, price_points, effective_at, created_by_admin_id)
        VALUES ($1, $2, 1, $3, $4, $5)`,
       [
-        randomUUID(),
+        newId(),
         id,
         price,
         extra.effectiveAt ?? new Date(Date.now() - 60_000).toISOString(),
@@ -66,10 +67,10 @@ describe.skipIf(!databaseUrl)('포인트 상점 (PostgreSQL)', () => {
 
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `sh_${RUN}`, `${adminId}@example.com`],
+      [adminId, `sh_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     snack = await createItem('snack', 'consumable', 100);
     hat = await createItem('hat', 'permanent', 500);
@@ -102,7 +103,7 @@ describe.skipIf(!databaseUrl)('포인트 상점 (PostgreSQL)', () => {
   describe('주문', () => {
     it('포인트를 차감하고 보유 수량을 늘림, 같은 키로 다시 보내면 한 번만 처리', async () => {
       const u = await fundedUser(1000);
-      const key = randomUUID();
+      const key = newId();
       const first = await post(
         u,
         '/shop/orders',
@@ -153,7 +154,7 @@ describe.skipIf(!databaseUrl)('포인트 상점 (PostgreSQL)', () => {
         409,
       );
       await post(u, '/shop/orders', {
-        itemId: randomUUID(),
+        itemId: newId(),
         quantity: 1,
       }).expect(404);
       await post(u, '/shop/orders', { itemId: snack, quantity: 0 }).expect(400);
@@ -257,7 +258,7 @@ describe.skipIf(!databaseUrl)('포인트 상점 (PostgreSQL)', () => {
         422,
       );
       await post(u, `/shop/inventory/${hat}/use`, {}).expect(422);
-      await post(u, `/shop/inventory/${randomUUID()}/use`, {}).expect(404);
+      await post(u, `/shop/inventory/${newId()}/use`, {}).expect(404);
 
       const inventory = await get(u, '/shop/inventory').expect(200);
       const bySnack = inventory.body.items.find((i) => i.itemId === snack);

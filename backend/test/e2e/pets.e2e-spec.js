@@ -1,6 +1,7 @@
 import { createTestApp } from '../support/app.js';
 import { testNickname } from '../support/users.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -32,7 +33,7 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
     });
 
   async function createUser() {
-    const id = randomUUID();
+    const id = newId();
     await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
     await db.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
       id,
@@ -47,7 +48,7 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
   }
 
   async function createCategory() {
-    const id = randomUUID();
+    const id = newId();
     const tag = next();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
@@ -60,9 +61,9 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
   async function createSpecies({ unlock = {}, categoryId } = {}) {
     const tag = next();
     const category = categoryId ?? (await createCategory());
-    const speciesId = randomUUID();
-    const versionId = randomUUID();
-    const imageId = randomUUID();
+    const speciesId = newId();
+    const versionId = newId();
+    const imageId = newId();
     await db.query(
       `INSERT INTO pet_species (id, code, name, status, created_by_admin_id)
        VALUES ($1, $2, $3, 'public', $4)`,
@@ -112,11 +113,11 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
   /** 완료·승인 판정까지 갖춘 미션 (해금 조건 "승인 미션 누적"용) */
   async function createApprovedMission(userId, categoryId) {
     const ids = {
-      difficulty: randomUUID(),
-      mission: randomUUID(),
-      record: randomUUID(),
-      criteria: randomUUID(),
-      result: randomUUID(),
+      difficulty: newId(),
+      mission: newId(),
+      record: newId(),
+      criteria: newId(),
+      result: newId(),
     };
     const tag = next();
     await db.query(
@@ -155,8 +156,8 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
 
   /** 대표 펫이 없을 때 지급되어 보류된 펫 XP를 만듦 */
   async function createPendingPetXp(userId, petXp) {
-    const policyId = randomUUID();
-    const sourceId = randomUUID();
+    const policyId = newId();
+    const sourceId = newId();
     const days = [7, 30, 100][counter++ % 3];
     await db.query(
       `INSERT INTO streak_milestone_policy_versions
@@ -187,15 +188,15 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
     ({ app, http, db } = await createTestApp());
     experience = app.get(ExperienceService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash)
        VALUES ($1, $2, $3, 'x')`,
-      [adminId, `pe_${RUN}`, `${adminId}@example.com`],
+      [adminId, `pe_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
 
     // 사용자 레벨 정책: 보류 XP 지급(awardExperience)이 사용자 XP 계정을 만들 때 필요 (다른 스위트의 정책이 있으면 그쪽이 우선하도록 오래된 시행일)
-    const userPolicyId = randomUUID();
+    const userPolicyId = newId();
     await db.query(
       `INSERT INTO user_level_policy_versions (id, version_no, effective_at, created_by_admin_id)
        VALUES ($1, $2, now() - interval '30 days', $3)`,
@@ -213,7 +214,7 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
     }
 
     // 펫 레벨 정책: 1=0, 2=40, 3=120, 4=400 (가장 최근 유효 정책이 되도록 현재 시각 기준)
-    const policyId = randomUUID();
+    const policyId = newId();
     await db.query(
       `INSERT INTO pet_level_policy_versions (id, version_no, effective_at, created_by_admin_id)
        VALUES ($1, $2, now() - interval '1 second', $3)`,
@@ -368,7 +369,7 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
       const missing = await http
         .post('/api/v1/me/pets')
         .set(auth(user.token))
-        .send({ speciesId: randomUUID(), nickname: '몽실이' })
+        .send({ speciesId: newId(), nickname: '몽실이' })
         .expect(404);
       expect(missing.body.error.code).toBe('SPECIES_NOT_FOUND');
     });
@@ -445,13 +446,13 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
         .send({ speciesId, nickname: '몽실이' })
         .expect(403);
 
-      const awardId = randomUUID();
+      const awardId = newId();
       await insertBypassingTriggers(
         `INSERT INTO streak_milestone_awards
                 (id, user_id, target_success_days, policy_version_id,
                  awarded_points, paid_points, first_achieved_date, status)
          VALUES ($1,$2,7,$3,0,0,CURRENT_DATE,'revoked')`,
-        [awardId, user.id, randomUUID()],
+        [awardId, user.id, newId()],
       );
       await http
         .post('/api/v1/me/pets')
@@ -472,7 +473,7 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
 
     it('업적 획득 해금', async () => {
       const user = await createUser();
-      const definitionId = randomUUID();
+      const definitionId = newId();
       await db.query(
         `INSERT INTO achievement_definitions (id, code, status, created_by_admin_id)
          VALUES ($1, $2, 'public', $3)`,
@@ -492,14 +493,7 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
                 (id, user_id, achievement_id, achievement_version_id, badge_image_id,
                  source_type, source_id, first_achieved_at, awarded_points, paid_points)
          VALUES ($1,$2,$3,$4,$5,'mission',$6,now(),0,0)`,
-        [
-          randomUUID(),
-          user.id,
-          definitionId,
-          randomUUID(),
-          randomUUID(),
-          randomUUID(),
-        ],
+        [newId(), user.id, definitionId, newId(), newId(), newId()],
       );
       await http
         .post('/api/v1/me/pets')
@@ -627,7 +621,7 @@ describe.skipIf(!databaseUrl)('펫 선택·이름·대표 (PostgreSQL)', () => {
       const user = await createUser();
       const stranger = await createUser();
       const theirs = await choose(stranger, '남의펫');
-      for (const petId of [theirs.id, randomUUID()]) {
+      for (const petId of [theirs.id, newId()]) {
         const res = await http
           .put('/api/v1/me/pets/representative')
           .set(auth(user.token))

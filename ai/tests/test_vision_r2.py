@@ -3,7 +3,7 @@
 import hashlib
 import io
 from pathlib import Path
-from uuid import uuid4
+from tests.conftest import new_id
 
 import pytest
 from app.api.v1 import vision
@@ -71,11 +71,11 @@ def setup(monkeypatch):
 
 
 def body(key=KEY, data=VIDEO, exercise="squat"):
-    record = str(uuid4())
+    record = new_id()
     return {
         "ingestKey": f"vision:{record}:1",
         "recordId": record,
-        "missionId": str(uuid4()),
+        "missionId": new_id(),
         "submissionNo": 1,
         "categoryCode": "exercise",
         "exerciseCode": exercise,
@@ -83,7 +83,7 @@ def body(key=KEY, data=VIDEO, exercise="squat"):
         "targetUnit": "reps",
         "media": [
             {
-                "mediaId": str(uuid4()),
+                "mediaId": new_id(),
                 "objectKey": key,
                 "mimeType": "video/mp4",
                 "mediaKind": "camera_video",
@@ -94,7 +94,7 @@ def body(key=KEY, data=VIDEO, exercise="squat"):
         "recordStartedAt": "2026-11-06T10:00:00Z",
         "submittedAt": "2026-11-06T10:01:00Z",
         "duplicateOfMediaId": None,
-        "criteria": {"versionId": str(uuid4()), "rules": {}},
+        "criteria": {"versionId": new_id(), "rules": {}},
         "callbackUrl": "http://localhost:3000/internal/v1/ai-callbacks",
     }
 

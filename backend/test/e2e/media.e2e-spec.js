@@ -1,6 +1,7 @@
 import { createUser as createUserWith } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -35,8 +36,8 @@ describe.skipIf(!databaseUrl)('미디어·R2 (PostgreSQL + 메모리 저장소)'
     user,
     { method = 'camera', status = 'recording' } = {},
   ) {
-    const missionId = randomUUID();
-    const recordId = randomUUID();
+    const missionId = newId();
+    const recordId = newId();
     await db.query(
       `INSERT INTO missions
               (id, user_id, source_type, title, category_id, difficulty_id,
@@ -121,13 +122,13 @@ describe.skipIf(!databaseUrl)('미디어·R2 (PostgreSQL + 메모리 저장소)'
     storage = app.get(OBJECT_STORAGE);
     media = app.get(MediaService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `md_${RUN}`, `${adminId}@example.com`],
+      [adminId, `md_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
-    categoryId = randomUUID();
-    difficultyId = randomUUID();
+    categoryId = newId();
+    difficultyId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [categoryId, `mdc${RUN}`, `미디어카테고리${RUN}`],
@@ -327,7 +328,7 @@ describe.skipIf(!databaseUrl)('미디어·R2 (PostgreSQL + 메모리 저장소)'
       const recordId = await createRecord(user);
       const stranger = await register(other, recordId).expect(404);
       expect(stranger.body.error.code).toBe('RECORD_NOT_FOUND');
-      await register(user, randomUUID()).expect(404);
+      await register(user, newId()).expect(404);
 
       for (const status of ['aborted']) {
         const closed = await createRecord(user, { status });
@@ -452,7 +453,7 @@ describe.skipIf(!databaseUrl)('미디어·R2 (PostgreSQL + 메모리 저장소)'
         .set(auth(other.token))
         .expect(404);
       await http
-        .post(`/api/v1/media/${randomUUID()}/complete`)
+        .post(`/api/v1/media/${newId()}/complete`)
         .set(auth(user.token))
         .expect(404);
 
@@ -638,7 +639,7 @@ describe.skipIf(!databaseUrl)('미디어·R2 (PostgreSQL + 메모리 저장소)'
          VALUES ($1,$2,$3,$4,'camera_photo','image/jpeg',10, now() + interval '5 minutes')
          RETURNING id`,
         [
-          randomUUID(),
+          newId(),
           user.id,
           submitted,
           `dev/users/${user.id}/records/${submitted}/x.jpg`,
@@ -811,7 +812,7 @@ describe.skipIf(!databaseUrl)('미디어·R2 (PostgreSQL + 메모리 저장소)'
       await db.query(
         `INSERT INTO account_actions (id, user_id, admin_id, action_type, reason, starts_at, ends_at)
          VALUES ($1,$2,$3,'restriction','사유', now() - interval '1 hour', now() + interval '1 hour')`,
-        [randomUUID(), user.id, adminId],
+        [newId(), user.id, adminId],
       );
 
       const blocked = await register(user, recordId).expect(403);

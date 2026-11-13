@@ -7,7 +7,7 @@ const BASE = import.meta.env.VITE_ADMIN_API_BASE_URL ?? '/admin/v1';
 const DEV_LOGIN_ID = 'dev_admin';
 const DEV_PASSWORD = 'devadmin1234';
 const ADMIN = {
-  id: '3f2c6a2e-0000-4000-8000-000000000001',
+  id: 'N5jkYLM6',
   loginId: DEV_LOGIN_ID,
   email: 'd***@dworld.example',
 };

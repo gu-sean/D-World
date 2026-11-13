@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { addDays, kstDate } from '../../src/common/time/kst.js';
 import { createTestApp } from '../support/app.js';
 import { createUser as createUserWith } from '../support/users.js';
@@ -19,13 +20,13 @@ describe.skipIf(!databaseUrl)(
 
     beforeAll(async () => {
       ({ app, http, db } = await createTestApp());
-      const adminId = randomUUID();
+      const adminId = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-        [adminId, `ma_${RUN}`, `${adminId}@example.com`],
+        [adminId, `ma_${RUN}`, `${adminId.toLowerCase()}@example.com`],
       );
-      const category = randomUUID();
-      const difficulty = randomUUID();
+      const category = newId();
+      const difficulty = newId();
       await db.query(
         `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
         [category, `mac${RUN}`, `재조정${RUN}`],
@@ -39,7 +40,7 @@ describe.skipIf(!databaseUrl)(
               (id, category_id, difficulty_id, version_no, points, user_xp, pet_xp,
                effective_at, created_by_admin_id)
        VALUES ($1,$2,$3,1,100,10,5, now() - interval '1 day', $4)`,
-        [randomUUID(), category, difficulty, adminId],
+        [newId(), category, difficulty, adminId],
       );
       ref = { categoryCode: `mac${RUN}`, difficultyCode: `mad${RUN}` };
     });
@@ -58,14 +59,14 @@ describe.skipIf(!databaseUrl)(
           endDate: day(14),
         })
         .expect(201);
-      const runId = randomUUID();
+      const runId = newId();
       await db.query(
         `INSERT INTO ai_analysis_runs
               (id, user_id, run_type, period_start, period_end)
        VALUES ($1,$2,'plan_adjustment', $3, $4)`,
         [runId, user.id, day(-7), day(-1)],
       );
-      const id = randomUUID();
+      const id = newId();
       const steps = [
         {
           stepNo: 1,

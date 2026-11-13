@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
 import { SessionsService } from '../../src/common/auth/sessions.service.js';
 import { addDays, kstDate } from '../../src/common/time/kst.js';
@@ -26,10 +27,10 @@ describe.skipIf(!databaseUrl)(
 
     beforeAll(async () => {
       ({ app, http, db } = await createTestApp());
-      const adminId = randomUUID();
+      const adminId = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-        [adminId, `mc_${RUN}`, `${adminId}@example.com`],
+        [adminId, `mc_${RUN}`, `${adminId.toLowerCase()}@example.com`],
       );
       const session = await db.withTransaction((t) =>
         app.get(SessionsService).create(t, 'admin', adminId),
@@ -37,8 +38,8 @@ describe.skipIf(!databaseUrl)(
       adminToken = await app
         .get(AccessTokenService)
         .issue('admin', adminId, session.sessionId);
-      category = { id: randomUUID(), code: `mcc${RUN}` };
-      difficulty = { id: randomUUID(), code: `mcd${RUN}` };
+      category = { id: newId(), code: `mcc${RUN}` };
+      difficulty = { id: newId(), code: `mcd${RUN}` };
       await db.query(
         `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
         [category.id, category.code, `모바일챌린지${RUN}`],
@@ -152,12 +153,12 @@ describe.skipIf(!databaseUrl)(
       await http
         .delete(`/api/v1/challenges/${challenge.id}/participations/me`)
         .set(auth(user))
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .expect(204);
       await http
         .delete(`/api/v1/challenges/${challenge.id}/participations/me`)
         .set(auth(user))
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .expect(409)
         .expect((res) =>
           expect(res.body.error.code).toBe('CHALLENGE_NOT_JOINED'),

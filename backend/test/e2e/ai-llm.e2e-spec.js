@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { addDays, kstDate } from '../../src/common/time/kst.js';
 import { AiClient } from '../../src/integrations/ai/ai.client.js';
 import { createTestApp } from '../support/app.js';
@@ -52,13 +53,13 @@ describe.skipIf(!databaseUrl)(
       await new Promise((resolve) => ai.listen(0, '127.0.0.1', resolve));
       aiPort = ai.address().port;
 
-      const adminId = randomUUID();
+      const adminId = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-        [adminId, `llm_${RUN}`, `${adminId}@example.com`],
+        [adminId, `llm_${RUN}`, `${adminId.toLowerCase()}@example.com`],
       );
-      const category = randomUUID();
-      const difficulty = randomUUID();
+      const category = newId();
+      const difficulty = newId();
       await db.query(
         `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
         [category, `llc${RUN}`, `LLM카테고리${RUN}`],
@@ -72,7 +73,7 @@ describe.skipIf(!databaseUrl)(
               (id, category_id, difficulty_id, version_no, points, user_xp, pet_xp,
                effective_at, created_by_admin_id)
        VALUES ($1,$2,$3,1,100,10,5, now() - interval '1 day', $4)`,
-        [randomUUID(), category, difficulty, adminId],
+        [newId(), category, difficulty, adminId],
       );
       ref = { categoryCode: `llc${RUN}`, difficultyCode: `lld${RUN}` };
       definitions = [];
@@ -80,7 +81,7 @@ describe.skipIf(!databaseUrl)(
         ['플랭크 60초', 'plank'],
         ['스쿼트 20개', 'squat'],
       ]) {
-        const id = randomUUID();
+        const id = newId();
         definitions.push({ id, title });
         await db.query(
           `INSERT INTO mission_definitions
@@ -383,7 +384,7 @@ describe.skipIf(!databaseUrl)(
           {
             body: {
               engineVersion: 'v',
-              items: [{ rankNo: 1, definitionId: randomUUID(), reason: 'x' }],
+              items: [{ rankNo: 1, definitionId: newId(), reason: 'x' }],
             },
           },
         ],

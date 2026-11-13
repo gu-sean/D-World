@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable } from '@nestjs/common';
 import { conflict } from '../common/errors/http-errors.js';
 
@@ -57,7 +57,7 @@ export class AdminMembersService {
         );
       }
     }
-    const id = randomUUID();
+    const id = newId();
     const { rows } = await tx.query(
       `INSERT INTO account_actions
          (id, user_id, admin_id, action_type, reason, starts_at, ends_at,
@@ -81,7 +81,7 @@ export class AdminMembersService {
     await tx.query(
       `INSERT INTO user_notifications (id, user_id, kind, event_key, title, body)
        VALUES ($1, $2, 'system', $3, $4, $5)`,
-      [randomUUID(), userId, `account_action:${id}`, title, body],
+      [newId(), userId, `account_action:${id}`, title, body],
     );
     return rows[0];
   }

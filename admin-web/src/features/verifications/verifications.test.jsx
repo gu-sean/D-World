@@ -17,8 +17,8 @@ vi.hoisted(() => {
   import.meta.env.VITE_ADMIN_API_BASE_URL = '/admin/v1';
 });
 
-const RECORD_ID = 'a0000000-0000-4000-8000-000000000001';
-const APPEAL_ID = 'e0000000-0000-4000-8000-000000000001';
+const RECORD_ID = 'a4000001';
+const APPEAL_ID = 'e4000001';
 
 const renderAt = (path) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

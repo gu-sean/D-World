@@ -1,4 +1,5 @@
-import { randomBytes, randomInt, randomUUID } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { createTestApp } from '../support/app.js';
 import { createUser } from '../support/users.js';
 import { AchievementsService } from '../../src/achievements/achievements.service.js';
@@ -20,7 +21,7 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
   const tag = () => randomBytes(5).toString('hex');
 
   async function createCategory() {
-    const id = randomUUID();
+    const id = newId();
     const t = tag();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
@@ -33,9 +34,9 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
   async function createSpecies({ unlockType = 'none', target = null } = {}) {
     const t = tag();
     const category = await createCategory();
-    const speciesId = randomUUID();
-    const versionId = randomUUID();
-    const imageId = randomUUID();
+    const speciesId = newId();
+    const versionId = newId();
+    const imageId = newId();
     await db.query(
       `INSERT INTO pet_species (id, code, name, status, created_by_admin_id)
        VALUES ($1,$2,$3,'public',$4)`,
@@ -80,7 +81,7 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
   }
 
   async function createItem(kind, price) {
-    const id = randomUUID();
+    const id = newId();
     const t = tag();
     await db.query(
       `INSERT INTO shop_items (id, code, name, item_kind, display_order, is_active)
@@ -91,7 +92,7 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
       `INSERT INTO shop_item_price_versions
               (id, item_id, version_no, price_points, effective_at, created_by_admin_id)
        VALUES ($1,$2,1,$3, now() - interval '1 minute', $4)`,
-      [randomUUID(), id, price, adminId],
+      [newId(), id, price, adminId],
     );
     return { id, name: `상품${t}` };
   }
@@ -109,9 +110,9 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
   }
 
   async function createApprovedMission(userId, categoryId, criteriaId) {
-    const difficultyId = randomUUID();
-    const missionId = randomUUID();
-    const recordId = randomUUID();
+    const difficultyId = newId();
+    const missionId = newId();
+    const recordId = newId();
     const t = tag();
     await db.query(
       `INSERT INTO difficulty_levels (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
@@ -134,7 +135,7 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
       `INSERT INTO verification_results
               (id, record_id, result_no, source, decision, criteria_version_id, engine_version)
        VALUES ($1,$2,1,'ai','approved',$3,'model-v1')`,
-      [randomUUID(), recordId, criteriaId],
+      [newId(), recordId, criteriaId],
     );
     await db.query(`UPDATE missions SET status = 'completed' WHERE id = $1`, [
       missionId,
@@ -142,7 +143,7 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
   }
 
   async function createCriteria(categoryId) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO verification_criteria_versions
               (id, category_id, verification_method, version_no, rules_json, effective_at, created_by_admin_id)
@@ -154,8 +155,8 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
 
   async function createAchievement({ targetCount, rarity = 'common' }) {
     const t = tag();
-    const def = randomUUID();
-    const image = randomUUID();
+    const def = newId();
+    const image = newId();
     await db.query(
       `INSERT INTO achievement_definitions (id, code, status, created_by_admin_id)
        VALUES ($1,$2,'public',$3)`,
@@ -175,7 +176,7 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
                reward_pet_xp, badge_image_id, effective_at, created_by_admin_id)
        VALUES ($1,$2,1,'모바일 업적','설명',$3,'approved_mission_count',$4,25,0,0,$5,
                now() - interval '1 day',$6)`,
-      [randomUUID(), def, rarity, targetCount, image, adminId],
+      [newId(), def, rarity, targetCount, image, adminId],
     );
     createdAchievements.push(def);
     return { id: def, code: `ach_${t}` };
@@ -184,11 +185,11 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
     achievements = app.get(AchievementsService);
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash)
        VALUES ($1,$2,$3,'x')`,
-      [adminId, `mr_${RUN}`, `${adminId}@example.com`],
+      [adminId, `mr_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
 
     // 펫을 고르려면 발효된 펫 레벨 정책이 있어야 한다. 시드된 DB에는 있지만 새로 마이그레이션한 DB에는 없으므로,
@@ -197,7 +198,7 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
       `SELECT 1 FROM pet_level_policy_versions WHERE effective_at <= now() LIMIT 1`,
     );
     if (hasPetPolicy.rowCount === 0) {
-      const policyId = randomUUID();
+      const policyId = newId();
       await db.query(
         `INSERT INTO pet_level_policy_versions (id, version_no, effective_at, created_by_admin_id)
          VALUES ($1, $3, now() - interval '30 days', $2)`,
@@ -222,7 +223,7 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
     // 공개 업적은 전역이라 다른 e2e 파일의 사용자도 달성하므로, 끝나면 숨겨서 영향을 남기지 않음
     if (createdAchievements.length > 0) {
       await db.query(
-        `UPDATE achievement_definitions SET status = 'hidden' WHERE id = ANY($1::uuid[])`,
+        `UPDATE achievement_definitions SET status = 'hidden' WHERE id = ANY($1::short_id[])`,
         [createdAchievements],
       );
     }
@@ -288,7 +289,7 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
     it('알 선택(멱등) → 목록 → 대표 설정 → 단계 변화 기록', async () => {
       const user = await createUser(app, db);
       const species = await createSpecies();
-      const key = randomUUID();
+      const key = newId();
       const body = { speciesId: species.speciesId, nickname: '모모' };
 
       const first = await http
@@ -338,7 +339,7 @@ describe.skipIf(!databaseUrl)('모바일 펫·인벤토리·업적 (PostgreSQL)'
                 (id, user_pet_id, from_stage_no, to_stage_no, total_xp_after, reason, occurred_at)
          VALUES ($1,$2,1,2,100,'growth', now() - interval '2 hours'),
                 ($3,$2,2,3,300,'growth', now() - interval '1 hour')`,
-        [randomUUID(), petId, randomUUID()],
+        [newId(), petId, newId()],
       );
       const events = await http
         .get(`/api/v1/me/pets/${petId}/evolution-events`)

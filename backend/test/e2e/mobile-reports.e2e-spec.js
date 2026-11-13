@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { kstDate } from '../../src/common/time/kst.js';
 import { createTestApp } from '../support/app.js';
 import { createUser as createUserWith } from '../support/users.js';
@@ -50,7 +50,7 @@ describe.skipIf(!databaseUrl)(
 
     it('A61~A63 AI 리포트 목록·상세·읽음', async () => {
       const user = await createUserWith(app, db);
-      const runId = randomUUID();
+      const runId = newId();
       await db.query(
         `INSERT INTO ai_analysis_runs
               (id, user_id, run_type, period_start, period_end)

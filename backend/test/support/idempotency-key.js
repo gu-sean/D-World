@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import Test from 'supertest/lib/test.js';
 
 /**
@@ -12,7 +12,7 @@ Test.prototype.end = function endWithKey(fn) {
     this.url.includes('/api/v1/') &&
     !this._header['idempotency-key']
   ) {
-    this.set('Idempotency-Key', randomUUID());
+    this.set('Idempotency-Key', newId());
   }
   return end.call(this, fn);
 };

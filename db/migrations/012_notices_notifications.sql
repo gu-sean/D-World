@@ -2,17 +2,17 @@
 BEGIN;
 
 CREATE TABLE notices (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     category varchar(12) NOT NULL
         CHECK (category IN ('service', 'event', 'policy', 'marketing')),
     title varchar(120) NOT NULL CHECK (length(btrim(title)) > 0),
     body text NOT NULL CHECK (length(btrim(body)) > 0),
-    link_screen varchar(80) CHECK (link_screen ~ '^[a-z][a-z0-9_/.-]*$'),
+    link_screen varchar(80) CHECK (link_screen ~ '^[a-z][A-Za-z0-9_/.-]*$'),
     audience_type varchar(8) NOT NULL DEFAULT 'all'
         CHECK (audience_type IN ('all', 'users')),
     show_in_list boolean NOT NULL DEFAULT true,
     send_push boolean NOT NULL DEFAULT false,
-    policy_document_version_id uuid
+    policy_document_version_id short_id
         REFERENCES policy_document_versions(id) ON DELETE RESTRICT,
     status varchar(12) NOT NULL DEFAULT 'draft'
         CHECK (status IN ('draft', 'scheduled', 'published', 'cancelled')),
@@ -20,7 +20,7 @@ CREATE TABLE notices (
     published_at timestamptz,
     fanout_completed_at timestamptz,
     cancelled_at timestamptz,
-    created_by_admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (id, audience_type),
@@ -47,9 +47,9 @@ CREATE INDEX notices_fanout_pending_idx
     ON notices (published_at) WHERE status = 'published' AND fanout_completed_at IS NULL;
 
 CREATE TABLE notice_recipients (
-    notice_id uuid NOT NULL,
+    notice_id short_id NOT NULL,
     audience_type varchar(8) NOT NULL DEFAULT 'users' CHECK (audience_type = 'users'),
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     PRIMARY KEY (notice_id, user_id),
     FOREIGN KEY (notice_id, audience_type)
         REFERENCES notices(id, audience_type) ON DELETE CASCADE
@@ -146,14 +146,14 @@ BEFORE INSERT OR DELETE ON notice_recipients
 FOR EACH ROW EXECUTE FUNCTION guard_notice_recipients();
 
 CREATE TABLE user_notifications (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     kind varchar(8) NOT NULL CHECK (kind IN ('notice', 'system')),
-    notice_id uuid REFERENCES notices(id) ON DELETE RESTRICT,
+    notice_id short_id REFERENCES notices(id) ON DELETE RESTRICT,
     event_key text CHECK (event_key IS NULL OR length(btrim(event_key)) > 0),
     title varchar(120) NOT NULL CHECK (length(btrim(title)) > 0),
     body text NOT NULL CHECK (length(btrim(body)) > 0),
-    link_screen varchar(80) CHECK (link_screen ~ '^[a-z][a-z0-9_/.-]*$'),
+    link_screen varchar(80) CHECK (link_screen ~ '^[a-z][A-Za-z0-9_/.-]*$'),
     created_at timestamptz NOT NULL DEFAULT now(),
     read_at timestamptz,
     push_status varchar(8) NOT NULL DEFAULT 'none'
@@ -239,8 +239,8 @@ BEFORE UPDATE ON user_notifications
 FOR EACH ROW EXECUTE FUNCTION guard_user_notification_update();
 
 CREATE TABLE push_devices (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     platform varchar(8) NOT NULL CHECK (platform IN ('android', 'ios')),
     token text NOT NULL UNIQUE CHECK (length(btrim(token)) > 0),
     is_active boolean NOT NULL DEFAULT true,

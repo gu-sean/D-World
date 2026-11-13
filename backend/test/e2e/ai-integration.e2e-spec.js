@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { addDays, kstDate } from '../../src/common/time/kst.js';
 import { AiClient } from '../../src/integrations/ai/ai.client.js';
 import { firstLevelUpXp } from '../../src/experience-pets/experience-ledger.js';
@@ -41,7 +42,7 @@ async function ensureLevelPolicies(db, adminId) {
       `SELECT 1 FROM ${table}_policy_versions WHERE effective_at <= now() LIMIT 1`,
     );
     if (rowCount > 0) continue;
-    const policyId = randomUUID();
+    const policyId = newId();
     await db.query(
       `INSERT INTO ${table}_policy_versions (id, version_no, effective_at, created_by_admin_id)
        VALUES ($1, $2, now() - interval '30 days', $3)`,
@@ -95,13 +96,13 @@ describe.skipIf(!databaseUrl)(
       await new Promise((resolve) => ai.listen(0, '127.0.0.1', resolve));
       aiPort = ai.address().port;
 
-      const adminId = randomUUID();
+      const adminId = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-        [adminId, `ai_${RUN}`, `${adminId}@example.com`],
+        [adminId, `ai_${RUN}`, `${adminId.toLowerCase()}@example.com`],
       );
-      const category = randomUUID();
-      const difficulty = randomUUID();
+      const category = newId();
+      const difficulty = newId();
       categoryCode = `aic${RUN}`;
       await db.query(
         `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
@@ -116,21 +117,21 @@ describe.skipIf(!databaseUrl)(
               (id, category_id, difficulty_id, version_no, points, user_xp, pet_xp,
                effective_at, created_by_admin_id)
        VALUES ($1,$2,$3,1,100,10,5, now() - interval '1 day', $4)`,
-        [randomUUID(), category, difficulty, adminId],
+        [newId(), category, difficulty, adminId],
       );
       await db.query(
         `INSERT INTO verification_criteria_versions
               (id, category_id, verification_method, version_no, rules_json, effective_at,
                created_by_admin_id)
        VALUES ($1,$2,'camera',1,'{"minReps":5}'::jsonb, now() - interval '30 days', $3)`,
-        [randomUUID(), category, adminId],
+        [newId(), category, adminId],
       );
       await db.query(
         `INSERT INTO verification_criteria_versions
               (id, category_id, verification_method, version_no, rules_json, effective_at,
                created_by_admin_id)
        VALUES ($1,$2,'sensor',1,'{"minDurationSeconds":300}'::jsonb, now() - interval '30 days', $3)`,
-        [randomUUID(), category, adminId],
+        [newId(), category, adminId],
       );
       await ensureLevelPolicies(db, adminId);
     });
@@ -731,14 +732,14 @@ describe.skipIf(!databaseUrl)(
       expect(again.body.status).toBe('ignored');
       await callback('/internal/v1/ai-callbacks', {
         ...body,
-        recordId: randomUUID(),
+        recordId: newId(),
       }).expect(404);
     });
 
     it('콜백 인증·형식 검증', async () => {
       const body = {
         ingestKey: 'vision:abc:1',
-        recordId: randomUUID(),
+        recordId: newId(),
         status: 'completed',
         engineVersion: 'v',
       };

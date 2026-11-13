@@ -22,7 +22,7 @@ import {
   oneOf,
   string,
   timestamp,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { notFound } from '../common/errors/http-errors.js';
@@ -87,7 +87,7 @@ export class AdminPointsController {
   @Bind(Query(), Res({ passthrough: true }))
   async list(query, response) {
     const filters = validateBody(query, {
-      userId: uuid({ optional: true }),
+      userId: shortId({ optional: true }),
       from: timestamp({ optional: true }),
       to: timestamp({ optional: true }),
     });
@@ -104,7 +104,7 @@ export class AdminPointsController {
       kind ?? null,
       sourceType ?? null,
     ];
-    const where = `($1::uuid IS NULL OR user_id = $1)
+    const where = `($1::short_id IS NULL OR user_id = $1)
           AND ($2::timestamptz IS NULL OR occurred_at >= $2)
           AND ($3::timestamptz IS NULL OR occurred_at < $3)
           AND ($4::text IS NULL OR kind = $4)
@@ -126,7 +126,7 @@ export class AdminPointsController {
            FROM mission_records r
            JOIN missions m ON m.id = r.mission_id
           WHERE r.status = 'review_required'
-            AND ($1::uuid IS NULL OR r.user_id = $1)`,
+            AND ($1::short_id IS NULL OR r.user_id = $1)`,
         [filters.userId ?? null],
       ),
     ]);
@@ -139,7 +139,7 @@ export class AdminPointsController {
   @Bind(Req(), Body())
   adjust(request, body) {
     const input = validateBody(body, {
-      userId: uuid(),
+      userId: shortId(),
       kind: oneOf(['manual_grant', 'manual_recovery']),
       amount: integer({ min: 1, max: MAX_ADJUST_POINTS }),
       reason: string({

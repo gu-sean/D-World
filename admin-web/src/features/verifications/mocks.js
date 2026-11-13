@@ -3,14 +3,14 @@ import { delay, http as mswHttp, HttpResponse } from 'msw';
 // MSW handlers for M30~M37 (verification review, appeals, criteria). Used with VITE_USE_MSW=true.
 const BASE = import.meta.env.VITE_ADMIN_API_BASE_URL ?? '/admin/v1';
 
-const CATEGORY_ID = '5b0c0000-0000-4000-8000-000000000001';
+const CATEGORY_ID = 'srCAfcNs';
 const now = Date.now();
 const hoursAgo = (h) => new Date(now - h * 3600 * 1000).toISOString();
 
 const records = [1, 2, 3].map((n) => ({
-  recordId: `a0000000-0000-4000-8000-00000000000${n}`,
-  missionId: `b0000000-0000-4000-8000-00000000000${n}`,
-  userId: `c0000000-0000-4000-8000-00000000000${n}`,
+  recordId: `a400000${n}`,
+  missionId: `b400000${n}`,
+  userId: `c400000${n}`,
   userNickname: `사용자${n}`,
   status: 'review_required',
   attemptNo: 1,
@@ -32,7 +32,7 @@ const records = [1, 2, 3].map((n) => ({
   },
   results: [
     {
-      id: `d0000000-0000-4000-8000-00000000000${n}`,
+      id: `d400000${n}`,
       resultNo: 1,
       source: 'ai',
       decision: 'review_required',
@@ -63,7 +63,7 @@ const records = [1, 2, 3].map((n) => ({
 
 const appeals = [
   {
-    id: 'e0000000-0000-4000-8000-000000000001',
+    id: 'e4000001',
     recordId: records[0].recordId,
     status: 'open',
     reason: '운동 중인 사진이 맞아요. 다시 확인해 주세요.',
@@ -95,7 +95,7 @@ const summary = (record) => ({
 
 let criteria = [
   {
-    id: 'f0000000-0000-4000-8000-000000000001',
+    id: 'f4000001',
     categoryId: CATEGORY_ID,
     verificationMethod: 'camera',
     versionNo: 1,

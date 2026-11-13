@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable } from '@nestjs/common';
 import { adminPage } from '../common/pagination/admin-page.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -24,9 +24,9 @@ export class AuditService {
       from ?? null,
       to ?? null,
     ];
-    const where = `($1::uuid IS NULL OR l.admin_id = $1)
+    const where = `($1::short_id IS NULL OR l.admin_id = $1)
           AND ($2::text IS NULL OR l.action LIKE $2)
-          AND ($3::uuid IS NULL OR l.target_user_id = $3)
+          AND ($3::short_id IS NULL OR l.target_user_id = $3)
           AND ($4::text IS NULL OR l.result = $4)
           AND ($5::timestamptz IS NULL OR l.recorded_at >= $5)
           AND ($6::timestamptz IS NULL OR l.recorded_at < $6)`;
@@ -81,7 +81,7 @@ export class AuditService {
               (id, admin_id, target_user_id, action, result, reason, before_value, after_value)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
-        randomUUID(),
+        newId(),
         adminId,
         targetUserId,
         action,

@@ -2,12 +2,12 @@
 // (원장·캐시·트리거 정합성을 직접 SQL로 맞추지 않고 앱 API·서비스를 그대로 통과시켜 만든다.
 //  과거 날짜가 필요한 것(정산·연속 기록)만 e2e와 같은 방식으로 날짜를 되감는다)
 //
-// 선행: 마이그레이션 + 개발 시드(001·002) + 시험 계정(01099999999, npm run demo)이 있는 DB, `npm run build`로 dist 생성
+// 선행: 마이그레이션 + 개발 시드(001·002) + 시험 계정(01099999999)이 있는 DB, `npm run build`로 dist 생성
 // 사용: npm run demo:fill        (DATABASE_URL은 backend/.env)
 //   재실행 안전: 단계마다 "그 단계가 만드는 표가 이미 차 있으면" 건너뛴다
 //
 // 계정을 제한하는 데이터(제재·탈퇴 요청 등)는 시험 계정이 아니라 별도 시연 사용자(아래 DEMO_USERS)에게만 만든다.
-import { randomUUID } from 'node:crypto';
+import { newId } from '../src/common/ids.js';
 import argon2 from 'argon2';
 import request from 'supertest';
 
@@ -24,7 +24,7 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const ADMIN_ID = 'd0000000-0000-4000-8000-000000000001'; // 001 시드의 dev_admin
+const ADMIN_ID = 'd4000001'; // 001 시드의 dev_admin
 const MAIN_PHONE = '+821099999999'; // 시험 계정
 const DEMO_PASSWORD = process.env.DEMO_USER_PASSWORD ?? '1234567890';
 // 상태를 바꿔 두는 별도 시연 사용자 (시험 계정은 그대로 두려고 따로 둔다)
@@ -63,7 +63,7 @@ const results = []; // { step, filled: [표...], note }
 /** 요청 한 번. status를 주면 다르면 오류를 던진다 */
 const call = (method, path, token, body, { expect: status, headers } = {}) => {
   const req = http[method](path).set('Authorization', `Bearer ${token}`);
-  if (method !== 'get') req.set('Idempotency-Key', randomUUID());
+  if (method !== 'get') req.set('Idempotency-Key', newId());
   for (const [key, value] of Object.entries(headers ?? {})) req.set(key, value);
   return (body === undefined ? req : req.send(body)).then((res) => {
     if (status !== undefined && res.status !== status) {
@@ -151,7 +151,7 @@ async function ensureUser({ phone, nickname }) {
     [phone],
   );
   if (found.rowCount > 0) return found.rows[0].user_id;
-  const id = randomUUID();
+  const id = newId();
   const hash = await argon2.hash(DEMO_PASSWORD);
   await db.withTransaction(async (tx) => {
     await tx.query('INSERT INTO users (id) VALUES ($1)', [id]);
@@ -166,7 +166,7 @@ async function ensureUser({ phone, nickname }) {
     );
     await tx.query(
       `INSERT INTO consent_records (id, user_id, document_version_id, granted)
-       SELECT gen_random_uuid(), $1, p.id, true FROM policy_document_versions p WHERE p.version = 'dev-1'`,
+       SELECT new_short_id(), $1, p.id, true FROM policy_document_versions p WHERE p.version = 'dev-1'`,
       [id],
     );
     await tx.query('INSERT INTO point_wallets (user_id) VALUES ($1)', [id]);
@@ -191,7 +191,7 @@ try {
   ]);
   if (main.rowCount === 0 || admin.rowCount === 0) {
     throw new Error(
-      '시험 계정(01099999999)과 개발 관리자가 있는 DB가 필요해요. 먼저 npm run demo 로 시연 덤프를 복원하세요.',
+      '시험 계정(01099999999)과 개발 관리자가 있는 DB가 필요해요. 마이그레이션과 개발 시드(001·002)를 먼저 적용하세요.',
     );
   }
   const MAIN_ID = main.rows[0].user_id;
@@ -203,11 +203,19 @@ try {
   // ---------- 문의 처리 ----------
   await step('문의 처리', ['support_ticket_resolutions'], async () => {
     const tickets = await user.get('/api/v1/me/support-tickets', 200);
-    const ticket = (tickets.items ?? tickets)[0];
-    if (!ticket)
-      throw new Error(
-        '시험 계정에 문의가 없어요 (npm run demo 의 덤프에는 1건이 있어요)',
-      );
+    // 문의가 없으면 앱 경로로 1건 접수
+    const ticket =
+      (tickets.items ?? tickets)[0] ??
+      (await user.post(
+        '/api/v1/me/support-tickets',
+        {
+          ticketType: 'inquiry',
+          category: 'mission',
+          subject: '시연 문의',
+          body: '미션 시간을 바꿀 수 있나요?',
+        },
+        201,
+      ));
     await adminApi.post(`/admin/v1/support-tickets/${ticket.id}/assign`, {
       reason: '시연 문의 담당 지정',
     });
@@ -313,7 +321,7 @@ try {
     '업적 생성·이미지 업로드',
     ['admin_asset_uploads', 'achievement_backfill_runs'],
     async () => {
-      const achievementId = randomUUID();
+      const achievementId = newId();
       const ticket = await adminApi.post(
         '/admin/v1/assets/upload-urls',
         {
@@ -371,7 +379,7 @@ try {
       (goals.items ?? goals).find((item) => item.hasAcceptedPlan) ??
       (goals.items ?? goals)[0];
     if (!goal) throw new Error('시험 계정에 활성 목표가 없어요');
-    const runId = randomUUID();
+    const runId = newId();
     const ingestKey = `plan-adjust:${runId}:${goal.id}`;
     const today = kstDate();
     const lastMonday = addDays(
@@ -639,7 +647,7 @@ try {
           .post('/internal/v1/ai-callbacks/verification-results')
           .set('x-internal-token', process.env.INTERNAL_API_TOKEN)
           .send({
-            ingestKey: randomUUID(),
+            ingestKey: newId(),
             recordId: record.id,
             decision: 'approved',
             engineVersion: 'demo-model@1',
@@ -672,7 +680,7 @@ try {
       await http
         .delete(`/api/v1/challenges/${challenge.id}/participations/me`)
         .set('Authorization', `Bearer ${d.token}`)
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .expect(204);
       await adminApi.post(
         `/admin/v1/challenges/${challenge.id}/moderation-actions`,
@@ -731,7 +739,7 @@ try {
     { offset = 0, decision = 'approved' } = {},
   ) {
     const [points, userXp, petXp] = [rate.points, rate.user_xp, rate.pet_xp];
-    const missionId = randomUUID();
+    const missionId = newId();
     await db.query(
       `INSERT INTO missions
               (id, user_id, source_type, title, category_id, difficulty_id, verification_method,
@@ -760,7 +768,7 @@ try {
       .post('/internal/v1/ai-callbacks/verification-results')
       .set('x-internal-token', process.env.INTERNAL_API_TOKEN)
       .send({
-        ingestKey: randomUUID(),
+        ingestKey: newId(),
         recordId: record.id,
         decision,
         engineVersion: 'demo-model@1',
@@ -846,7 +854,7 @@ try {
     const adopted = await http
       .post('/api/v1/me/pets')
       .set('Authorization', `Bearer ${u.token}`)
-      .set('Idempotency-Key', randomUUID())
+      .set('Idempotency-Key', newId())
       .send({ speciesId, nickname: '시연냥', makeRepresentative: true });
     if (![201, 409].includes(adopted.status)) {
       throw new Error(

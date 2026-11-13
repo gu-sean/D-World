@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router';
 import { server } from '../../test/setup.js';
 
 const BASE = '/admin/v1';
-const USER = 'a0000000-0000-4000-8000-000000000001';
+const USER = 'a4000001';
 
 let PointTransactionListPage;
 let PointAdjustmentPage;

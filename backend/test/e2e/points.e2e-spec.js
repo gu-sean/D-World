@@ -1,5 +1,6 @@
 import { configureApp } from '../../src/app.setup.js';
-import { randomInt, randomUUID, randomBytes } from 'node:crypto';
+import { randomInt, randomBytes } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { Test } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import request from 'supertest';
@@ -21,7 +22,7 @@ describe.skipIf(!databaseUrl)('포인트 (PostgreSQL)', () => {
   const tx = (fn) => db.withTransaction(fn);
 
   async function createUser() {
-    const id = randomUUID();
+    const id = newId();
     await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
     return id;
   }
@@ -29,13 +30,13 @@ describe.skipIf(!databaseUrl)('포인트 (PostgreSQL)', () => {
   /** 승인된 판정까지 갖춘 미션 (보상표 버전은 금액마다 새로 만듦) */
   async function createMission(userId, rewardPoints) {
     const ids = {
-      category: randomUUID(),
-      difficulty: randomUUID(),
-      rate: randomUUID(),
-      mission: randomUUID(),
-      record: randomUUID(),
-      criteria: randomUUID(),
-      result: randomUUID(),
+      category: newId(),
+      difficulty: newId(),
+      rate: newId(),
+      mission: newId(),
+      record: newId(),
+      criteria: newId(),
+      result: newId(),
     };
     const tag = randomBytes(6).toString('hex'); // 공유 DB에 쌓여도 충돌하지 않게 넓은 범위
     await db.query(
@@ -105,7 +106,7 @@ describe.skipIf(!databaseUrl)('포인트 (PostgreSQL)', () => {
         originalPoints: mission.rewardPoints,
       }),
     );
-  const revoke = (userId, mission, resultId = randomUUID()) =>
+  const revoke = (userId, mission, resultId = newId()) =>
     tx((t) =>
       points.revokeMissionPoints(t, {
         userId,
@@ -113,7 +114,7 @@ describe.skipIf(!databaseUrl)('포인트 (PostgreSQL)', () => {
         resultId,
       }),
     );
-  const reinstate = (userId, mission, resultId = randomUUID()) =>
+  const reinstate = (userId, mission, resultId = newId()) =>
     tx((t) =>
       points.reinstateMissionPoints(t, {
         userId,
@@ -184,11 +185,15 @@ describe.skipIf(!databaseUrl)('포인트 (PostgreSQL)', () => {
     db = app.get(DatabaseService);
     points = app.get(PointsService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash)
        VALUES ($1, $2, $3, 'x')`,
-      [adminId, `pa_${randomInt(100_000, 999_999)}`, `${adminId}@example.com`],
+      [
+        adminId,
+        `pa_${randomInt(100_000, 999_999)}`,
+        `${adminId.toLowerCase()}@example.com`,
+      ],
     );
   });
 
@@ -567,37 +572,37 @@ describe.skipIf(!databaseUrl)('포인트 (PostgreSQL)', () => {
 
     const sources = {
       async streak(userId, n = 0) {
-        const id = randomUUID();
+        const id = newId();
         await insertSource(
           `INSERT INTO streak_milestone_awards
                   (id, user_id, target_success_days, policy_version_id,
                    awarded_points, paid_points, first_achieved_date, status)
            VALUES ($1, $2, $4, $3, 300, 300, CURRENT_DATE, 'active')`,
-          [id, userId, randomUUID(), [7, 30, 100][n]],
+          [id, userId, newId(), [7, 30, 100][n]],
         );
         return { sourceType: 'streak', sourceId: id };
       },
       async achievement(userId) {
-        const id = randomUUID();
+        const id = newId();
         await insertSource(
           `INSERT INTO user_achievements
                   (id, user_id, achievement_id, achievement_version_id,
                    badge_image_id, source_type, source_id, first_achieved_at,
                    awarded_points, paid_points)
            VALUES ($1, $2, $3, $4, $5, 'mission', $6, now(), 300, 300)`,
-          [id, userId, randomUUID(), randomUUID(), randomUUID(), randomUUID()],
+          [id, userId, newId(), newId(), newId(), newId()],
         );
         return { sourceType: 'achievement', sourceId: id };
       },
       async challenge(userId) {
-        const id = randomUUID();
+        const id = newId();
         await insertSource(
           `INSERT INTO challenge_reward_grants
                   (id, participation_id, challenge_id, user_id,
                    first_settlement_run_id, promised_points, paid_points,
                    user_xp, pet_xp, status)
            VALUES ($1, $2, $3, $4, $5, 300, 300, 0, 0, 'active')`,
-          [id, randomUUID(), randomUUID(), userId, randomUUID()],
+          [id, newId(), newId(), userId, newId()],
         );
         return { sourceType: 'challenge', sourceId: id };
       },
@@ -617,7 +622,7 @@ describe.skipIf(!databaseUrl)('포인트 (PostgreSQL)', () => {
         points_.revokeAutoPoints(t, {
           userId,
           ...source,
-          resultId: randomUUID(),
+          resultId: newId(),
         }),
       );
     const reinstateAuto = (userId, source) =>
@@ -625,7 +630,7 @@ describe.skipIf(!databaseUrl)('포인트 (PostgreSQL)', () => {
         points_.reinstateAutoPoints(t, {
           userId,
           ...source,
-          resultId: randomUUID(),
+          resultId: newId(),
         }),
       );
     // 테스트 안에서 서비스 인스턴스를 짧게 참조
@@ -751,7 +756,7 @@ describe.skipIf(!databaseUrl)('포인트 (PostgreSQL)', () => {
                     (id, user_id, ${column}, original_award_transaction_id,
                      target_points, outstanding_points)
              VALUES ($1, $2, $3, $4, 10, 10)`,
-            [randomUUID(), user, source.sourceId, award.rows[0].id],
+            [newId(), user, source.sourceId, award.rows[0].id],
           ),
         ).rejects.toMatchObject({ code: '23505' });
       });
@@ -779,8 +784,8 @@ describe.skipIf(!databaseUrl)('포인트 (PostgreSQL)', () => {
           points_.revokeAutoPoints(t, {
             userId: user,
             sourceType: 'mission',
-            sourceId: randomUUID(),
-            resultId: randomUUID(),
+            sourceId: newId(),
+            resultId: newId(),
           }),
         ),
       ).rejects.toThrow(RangeError);

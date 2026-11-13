@@ -1,7 +1,8 @@
 import { createTestApp } from '../support/app.js';
 import { testNickname } from '../support/users.js';
 import { adminApi } from '../support/admin-api.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -24,7 +25,7 @@ describe.skipIf(!databaseUrl)('챌린지 정의·공개 (PostgreSQL)', () => {
   const tx = (fn) => db.withTransaction(fn);
   const auth = (token) => ({ Authorization: `Bearer ${token}` });
   const today = () => kstDate();
-  const post = (path, body, key = randomUUID()) =>
+  const post = (path, body, key = newId()) =>
     adminApi(http, adminToken).post(path, body, key);
   const patch = (path, body) => adminApi(http, adminToken).patch(path, body);
 
@@ -42,7 +43,7 @@ describe.skipIf(!databaseUrl)('챌린지 정의·공개 (PostgreSQL)', () => {
   });
 
   async function createUser() {
-    const id = randomUUID();
+    const id = newId();
     await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
     await db.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
       id,
@@ -62,10 +63,10 @@ describe.skipIf(!databaseUrl)('챌린지 정의·공개 (PostgreSQL)', () => {
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `ch_${RUN}`, `${adminId}@example.com`],
+      [adminId, `ch_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await tx((t) =>
       app.get(SessionsService).create(t, 'admin', adminId),
@@ -74,8 +75,8 @@ describe.skipIf(!databaseUrl)('챌린지 정의·공개 (PostgreSQL)', () => {
       .get(AccessTokenService)
       .issue('admin', adminId, session.sessionId);
 
-    categoryId = randomUUID();
-    difficultyId = randomUUID();
+    categoryId = newId();
+    difficultyId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [categoryId, `chc${RUN}`, `챌린지카테고리${RUN}`],
@@ -142,7 +143,7 @@ describe.skipIf(!databaseUrl)('챌린지 정의·공개 (PostgreSQL)', () => {
       422,
       'VERIFY_EVIDENCE_KIND_MISMATCH',
     );
-    await bad({ categoryId: randomUUID() }, 404, 'CATALOG_NOT_FOUND');
+    await bad({ categoryId: newId() }, 404, 'CATALOG_NOT_FOUND');
     await bad({ title: '  ' }, 400);
     await bad({ startDate: '2026-02-30' }, 400);
     await bad({ reward: { points: -1, userXp: 0, petXp: 0 } }, 400);
@@ -152,7 +153,7 @@ describe.skipIf(!databaseUrl)('챌린지 정의·공개 (PostgreSQL)', () => {
           points: 1,
           userXp: 0,
           petXp: 0,
-          badgeAchievementVersionId: randomUUID(),
+          badgeAchievementVersionId: newId(),
         },
       },
       422,
@@ -164,7 +165,7 @@ describe.skipIf(!databaseUrl)('챌린지 정의·공개 (PostgreSQL)', () => {
     await http
       .post('/admin/v1/challenges')
       .set(auth(user.token))
-      .set('Idempotency-Key', randomUUID())
+      .set('Idempotency-Key', newId())
       .send(definition())
       .expect(401);
     await post('/admin/v1/challenges', definition(), null).expect(400);
@@ -227,7 +228,7 @@ describe.skipIf(!databaseUrl)('챌린지 정의·공개 (PostgreSQL)', () => {
       (await post(`/admin/v1/challenges/${late.id}/publish`, {}).expect(422))
         .body.error.code,
     ).toBe('START_DATE_NOT_FUTURE');
-    await post(`/admin/v1/challenges/${randomUUID()}/publish`, {}).expect(404);
+    await post(`/admin/v1/challenges/${newId()}/publish`, {}).expect(404);
   });
 
   it('목록은 커서로 이어서 조회하고 잘못된 필터는 400', async () => {
@@ -301,9 +302,7 @@ describe.skipIf(!databaseUrl)('챌린지 정의·공개 (PostgreSQL)', () => {
     await patch(`/admin/v1/challenges/${created.id}`, {
       endDate: addDays(today(), 11),
     }).expect(400);
-    await patch(`/admin/v1/challenges/${randomUUID()}`, { title: 'x' }).expect(
-      404,
-    );
+    await patch(`/admin/v1/challenges/${newId()}`, { title: 'x' }).expect(404);
 
     await post(`/admin/v1/challenges/${created.id}/publish`, {}).expect(200);
     await post(`/admin/v1/challenges/${created.id}/hide`, {}).expect(400);
@@ -347,7 +346,7 @@ describe.skipIf(!databaseUrl)('챌린지 정의·공개 (PostgreSQL)', () => {
   });
 
   it('같은 Idempotency-Key로 다시 보내면 챌린지를 하나만 만든다', async () => {
-    const key = randomUUID();
+    const key = newId();
     const body = definition({ title: `멱등 ${RUN}` });
     const first = await post('/admin/v1/challenges', body, key).expect(201);
     const replay = await post('/admin/v1/challenges', body, key).expect(201);

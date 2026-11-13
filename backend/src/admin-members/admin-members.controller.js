@@ -19,6 +19,7 @@ import { SessionsService } from '../common/auth/sessions.service.js';
 import { conflict, notFound } from '../common/errors/http-errors.js';
 import { readIdempotencyKey } from '../common/idempotency/admin-idempotency.service.js';
 import { maskEmail, maskPhone } from '../common/masking.js';
+import { isId } from '../common/ids.js';
 import {
   adminPage,
   parseAdminPage,
@@ -98,8 +99,6 @@ const WITHDRAWAL_SELECT = `SELECT w.*, p.nickname, ${DATA_SCOPE_COLUMNS}
    LEFT JOIN profiles p ON p.user_id = w.user_id`;
 
 const escapeLike = (text) => text.replace(/[\\%_]/g, '\\$&');
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** 관리자 회원 API: 목록·상세·활동(M10~M12), 이용 조치(M13·M14), 탈퇴 요청(M15·M16) */
 @Controller('admin/v1')
@@ -137,8 +136,9 @@ export class AdminMembersController {
     });
     const text = typeof query.query === 'string' ? query.query.trim() : '';
     const params = [
-      text && !UUID_PATTERN.test(text) ? `%${escapeLike(text)}%` : null,
-      text && UUID_PATTERN.test(text) ? text : null,
+      // 8자 영숫자는 닉네임일 수도 ID일 수도 있어, 닉네임 검색과 ID 일치를 함께 본다
+      text ? `%${escapeLike(text)}%` : null,
+      isId(text) ? text : null,
       status ?? null,
       restricted === undefined ? null : restricted === 'true',
       filters.joinedFrom ?? null,
@@ -148,8 +148,7 @@ export class AdminMembersController {
              WHERE a.user_id = u.id AND a.action_type = 'restriction'
                AND a.lifted_at IS NULL AND a.starts_at <= now()
                AND a.ends_at > now())`;
-    const where = `($1::text IS NULL OR p.nickname ILIKE $1)
-      AND ($2::uuid IS NULL OR u.id = $2)
+    const where = `($1::text IS NULL OR p.nickname ILIKE $1 OR u.id = $2::short_id)
       AND ($3::text IS NULL OR u.status = $3)
       AND ($5::timestamptz IS NULL OR u.created_at >= $5)
       AND ($6::timestamptz IS NULL OR u.created_at < $6)

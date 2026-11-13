@@ -1,5 +1,6 @@
 import { configureApp } from '../../src/app.setup.js';
-import { randomInt, randomUUID, randomBytes } from 'node:crypto';
+import { randomInt, randomBytes } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { Test } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import request from 'supertest';
@@ -45,7 +46,7 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
   const userTagPrefix = randomInt(100, 999);
 
   async function createUser() {
-    const id = randomUUID();
+    const id = newId();
     userTag += 1;
     await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
     await db.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
@@ -67,7 +68,7 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
       speciesVersionId: svId = speciesVersionId,
     } = {},
   ) {
-    const id = randomUUID();
+    const id = newId();
     const nickname = sId === speciesId ? '테스트펫' : '테스트펫둘';
     await insertBypassingTriggers(
       `INSERT INTO user_pets
@@ -89,10 +90,10 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
   async function createAchievementSource(userId, { userXp, petXp }) {
     const tag = randomBytes(6).toString('hex'); // 공유 DB에 쌓여도 충돌하지 않게 넓은 범위
     const ids = {
-      def: randomUUID(),
-      image: randomUUID(),
-      version: randomUUID(),
-      grant: randomUUID(),
+      def: newId(),
+      image: newId(),
+      version: newId(),
+      grant: newId(),
     };
     await db.query(
       `INSERT INTO achievement_definitions (id, code, status, created_by_admin_id)
@@ -120,7 +121,7 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
               (id, user_id, achievement_id, achievement_version_id, badge_image_id,
                status, source_type, source_id, first_achieved_at, awarded_points, paid_points)
        VALUES ($1,$2,$3,$4,$5,'active','mission',$6, now(), 0, 0)`,
-      [ids.grant, userId, ids.def, ids.version, ids.image, randomUUID()],
+      [ids.grant, userId, ids.def, ids.version, ids.image, newId()],
     );
     return { sourceType: 'achievement', sourceId: ids.grant };
   }
@@ -130,8 +131,8 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
 
   // user_id당 target_success_days는 하나뿐이라(마일스톤은 한 번만 달성) 호출마다 돌려씀
   async function createStreakSource(userId, { userXp, petXp }) {
-    const policyId = randomUUID();
-    const awardIdRow = randomUUID();
+    const policyId = newId();
+    const awardIdRow = newId();
     const days = STREAK_DAYS[streakVersionNo % STREAK_DAYS.length];
     streakVersionNo += 1;
     await db.query(
@@ -158,13 +159,13 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
   ) {
     const tag = randomBytes(6).toString('hex'); // 공유 DB에 쌓여도 충돌하지 않게 넓은 범위
     const ids = {
-      category: categoryId ?? randomUUID(),
-      difficulty: randomUUID(),
-      rate: randomUUID(),
-      mission: randomUUID(),
-      record: randomUUID(),
-      criteria: randomUUID(),
-      result: randomUUID(),
+      category: categoryId ?? newId(),
+      difficulty: newId(),
+      rate: newId(),
+      mission: newId(),
+      record: newId(),
+      criteria: newId(),
+      result: newId(),
     };
     if (!categoryId) {
       await db.query(
@@ -208,7 +209,7 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
     await db.query(
       `INSERT INTO verification_criteria_versions
               (id, category_id, verification_method, version_no, rules_json, effective_at, created_by_admin_id)
-       VALUES ($1,$2,'sensor',
+       VALUES ($1,$2::short_id,'sensor',
                (SELECT COALESCE(max(version_no), 0) + 1 FROM verification_criteria_versions
                  WHERE category_id = $2 AND verification_method = 'sensor'),
                '{}'::jsonb, now() - interval '1 day', $3)`,
@@ -248,9 +249,9 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
         recipient,
       }),
     );
-  const revoke = (awardId, resultId = randomUUID()) =>
+  const revoke = (awardId, resultId = newId()) =>
     tx((t) => experience.revokeExperience(t, { awardId, resultId }));
-  const reinstate = (awardId, resultId = randomUUID()) =>
+  const reinstate = (awardId, resultId = newId()) =>
     tx((t) => experience.reinstateExperience(t, { awardId, resultId }));
   const assign = (userId, petId) =>
     tx((t) => experience.assignPendingExperience(t, { userId, petId }));
@@ -305,16 +306,20 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
     db = app.get(DatabaseService);
     experience = app.get(ExperienceService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash)
        VALUES ($1, $2, $3, 'x')`,
-      [adminId, `pa_${randomInt(100_000, 999_999)}`, `${adminId}@example.com`],
+      [
+        adminId,
+        `pa_${randomInt(100_000, 999_999)}`,
+        `${adminId.toLowerCase()}@example.com`,
+      ],
     );
 
     // 사용자 레벨 정책: 1=0, 2=100, 3=300, 4=1000
     // version_no는 전역 고유라 같은 테스트 DB에서 여러 e2e 파일이 동시에 도는 경우를 대비해 무작위로 둠
-    userPolicyId = randomUUID();
+    userPolicyId = newId();
     await db.query(
       `INSERT INTO user_level_policy_versions (id, version_no, effective_at, created_by_admin_id)
        VALUES ($1, $3, now() - interval '1 day', $2)`,
@@ -334,7 +339,7 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
     }
 
     // 펫 레벨 정책: 1=0, 2=40, 3=120, 4=400
-    petPolicyId = randomUUID();
+    petPolicyId = newId();
     await db.query(
       `INSERT INTO pet_level_policy_versions (id, version_no, effective_at, created_by_admin_id)
        VALUES ($1, $3, now() - interval '1 day', $2)`,
@@ -354,8 +359,8 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
     }
 
     // 펫 종류: 해금 조건 없음, 부화 필요 미션 0(이 스위트에서는 미션 수 조건을 다루지 않음)
-    speciesId = randomUUID();
-    speciesCategoryId = randomUUID();
+    speciesId = newId();
+    speciesCategoryId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,'pc${RUN}','펫카테고리${RUN}',1)`,
       [speciesCategoryId],
@@ -365,7 +370,7 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
        VALUES ($1,'dr${RUN}','드라고${RUN}','public',$2)`,
       [speciesId, adminId],
     );
-    speciesVersionId = randomUUID();
+    speciesVersionId = newId();
     await db.query(
       `INSERT INTO pet_species_versions
               (id, species_id, version_no, name, category_id, unlock_condition_type,
@@ -373,7 +378,7 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
        VALUES ($1,$2,1,'드라고',$3,'none',0, now() - interval '1 day', $4)`,
       [speciesVersionId, speciesId, speciesCategoryId, adminId],
     );
-    const imageId = randomUUID();
+    const imageId = newId();
     await db.query(
       `INSERT INTO pet_stage_images
               (id, species_id, r2_object_key, mime_type, size_bytes, uploaded_at, created_by_admin_id)
@@ -396,13 +401,13 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
     }
 
     // 종류당 한 마리뿐이라 같은 사용자의 두 번째 펫 테스트용으로 별도 종류 하나 더
-    species2Id = randomUUID();
+    species2Id = newId();
     await db.query(
       `INSERT INTO pet_species (id, code, name, status, created_by_admin_id)
        VALUES ($1,'dt${RUN}','드라고2${RUN}','public',$2)`,
       [species2Id, adminId],
     );
-    species2VersionId = randomUUID();
+    species2VersionId = newId();
     await db.query(
       `INSERT INTO pet_species_versions
               (id, species_id, version_no, name, category_id, unlock_condition_type,
@@ -410,7 +415,7 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
        VALUES ($1,$2,1,'드라고2',$3,'none',0, now() - interval '1 day', $4)`,
       [species2VersionId, species2Id, speciesCategoryId, adminId],
     );
-    const image2Id = randomUUID();
+    const image2Id = newId();
     await db.query(
       `INSERT INTO pet_stage_images
               (id, species_id, r2_object_key, mime_type, size_bytes, uploaded_at, created_by_admin_id)
@@ -690,7 +695,7 @@ describe.skipIf(!databaseUrl)('경험치·펫 (PostgreSQL)', () => {
     });
 
     it('지급 기록이 없는 awardId 회수는 404', async () => {
-      await expect(revoke(randomUUID())).rejects.toMatchObject({ status: 404 });
+      await expect(revoke(newId())).rejects.toMatchObject({ status: 404 });
     });
   });
 

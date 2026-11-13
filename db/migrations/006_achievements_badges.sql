@@ -4,20 +4,20 @@
 BEGIN;
 
 CREATE TABLE achievement_definitions (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     code varchar(80) NOT NULL UNIQUE
         CHECK (code ~ '^[a-z][a-z0-9_]*$'),
     status varchar(16) NOT NULL DEFAULT 'draft'
         CHECK (status IN ('draft', 'public', 'hidden')),
-    created_by_admin_id uuid NOT NULL
+    created_by_admin_id short_id NOT NULL
         REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE achievement_badge_images (
-    id uuid PRIMARY KEY,
-    achievement_id uuid NOT NULL
+    id short_id PRIMARY KEY,
+    achievement_id short_id NOT NULL
         REFERENCES achievement_definitions(id) ON DELETE RESTRICT,
     version_no integer NOT NULL CHECK (version_no > 0),
     r2_object_key text NOT NULL UNIQUE
@@ -26,7 +26,7 @@ CREATE TABLE achievement_badge_images (
         CHECK (mime_type IN ('image/png', 'image/jpeg', 'image/webp')),
     size_bytes bigint NOT NULL CHECK (size_bytes > 0),
     uploaded_at timestamptz NOT NULL,
-    created_by_admin_id uuid NOT NULL
+    created_by_admin_id short_id NOT NULL
         REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (achievement_id, version_no),
@@ -49,8 +49,8 @@ BEFORE UPDATE ON achievement_badge_images
 FOR EACH ROW EXECUTE FUNCTION protect_badge_image();
 
 CREATE TABLE achievement_versions (
-    id uuid PRIMARY KEY,
-    achievement_id uuid NOT NULL
+    id short_id PRIMARY KEY,
+    achievement_id short_id NOT NULL
         REFERENCES achievement_definitions(id) ON DELETE RESTRICT,
     version_no integer NOT NULL CHECK (version_no > 0),
     title varchar(160) NOT NULL CHECK (length(btrim(title)) > 0),
@@ -62,11 +62,11 @@ CREATE TABLE achievement_versions (
             ('first_goal_completed', 'approved_mission_count',
              'category_approved_mission_count', 'streak_milestone')),
     target_count integer NOT NULL CHECK (target_count > 0),
-    category_id uuid REFERENCES goal_categories(id) ON DELETE RESTRICT,
+    category_id short_id REFERENCES goal_categories(id) ON DELETE RESTRICT,
     reward_points integer NOT NULL CHECK (reward_points >= 0),
-    badge_image_id uuid NOT NULL,
+    badge_image_id short_id NOT NULL,
     effective_at timestamptz NOT NULL,
-    created_by_admin_id uuid NOT NULL
+    created_by_admin_id short_id NOT NULL
         REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (achievement_id, version_no),
@@ -103,16 +103,16 @@ BEFORE UPDATE OR DELETE ON achievement_versions
 FOR EACH ROW EXECUTE FUNCTION protect_achievement_version();
 
 CREATE TABLE user_achievements (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    achievement_id uuid NOT NULL,
-    achievement_version_id uuid NOT NULL,
-    badge_image_id uuid NOT NULL,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    achievement_id short_id NOT NULL,
+    achievement_version_id short_id NOT NULL,
+    badge_image_id short_id NOT NULL,
     status varchar(12) NOT NULL DEFAULT 'active'
         CHECK (status IN ('active', 'revoked')),
     source_type varchar(12) NOT NULL
         CHECK (source_type IN ('goal', 'mission', 'streak')),
-    source_id uuid NOT NULL,
+    source_id short_id NOT NULL,
     first_achieved_at timestamptz NOT NULL,
     awarded_at timestamptz NOT NULL DEFAULT now(),
     awarded_points integer NOT NULL CHECK (awarded_points >= 0),
@@ -141,14 +141,14 @@ DECLARE
     definition_status varchar(16);
     version_condition varchar(40);
     version_target integer;
-    version_category uuid;
+    version_category short_id;
     version_points integer;
-    version_image_id uuid;
+    version_image_id short_id;
     version_effective_at timestamptz;
-    current_version_id uuid;
+    current_version_id short_id;
     source_goal_status varchar(20);
     source_mission_status varchar(20);
-    source_mission_category uuid;
+    source_mission_category short_id;
     source_streak_target integer;
     source_streak_status varchar(12);
     qualifying_count integer;
@@ -298,14 +298,14 @@ BEFORE DELETE ON user_achievements
 FOR EACH ROW EXECUTE FUNCTION protect_user_achievement_delete();
 
 CREATE TABLE user_achievement_events (
-    id uuid PRIMARY KEY,
-    user_achievement_id uuid NOT NULL,
-    user_id uuid NOT NULL,
+    id short_id PRIMARY KEY,
+    user_achievement_id short_id NOT NULL,
+    user_id short_id NOT NULL,
     event_type varchar(16) NOT NULL
         CHECK (event_type IN ('earned', 'revoked', 'reinstated')),
     source_type varchar(12) NOT NULL
         CHECK (source_type IN ('goal', 'mission', 'streak')),
-    source_id uuid NOT NULL,
+    source_id short_id NOT NULL,
     reason text,
     idempotency_key text NOT NULL UNIQUE
         CHECK (length(btrim(idempotency_key)) > 0),
@@ -381,7 +381,7 @@ BEFORE UPDATE OR DELETE ON user_achievement_events
 FOR EACH ROW EXECUTE FUNCTION protect_user_achievement_event();
 
 ALTER TABLE profiles
-    ADD COLUMN representative_achievement_id uuid,
+    ADD COLUMN representative_achievement_id short_id,
     ADD CONSTRAINT profiles_representative_achievement_owner_fk
         FOREIGN KEY (representative_achievement_id, user_id)
         REFERENCES user_achievements(id, user_id)
@@ -441,13 +441,13 @@ BEFORE INSERT ON point_transactions
 FOR EACH ROW EXECUTE FUNCTION guard_achievement_point_source();
 
 CREATE TABLE achievement_backfill_runs (
-    id uuid PRIMARY KEY,
-    achievement_id uuid NOT NULL
+    id short_id PRIMARY KEY,
+    achievement_id short_id NOT NULL
         REFERENCES achievement_definitions(id) ON DELETE RESTRICT,
-    version_id uuid NOT NULL,
-    requested_by_admin_id uuid NOT NULL
+    version_id short_id NOT NULL,
+    requested_by_admin_id short_id NOT NULL
         REFERENCES admin_accounts(id) ON DELETE RESTRICT,
-    cursor_user_id uuid,
+    cursor_user_id short_id,
     processed_users integer NOT NULL DEFAULT 0 CHECK (processed_users >= 0),
     earned_count integer NOT NULL DEFAULT 0 CHECK (earned_count >= 0),
     requested_at timestamptz NOT NULL DEFAULT now(),

@@ -46,7 +46,7 @@ export class AdminReviewService {
     const params = [status, method ?? null, userId ?? null];
     const where = `r.status = $1
           AND ($2::text IS NULL OR m.verification_method = $2)
-          AND ($3::uuid IS NULL OR r.user_id = $3)`;
+          AND ($3::short_id IS NULL OR r.user_id = $3)`;
     const [{ rows }, count, completed] = await Promise.all([
       this.database.query(
         `SELECT r.id, r.mission_id, r.user_id, r.attempt_no, r.submission_no, r.evidence_kind,

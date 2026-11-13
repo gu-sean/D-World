@@ -1,5 +1,6 @@
 import { configureApp } from '../../src/app.setup.js';
-import { randomInt, randomUUID, randomBytes } from 'node:crypto';
+import { randomInt, randomBytes } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { Test } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import request from 'supertest';
@@ -31,7 +32,7 @@ describe.skipIf(!databaseUrl)('업적·배지 (PostgreSQL)', () => {
   }
 
   async function createUser() {
-    const id = randomUUID();
+    const id = newId();
     userTag += 1;
     await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
     await db.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
@@ -43,7 +44,7 @@ describe.skipIf(!databaseUrl)('업적·배지 (PostgreSQL)', () => {
 
   async function createCategory() {
     const tag = randomBytes(6).toString('hex'); // 공유 DB에 쌓여도 충돌하지 않게 넓은 범위
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [id, `c${tag}`, `카테고리${tag}`],
@@ -53,7 +54,7 @@ describe.skipIf(!databaseUrl)('업적·배지 (PostgreSQL)', () => {
 
   async function createDifficulty() {
     const tag = randomBytes(6).toString('hex'); // 공유 DB에 쌓여도 충돌하지 않게 넓은 범위
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO difficulty_levels (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [id, `d${tag}`, `난이도${tag}`],
@@ -62,7 +63,7 @@ describe.skipIf(!databaseUrl)('업적·배지 (PostgreSQL)', () => {
   }
 
   async function createCriteria(categoryId) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO verification_criteria_versions
               (id, category_id, verification_method, version_no, rules_json, effective_at, created_by_admin_id)
@@ -76,9 +77,9 @@ describe.skipIf(!databaseUrl)('업적·배지 (PostgreSQL)', () => {
   async function createApprovedMission(userId, categoryId, criteriaId) {
     const difficultyId = await createDifficulty();
     const ids = {
-      mission: randomUUID(),
-      record: randomUUID(),
-      result: randomUUID(),
+      mission: newId(),
+      record: newId(),
+      result: newId(),
     };
     await db.query(
       `INSERT INTO missions
@@ -108,7 +109,7 @@ describe.skipIf(!databaseUrl)('업적·배지 (PostgreSQL)', () => {
   async function createGoal(userId, { completed = true } = {}) {
     const categoryId = await createCategory();
     const difficultyId = await createDifficulty();
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO goals
               (id, user_id, category_id, difficulty_id, title, start_date, end_date,
@@ -137,9 +138,9 @@ describe.skipIf(!databaseUrl)('업적·배지 (PostgreSQL)', () => {
   }) {
     const tag = randomBytes(6).toString('hex'); // 공유 DB에 쌓여도 충돌하지 않게 넓은 범위
     const ids = {
-      def: randomUUID(),
-      image: randomUUID(),
-      version: randomUUID(),
+      def: newId(),
+      image: newId(),
+      version: newId(),
     };
     await db.query(
       `INSERT INTO achievement_definitions (id, code, status, created_by_admin_id)
@@ -176,8 +177,8 @@ describe.skipIf(!databaseUrl)('업적·배지 (PostgreSQL)', () => {
   }
 
   async function createStreakMilestone(userId, days) {
-    const policyId = randomUUID();
-    const awardId = randomUUID();
+    const policyId = newId();
+    const awardId = newId();
     await db.query(
       `INSERT INTO streak_milestone_policy_versions
               (id, target_success_days, version_no, points, user_xp, pet_xp,
@@ -238,17 +239,21 @@ describe.skipIf(!databaseUrl)('업적·배지 (PostgreSQL)', () => {
     db = app.get(DatabaseService);
     achievements = app.get(AchievementsService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash)
        VALUES ($1, $2, $3, 'x')`,
-      [adminId, `pa_${randomInt(100_000, 999_999)}`, `${adminId}@example.com`],
+      [
+        adminId,
+        `pa_${randomInt(100_000, 999_999)}`,
+        `${adminId.toLowerCase()}@example.com`,
+      ],
     );
 
     // 사용자 레벨 정책: XP 지급 테스트를 위한 최소 정책(1=0, level_no는 검증하지 않음)
     // version_no는 전역 고유라 무작위로 두고, effective_at은 먼 과거로 둬서 experience.e2e-spec.js가
     // 만드는 정책(최근 시각)이 "현재 정책" 선정에서 항상 이기게 함(둘 다 전역 단일 정책 테이블을 공유)
-    const userPolicyId = randomUUID();
+    const userPolicyId = newId();
     await db.query(
       `INSERT INTO user_level_policy_versions (id, version_no, effective_at, created_by_admin_id)
        VALUES ($1, $3, '2000-01-01', $2)`,

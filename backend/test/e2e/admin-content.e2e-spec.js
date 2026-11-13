@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { testNickname } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -23,13 +24,13 @@ describe.skipIf(!databaseUrl)('관리자 운영 콘텐츠 API (PostgreSQL)', () 
   const send = (method, path, body = {}) =>
     http[method](path)
       .set(auth())
-      .set('Idempotency-Key', randomUUID())
+      .set('Idempotency-Key', newId())
       .send({ reason: REASON, ...body });
   const post = (path, body) => send('post', path, body);
   const patch = (path, body) => send('patch', path, body);
 
   async function createUser(notificationEnabled = true) {
-    const id = randomUUID();
+    const id = newId();
     await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
     await db.query(
       'INSERT INTO profiles (user_id, nickname, notification_enabled) VALUES ($1, $2, $3)',
@@ -58,10 +59,10 @@ describe.skipIf(!databaseUrl)('관리자 운영 콘텐츠 API (PostgreSQL)', () 
 
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `ac_${RUN}`, `${adminId}@example.com`],
+      [adminId, `ac_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await db.withTransaction((tx) =>
       app.get(SessionsService).create(tx, 'admin', adminId),
@@ -151,7 +152,7 @@ describe.skipIf(!databaseUrl)('관리자 운영 콘텐츠 API (PostgreSQL)', () 
       ).expect(400);
       await post(
         '/admin/v1/notices',
-        noticeBody({ userIds: [randomUUID()] }),
+        noticeBody({ userIds: [newId()] }),
       ).expect(400);
     });
 
@@ -234,7 +235,7 @@ describe.skipIf(!databaseUrl)('관리자 운영 콘텐츠 API (PostgreSQL)', () 
         `INSERT INTO policy_document_versions
            (id, document_type, version, body, effective_at, published_at)
          VALUES ($1, 'marketing', $2, '본문', now(), now()) RETURNING id`,
-        [randomUUID(), `m${RUN}`],
+        [newId(), `m${RUN}`],
       );
       const doc = rows[0].id;
       for (const [userId, granted] of [
@@ -244,7 +245,7 @@ describe.skipIf(!databaseUrl)('관리자 운영 콘텐츠 API (PostgreSQL)', () 
         await db.query(
           `INSERT INTO consent_records (id, user_id, document_version_id, granted)
            VALUES ($1, $2, $3, $4)`,
-          [randomUUID(), userId, doc, granted],
+          [newId(), userId, doc, granted],
         );
       }
       const created = await post(
@@ -336,7 +337,7 @@ describe.skipIf(!databaseUrl)('관리자 운영 콘텐츠 API (PostgreSQL)', () 
       const res = await http
         .post('/admin/v1/policy-documents')
         .set(auth())
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .set('Content-Type', 'application/json')
         .send('{"documentType": ');
       expect(res.status).toBe(400);
@@ -365,7 +366,7 @@ describe.skipIf(!databaseUrl)('관리자 운영 콘텐츠 API (PostgreSQL)', () 
         noticeBody({
           category: 'policy',
           audienceType: 'all',
-          policyDocumentVersionId: randomUUID(),
+          policyDocumentVersionId: newId(),
         }),
       ).expect(400);
     });
@@ -377,7 +378,7 @@ describe.skipIf(!databaseUrl)('관리자 운영 콘텐츠 API (PostgreSQL)', () 
       await db.query(
         `INSERT INTO goal_categories (id, code, name, display_order)
          VALUES ($1, $2, $3, 1)`,
-        [randomUUID(), code, `분야${RUN}`],
+        [newId(), code, `분야${RUN}`],
       );
       const created = await post('/admin/v1/recommendation-messages', {
         message: `오늘은 쉬어가도 좋아요 ${RUN}`,
@@ -432,7 +433,7 @@ describe.skipIf(!databaseUrl)('관리자 운영 콘텐츠 API (PostgreSQL)', () 
           ...bad,
         }).expect(400);
       }
-      await patch(`/admin/v1/recommendation-messages/${randomUUID()}`, {
+      await patch(`/admin/v1/recommendation-messages/${newId()}`, {
         isActive: true,
       }).expect(404);
     });

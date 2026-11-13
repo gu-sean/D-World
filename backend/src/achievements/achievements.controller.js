@@ -8,7 +8,7 @@ import {
   Body,
   Req,
 } from '@nestjs/common';
-import { uuid, validateBody } from '../common/validation.js';
+import { shortId, validateBody } from '../common/validation.js';
 import { AchievementsService } from './achievements.service.js';
 
 @Controller()
@@ -33,7 +33,7 @@ export class AchievementsController {
     const { achievementId } = validateBody(
       { achievementId: id },
       {
-        achievementId: uuid(),
+        achievementId: shortId(),
       },
     );
     return this.achievements.getProgress(
@@ -46,9 +46,9 @@ export class AchievementsController {
   @Patch('me/profile/representative-achievement')
   @Bind(Req(), Body())
   setRepresentative(request, body) {
-    // null·누락 모두 해제, uuid면 해당 업적으로 설정(소유·활성 검증은 DB 트리거)
+    // null·누락 모두 해제, ID면 해당 업적으로 설정(소유·활성 검증은 DB 트리거)
     const { achievementId } = validateBody(body, {
-      achievementId: uuid({ optional: true }),
+      achievementId: shortId({ optional: true }),
     });
     return this.achievements.setRepresentative(
       this.achievements.database,

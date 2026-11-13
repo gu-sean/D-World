@@ -9,7 +9,12 @@ import {
   Body,
   Req,
 } from '@nestjs/common';
-import { idOf, timestamp, uuid, validateBody } from '../common/validation.js';
+import {
+  idOf,
+  timestamp,
+  shortId,
+  validateBody,
+} from '../common/validation.js';
 import { MobilePetsService } from './mobile-pets.service.js';
 
 /** 모바일 클라이언트 펫 API A81~A83, A85 */
@@ -25,7 +30,7 @@ export class MobilePetsController {
   @Bind(Req(), Query())
   species(request, query) {
     const { categoryId } = validateBody(query, {
-      categoryId: uuid({ optional: true }),
+      categoryId: shortId({ optional: true }),
     });
     return this.pets.listSpecies(request.auth.userId, { categoryId });
   }
@@ -41,7 +46,7 @@ export class MobilePetsController {
   @Put('me/representative-pet')
   @Bind(Req(), Body())
   async setRepresentative(request, body) {
-    const { petId } = validateBody(body, { petId: uuid() });
+    const { petId } = validateBody(body, { petId: shortId() });
     return this.pets.setRepresentative(request.auth.userId, petId);
   }
 

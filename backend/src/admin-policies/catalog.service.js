@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable } from '@nestjs/common';
 import { AdminMutationService } from '../admin-auth/admin-mutation.service.js';
 import { rethrowConstraint } from '../common/errors/constraint.js';
@@ -58,7 +58,7 @@ export class CatalogService {
       payload: { ...input, reason },
       reason,
       run: async (tx) => {
-        const id = randomUUID();
+        const id = newId();
         try {
           await tx.query(
             `INSERT INTO ${table} (id, code, name, display_order) VALUES ($1,$2,$3,$4)`,

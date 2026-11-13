@@ -1,6 +1,7 @@
 import { createUser as createUserWith } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -31,8 +32,8 @@ describe.skipIf(!databaseUrl)('목표·단계 (PostgreSQL)', () => {
 
   async function createReference(isActive = true) {
     const tag = next();
-    const category = randomUUID();
-    const difficulty = randomUUID();
+    const category = newId();
+    const difficulty = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order, is_active) VALUES ($1,$2,$3,1,$4)`,
       [category, `gc${tag}`, `목표카테고리${tag}`, isActive],
@@ -88,7 +89,7 @@ describe.skipIf(!databaseUrl)('목표·단계 (PostgreSQL)', () => {
       deleted = false,
     } = {},
   ) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO missions
               (id, user_id, goal_id, goal_step_id, source_type, title, category_id,
@@ -119,10 +120,10 @@ describe.skipIf(!databaseUrl)('목표·단계 (PostgreSQL)', () => {
     ({ app, http, db } = await createTestApp());
     goalsService = app.get(GoalsService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `gl_${RUN}`, `${adminId}@example.com`],
+      [adminId, `gl_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const reference = await createReference();
     ({ category: categoryId, difficulty: difficultyId } = reference);
@@ -231,7 +232,7 @@ describe.skipIf(!databaseUrl)('목표·단계 (PostgreSQL)', () => {
       for (const overrides of [
         { categoryId: inactive.category },
         { difficultyId: inactive.difficulty },
-        { categoryId: randomUUID() },
+        { categoryId: newId() },
       ]) {
         const res = await http
           .post('/api/v1/goals')
@@ -399,7 +400,7 @@ describe.skipIf(!databaseUrl)('목표·단계 (PostgreSQL)', () => {
         .set(auth(user.token))
         .expect(400);
       await http
-        .get(`/api/v1/goals/${randomUUID()}`)
+        .get(`/api/v1/goals/${newId()}`)
         .set(auth(user.token))
         .expect(404);
     });
@@ -605,14 +606,14 @@ describe.skipIf(!databaseUrl)('목표·단계 (PostgreSQL)', () => {
 
     it('완료 확정이 첫 목표 완료 업적을 평가해 지급', async () => {
       const user = await createUser();
-      const definitionId = randomUUID();
+      const definitionId = newId();
       const tag = next();
       await db.query(
         `INSERT INTO achievement_definitions (id, code, status, created_by_admin_id)
          VALUES ($1, $2, 'public', $3)`,
         [definitionId, `first_goal_${tag}`, adminId],
       );
-      const imageId = randomUUID();
+      const imageId = newId();
       await db.query(
         `INSERT INTO achievement_badge_images
                 (id, achievement_id, version_no, r2_object_key, mime_type, size_bytes,
@@ -626,7 +627,7 @@ describe.skipIf(!databaseUrl)('목표·단계 (PostgreSQL)', () => {
                  target_count, reward_points, badge_image_id, effective_at, created_by_admin_id)
          VALUES ($1,$2,1,'첫 목표','첫 목표를 완료한다','common','first_goal_completed',
                  1,0,$3, now() - interval '1 day', $4)`,
-        [randomUUID(), definitionId, imageId, adminId],
+        [newId(), definitionId, imageId, adminId],
       );
 
       try {
@@ -870,7 +871,7 @@ describe.skipIf(!databaseUrl)('목표·단계 (PostgreSQL)', () => {
         expect(still.rows[0].goal_step_id).toBe(step.id);
       }
       await http
-        .delete(`/api/v1/goals/${goal.id}/steps/${randomUUID()}`)
+        .delete(`/api/v1/goals/${goal.id}/steps/${newId()}`)
         .set(auth(user.token))
         .expect(404);
     });
@@ -1030,7 +1031,7 @@ describe.skipIf(!databaseUrl)('목표·단계 (PostgreSQL)', () => {
         `INSERT INTO account_actions
                 (id, user_id, admin_id, action_type, reason, starts_at, ends_at)
          VALUES ($1,$2,$3,'restriction','사유', now() - interval '1 hour', now() + interval '1 hour')`,
-        [randomUUID(), user.id, adminId],
+        [newId(), user.id, adminId],
       );
 
       for (const [method, path, body] of [

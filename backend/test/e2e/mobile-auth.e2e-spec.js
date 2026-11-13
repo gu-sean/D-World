@@ -22,9 +22,9 @@ describe.skipIf(!databaseUrl)('모바일 계정 API A01~A10 (PostgreSQL)', () =>
     // 테스트 DB에는 약관이 없으므로 필수 두 문서와 선택 한 문서를 둔다
     // 기존 인증 e2e(auth.e2e-spec)와 같은 문서 행을 쓰고, 이미 있으면 그대로 둔다
     for (const [type, id] of [
-      ['terms', '00000000-0000-4000-8000-0000000000a1'],
-      ['privacy', '00000000-0000-4000-8000-0000000000a2'],
-      ['marketing', '00000000-0000-4000-8000-0000000000a3'],
+      ['terms', '040000a1'],
+      ['privacy', '040000a2'],
+      ['marketing', '040000a3'],
     ]) {
       await db.query(
         `INSERT INTO policy_document_versions

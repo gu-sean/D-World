@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable } from '@nestjs/common';
 import { conflict } from '../common/errors/http-errors.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -55,7 +55,7 @@ export class UserWithdrawalService {
       }
       await tx.query(
         `INSERT INTO account_withdrawal_requests (id, user_id) VALUES ($1, $2)`,
-        [randomUUID(), userId],
+        [newId(), userId],
       );
       return this.getCurrent(userId, tx);
     });

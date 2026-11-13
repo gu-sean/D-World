@@ -1,7 +1,8 @@
 import { createTestApp } from '../support/app.js';
 import { testNickname } from '../support/users.js';
 import { adminApi } from '../support/admin-api.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -41,7 +42,7 @@ describe.skipIf(!databaseUrl)('챌린지 정산·보상 지급 (PostgreSQL)', ()
     });
 
   async function createUser() {
-    const id = randomUUID();
+    const id = newId();
     await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
     await db.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
       id,
@@ -142,7 +143,7 @@ describe.skipIf(!databaseUrl)('챌린지 정산·보상 지급 (PostgreSQL)', ()
       .post('/internal/v1/ai-callbacks/verification-results')
       .set('x-internal-token', SECRET)
       .send({
-        ingestKey: randomUUID(),
+        ingestKey: newId(),
         recordId,
         decision,
         engineVersion: 'model-v1',
@@ -258,10 +259,10 @@ describe.skipIf(!databaseUrl)('챌린지 정산·보상 지급 (PostgreSQL)', ()
     scoring = app.get(ScoringService);
     decisions = app.get(DecisionService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `st_${RUN}`, `${adminId}@example.com`],
+      [adminId, `st_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await tx((t) =>
       app.get(SessionsService).create(t, 'admin', adminId),
@@ -269,8 +270,8 @@ describe.skipIf(!databaseUrl)('챌린지 정산·보상 지급 (PostgreSQL)', ()
     adminToken = await app
       .get(AccessTokenService)
       .issue('admin', adminId, session.sessionId);
-    categoryId = randomUUID();
-    difficultyId = randomUUID();
+    categoryId = newId();
+    difficultyId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [categoryId, `stc${RUN}`, `정산카테고리${RUN}`],
@@ -283,7 +284,7 @@ describe.skipIf(!databaseUrl)('챌린지 정산·보상 지급 (PostgreSQL)', ()
       `INSERT INTO verification_criteria_versions
               (id, category_id, verification_method, version_no, rules_json, effective_at, created_by_admin_id)
        VALUES ($1,$2,'sensor',1,'{}'::jsonb, now() - interval '30 days', $3)`,
-      [randomUUID(), categoryId, adminId],
+      [newId(), categoryId, adminId],
     );
     for (const [table, thresholds] of [
       [
@@ -303,7 +304,7 @@ describe.skipIf(!databaseUrl)('챌린지 정산·보상 지급 (PostgreSQL)', ()
         ],
       ],
     ]) {
-      const policyId = randomUUID();
+      const policyId = newId();
       await db.query(
         `INSERT INTO ${table} (id, version_no, effective_at, created_by_admin_id)
          VALUES ($1,$2, now() - interval '30 days', $3)`,
@@ -439,7 +440,7 @@ describe.skipIf(!databaseUrl)('챌린지 정산·보상 지급 (PostgreSQL)', ()
         `/admin/v1/challenges/${challenge.id}/settlements`,
       ).expect(201)
     ).body;
-    const key = randomUUID();
+    const key = newId();
     const path = `/admin/v1/settlement-runs/${draft.id}/confirm`;
     const confirmed = await http
       .post(path)

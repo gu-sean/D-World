@@ -1,5 +1,6 @@
 import { Dependencies, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { readFileSync } from 'node:fs';
 import pg from 'pg';
 
 /**
@@ -13,6 +14,7 @@ const ISOLATION_LEVELS = new Set([
   'SERIALIZABLE',
 ]);
 const RETRYABLE_SQLSTATES = new Set(['40001', '40P01']);
+const UNIQUE_VIOLATION = '23505';
 const CONNECTION_TIMEOUT_MS = 5_000;
 const IDLE_TIMEOUT_MS = 30_000;
 
@@ -20,9 +22,29 @@ const IDLE_TIMEOUT_MS = 30_000;
 const PG_DATE_OID = 1082;
 pg.types.setTypeParser(PG_DATE_OID, (value) => value);
 
+/** 새로 만든 ID가 기존 행과 겹침: PK 중복 (재시도하면 fn이 새 ID를 만듦) */
+export function isIdCollision(error) {
+  return (
+    error?.code === UNIQUE_VIOLATION &&
+    typeof error.constraint === 'string' &&
+    error.constraint.endsWith('_pkey')
+  );
+}
+
 export function isRetryableError(error) {
   const code = error?.code;
-  return typeof code === 'string' && RETRYABLE_SQLSTATES.has(code);
+  return (
+    (typeof code === 'string' && RETRYABLE_SQLSTATES.has(code)) ||
+    isIdCollision(error)
+  );
+}
+
+/** TLS 옵션: 항상 서버 인증서를 검증하고, CA 파일이 있으면 그 CA로 검증 */
+export function sslOptions(enabled, caPath) {
+  if (!enabled) return undefined;
+  return caPath
+    ? { rejectUnauthorized: true, ca: readFileSync(caPath, 'utf8') }
+    : { rejectUnauthorized: true };
 }
 
 @Injectable()
@@ -34,9 +56,10 @@ export class DatabaseService {
     this.pool = new pg.Pool({
       connectionString: config.get('DATABASE_URL'),
       max: config.get('DATABASE_POOL_MAX'),
-      ssl: config.get('DATABASE_SSL')
-        ? { rejectUnauthorized: true }
-        : undefined,
+      ssl: sslOptions(
+        config.get('DATABASE_SSL'),
+        config.get('DATABASE_SSL_CA'),
+      ),
       connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
       idleTimeoutMillis: IDLE_TIMEOUT_MS,
       application_name: 'd-world-backend',

@@ -3,8 +3,8 @@ import { delay, http as mswHttp, HttpResponse } from 'msw';
 // MSW handlers for the admin challenge API M51~M61 plus the catalogs the form needs.
 const BASE = import.meta.env.VITE_ADMIN_API_BASE_URL ?? '/admin/v1';
 
-const CATEGORY_ID = '11111111-0000-4000-8000-000000000001';
-const DIFFICULTY_ID = '22222222-0000-4000-8000-000000000001';
+const CATEGORY_ID = 'zo5MzcDs';
+const DIFFICULTY_ID = 'W7kRZ42d';
 
 const makeChallenge = (id, fields) => ({
   id,
@@ -44,8 +44,8 @@ const errorResponse = (status, code, message) =>
 function reset() {
   counter = 100;
   challenges = [
-    makeChallenge('c0000000-0000-4000-8000-000000000001', { title: '14일 푸시업 챌린지' }),
-    makeChallenge('c0000000-0000-4000-8000-000000000002', {
+    makeChallenge('c4000001', { title: '14일 푸시업 챌린지' }),
+    makeChallenge('c4000002', {
       title: '주말 러닝 챌린지',
       origin: 'user',
       creatorNickname: '러너',
@@ -57,7 +57,7 @@ function reset() {
       exerciseCode: 'running',
       requiredSuccessDays: 5,
     }),
-    makeChallenge('c0000000-0000-4000-8000-000000000003', {
+    makeChallenge('c4000003', {
       title: '새 공식 챌린지',
       publicationStatus: 'draft',
       phase: 'recruiting',
@@ -137,7 +137,7 @@ export const handlers = [
     const { reason, ...body } = await request.json();
     if (!reason) return errorResponse(400, 'COMMON_VALIDATION', '사유를 입력해 주세요.');
     counter += 1;
-    const created = makeChallenge(`c0000000-0000-4000-8000-${String(counter).padStart(12, '0')}`, {
+    const created = makeChallenge(`c4${String(counter).padStart(6, '0')}`, {
       ...body,
       publicationStatus: 'draft',
       phase: 'recruiting',
@@ -228,7 +228,7 @@ export const handlers = [
     if (!challenge) return errorResponse(404, 'COMMON_NOT_FOUND', '찾을 수 없어요.');
     counter += 1;
     const run = {
-      id: `a0000000-0000-4000-8000-${String(counter).padStart(12, '0')}`,
+      id: `a4${String(counter).padStart(6, '0')}`,
       challengeId: params.id,
       runNo: runs.size + 1,
       status: 'draft',

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable } from '@nestjs/common';
 import {
   conflict,
@@ -101,7 +101,7 @@ export class ShopService {
         throw conflict('price_changed', '가격이 바뀜');
       }
 
-      const orderId = randomUUID();
+      const orderId = newId();
       const spendId = await this.points.spendForShopOrder(tx, {
         userId,
         orderId,
@@ -128,7 +128,7 @@ export class ShopService {
            (id, user_id, item_id, kind, quantity_delta, order_id, idempotency_key)
          VALUES ($1, $2, $3, 'purchase', $4, $5, $6)`,
         [
-          randomUUID(),
+          newId(),
           userId,
           itemId,
           quantity,
@@ -165,7 +165,7 @@ export class ShopService {
       `${ORDER_SELECT}
         WHERE o.user_id = $1
           AND ($2::timestamptz IS NULL
-               OR (o.created_at, o.id) < ($2::timestamptz, $3::uuid))
+               OR (o.created_at, o.id) < ($2::timestamptz, $3::short_id))
         ORDER BY o.created_at DESC, o.id DESC
         LIMIT $4`,
       [userId, after.t, after.id, limit + 1],
@@ -228,7 +228,7 @@ export class ShopService {
            (id, user_id, item_id, kind, quantity_delta, order_id, idempotency_key)
          VALUES ($1, $2, $3, 'refund', $4, $5, $6)`,
         [
-          randomUUID(),
+          newId(),
           userId,
           order.item_id,
           -order.quantity,
@@ -288,13 +288,7 @@ export class ShopService {
         `INSERT INTO user_inventory_events
            (id, user_id, item_id, kind, quantity_delta, idempotency_key)
          VALUES ($1, $2, $3, 'use', $4, $5)`,
-        [
-          randomUUID(),
-          userId,
-          itemId,
-          -quantity,
-          `use:${userId}:${idempotencyKey}`,
-        ],
+        [newId(), userId, itemId, -quantity, `use:${userId}:${idempotencyKey}`],
       );
       const { rows } = await tx.query(
         `SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2`,

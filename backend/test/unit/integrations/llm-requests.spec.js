@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../../../src/common/ids.js';
 import {
   llmErrorCode,
   toLlmException,
@@ -45,7 +45,7 @@ describe('llmErrorCode', () => {
 
 describe('buildGoalPlanRequest', () => {
   const goal = {
-    id: randomUUID(),
+    id: newId(),
     title: '스쿼트 꾸준히',
     description: null,
     start_date: '2026-11-09',
@@ -113,7 +113,7 @@ describe('toProposalJson', () => {
 
 describe('situational recommendation contract', () => {
   const def = (extra = {}) => ({
-    id: randomUUID(),
+    id: newId(),
     title: '스쿼트 20개',
     category_code: 'exercise',
     exercise_code: 'squat',
@@ -200,7 +200,7 @@ describe('situational recommendation contract', () => {
 
     const bad = [
       { items: [] },
-      { items: [{ rankNo: 1, definitionId: randomUUID(), reason: 'x' }] },
+      { items: [{ rankNo: 1, definitionId: newId(), reason: 'x' }] },
       {
         items: [
           { rankNo: 1, definitionId: a.id, reason: 'x' },

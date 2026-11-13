@@ -19,7 +19,7 @@ import {
   password,
   phone,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { MobileAuthService } from './mobile-auth.service.js';
@@ -27,7 +27,9 @@ import { MobileAuthService } from './mobile-auth.service.js';
 const STRICT = { default: { limit: 10, ttl: 60_000 } };
 
 const consents = () =>
-  array(object({ documentVersionId: uuid(), granted: boolean() }), { max: 10 });
+  array(object({ documentVersionId: shortId(), granted: boolean() }), {
+    max: 10,
+  });
 const token = (options) => string({ min: 1, max: 4096, ...options });
 
 /** 모바일 클라이언트 계정 API (08 A01~A09, 로그아웃 A10은 AuthController) */

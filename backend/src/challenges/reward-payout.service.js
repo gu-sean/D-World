@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable, Logger } from '@nestjs/common';
 import { AchievementsService } from '../achievements/achievements.service.js';
 import { AdminMutationService } from '../admin-auth/admin-mutation.service.js';
@@ -54,7 +54,7 @@ export class RewardPayoutService {
         userId: grant.user_id,
         sourceType: 'challenge',
         sourceId: grant.id,
-        resultId: randomUUID(),
+        resultId: newId(),
       });
       const awardId = await this.experience.findAwardId(
         tx,
@@ -65,7 +65,7 @@ export class RewardPayoutService {
       if (awardId) {
         await this.experience.revokeExperience(tx, {
           awardId,
-          resultId: randomUUID(),
+          resultId: newId(),
         });
       }
       await this.achievements.evaluate(tx, {
@@ -254,7 +254,7 @@ export class RewardPayoutService {
         WHERE run_id = $1 AND participation_id = $2`,
       [entry.run_id, entry.participation_id, paid],
     );
-    const grantId = randomUUID();
+    const grantId = newId();
     await tx.query(
       `INSERT INTO challenge_reward_grants
               (id, participation_id, challenge_id, user_id, first_settlement_run_id,
@@ -331,7 +331,7 @@ export class RewardPayoutService {
       userId,
       sourceType: 'challenge',
       sourceId: grant.id,
-      resultId: randomUUID(),
+      resultId: newId(),
     });
     const awardId = await this.experience.findAwardId(
       tx,
@@ -342,7 +342,7 @@ export class RewardPayoutService {
     if (awardId) {
       await this.experience.reinstateExperience(tx, {
         awardId,
-        resultId: randomUUID(),
+        resultId: newId(),
       });
     }
     await this.achievements.evaluate(tx, {

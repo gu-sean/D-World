@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../admin-auth/audit.service.js';
 import { AdminIdempotencyService } from '../common/idempotency/admin-idempotency.service.js';
@@ -89,7 +89,7 @@ export class DefinitionReviewService {
     const where = `d.deleted_at IS NULL
           AND ($1::text IS NULL OR d.origin = $1)
           AND ($2::text IS NULL OR d.publication_status = $2)
-          AND ($3::uuid IS NULL OR d.category_id = $3)
+          AND ($3::short_id IS NULL OR d.category_id = $3)
           AND ($4::text IS NULL OR d.title ILIKE $4)`;
     const [{ rows }, count] = await Promise.all([
       this.database.query(
@@ -145,7 +145,7 @@ export class DefinitionReviewService {
                   (id, definition_id, requested_by_user_id, reviewed_by_admin_id, decision, reason)
            VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at`,
           [
-            randomUUID(),
+            newId(),
             definitionId,
             definition.created_by_user_id,
             adminId,

@@ -1,6 +1,7 @@
 import { createUser as createUserWith } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -39,7 +40,7 @@ describe.skipIf(!databaseUrl)('스트릭 (PostgreSQL)', () => {
 
   /** 오늘 예정 미션을 만든다(보상 100P). 날짜 이동은 backdate로 */
   async function createMission(user) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO missions
               (id, user_id, source_type, title, category_id, difficulty_id, verification_method,
@@ -81,7 +82,7 @@ describe.skipIf(!databaseUrl)('스트릭 (PostgreSQL)', () => {
       .post('/internal/v1/ai-callbacks/verification-results')
       .set('x-internal-token', SECRET)
       .send({
-        ingestKey: randomUUID(),
+        ingestKey: newId(),
         recordId,
         decision,
         engineVersion: 'model-v1',
@@ -113,7 +114,7 @@ describe.skipIf(!databaseUrl)('스트릭 (PostgreSQL)', () => {
 
   /** 제출 없이 지나간 예정 미션(또는 취소된 미션) */
   async function bareMission(user, offset, { cancelled = false } = {}) {
-    const id = randomUUID();
+    const id = newId();
     await bypass(
       `INSERT INTO missions
               (id, user_id, source_type, title, category_id, difficulty_id, verification_method,
@@ -178,14 +179,14 @@ describe.skipIf(!databaseUrl)('스트릭 (PostgreSQL)', () => {
     streak = app.get(StreakService);
     decisions = app.get(DecisionService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `st_${RUN}`, `${adminId}@example.com`],
+      [adminId, `st_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
-    categoryId = randomUUID();
-    difficultyId = randomUUID();
-    rateId = randomUUID();
+    categoryId = newId();
+    difficultyId = newId();
+    rateId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [categoryId, `stc${RUN}`, `스트릭카테고리${RUN}`],
@@ -206,14 +207,14 @@ describe.skipIf(!databaseUrl)('스트릭 (PostgreSQL)', () => {
               (id, category_id, verification_method, version_no, rules_json, effective_at,
                created_by_admin_id)
        VALUES ($1,$2,'sensor',1,'{}'::jsonb, now() - interval '30 days', $3)`,
-      [randomUUID(), categoryId, adminId],
+      [newId(), categoryId, adminId],
     );
     // 사용자 레벨 정책이 없으면 최소 정책을 만듦(미션 승인이 XP를 지급함, 전역 단일 정책 테이블이라 먼 과거 시각)
     const { rowCount } = await db.query(
       'SELECT 1 FROM user_level_policy_versions LIMIT 1',
     );
     if (rowCount === 0) {
-      const policyId = randomUUID();
+      const policyId = newId();
       await db.query(
         `INSERT INTO user_level_policy_versions (id, version_no, effective_at, created_by_admin_id)
          VALUES ($1, $3, '2000-01-01', $2)`,
@@ -230,7 +231,7 @@ describe.skipIf(!databaseUrl)('스트릭 (PostgreSQL)', () => {
       `INSERT INTO streak_milestone_policy_versions
               (id, target_success_days, version_no, points, effective_at, created_by_admin_id)
        VALUES ($1, 7, $2, 70, now() - interval '1 minute', $3)`,
-      [randomUUID(), randomInt(1_000_000, 1_000_000_000), adminId],
+      [newId(), randomInt(1_000_000, 1_000_000_000), adminId],
     );
   });
 
@@ -537,7 +538,7 @@ describe.skipIf(!databaseUrl)('스트릭 (PostgreSQL)', () => {
         `INSERT INTO streak_milestone_policy_versions
                 (id, target_success_days, version_no, points, user_xp, pet_xp, effective_at, created_by_admin_id)
          VALUES ($1, 7, $2, 70, 40, 0, now() - interval '10 seconds', $3)`,
-        [randomUUID(), randomInt(1_000_000, 1_000_000_000), adminId],
+        [newId(), randomInt(1_000_000, 1_000_000_000), adminId],
       );
     });
 

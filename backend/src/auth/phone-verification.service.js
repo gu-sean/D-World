@@ -1,4 +1,5 @@
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../database/database.service.js';
@@ -45,7 +46,7 @@ export class PhoneVerificationService {
    */
   async send(phone, purpose) {
     const code = randomCode();
-    const challengeId = randomUUID();
+    const challengeId = newId();
     let expiresAt;
 
     const resendAvailableAt = new Date(Date.now() + RESEND_COOLDOWN_SEC * 1000);

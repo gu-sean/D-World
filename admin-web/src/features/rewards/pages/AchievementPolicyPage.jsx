@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { Button, Drawer, Form, Image, Input, InputNumber, Select, Table, Typography } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
+import { newId } from '../../../api/ids.js';
 import { ImageUploadField } from '../../../components/ImageUploadField.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
@@ -51,7 +52,7 @@ function AchievementDrawer({ target, onClose }) {
   const isNew = target.mode === 'create';
   const [ask, modal] = useConfirmedChange();
   // A new achievement uses an id chosen in advance, so its badge can be uploaded before saving.
-  const newOwnerId = useMemo(() => crypto.randomUUID(), []);
+  const newOwnerId = useMemo(() => newId(), []);
   const ownerId = isNew ? newOwnerId : target.achievement.id;
   const current = target.achievement?.versions.find(
     (v) => v.versionNo === target.achievement.currentVersionNo,

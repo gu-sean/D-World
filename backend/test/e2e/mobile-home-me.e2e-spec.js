@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { addDays, kstDate } from '../../src/common/time/kst.js';
 import { createTestApp } from '../support/app.js';
 import { createUser as createUserWith } from '../support/users.js';
@@ -45,13 +46,13 @@ describe.skipIf(!databaseUrl)(
 
     beforeAll(async () => {
       ({ app, http, db } = await createTestApp());
-      const adminId = randomUUID();
+      const adminId = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-        [adminId, `mh_${RUN}`, `${adminId}@example.com`],
+        [adminId, `mh_${RUN}`, `${adminId.toLowerCase()}@example.com`],
       );
-      const category = randomUUID();
-      const difficulty = randomUUID();
+      const category = newId();
+      const difficulty = newId();
       await db.query(
         `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
         [category, `mhc${RUN}`, `홈카테고리${RUN}`],
@@ -65,7 +66,7 @@ describe.skipIf(!databaseUrl)(
               (id, category_id, difficulty_id, version_no, points, user_xp, pet_xp,
                effective_at, created_by_admin_id)
        VALUES ($1,$2,$3,1,100,10,5, now() - interval '1 day', $4)`,
-        [randomUUID(), category, difficulty, adminId],
+        [newId(), category, difficulty, adminId],
       );
       ref = {
         categoryCode: `mhc${RUN}`,
@@ -160,7 +161,7 @@ describe.skipIf(!databaseUrl)(
         `INSERT INTO recommendation_messages
               (id, message, condition_type, priority, created_by_admin_id, updated_by_admin_id)
        VALUES ($1, $2, 'no_mission_today', 100, $3, $3)`,
-        [randomUUID(), `오늘은 쉬는 날 ${RUN}`, ref.adminId],
+        [newId(), `오늘은 쉬는 날 ${RUN}`, ref.adminId],
       );
       const res = await http.get('/api/v1/home').set(auth(user)).expect(200);
       expect(res.body.message).toBe(`오늘은 쉬는 날 ${RUN}`);
@@ -185,7 +186,7 @@ describe.skipIf(!databaseUrl)(
        SELECT $1,'admin',$2,c.id,d.id,'camera','public','squat',50,5,2
          FROM goal_categories c, difficulty_levels d
         WHERE c.code = $3 AND d.code = $4`,
-        [randomUUID(), `홈추천 ${RUN}`, ref.categoryCode, ref.difficultyCode],
+        [newId(), `홈추천 ${RUN}`, ref.categoryCode, ref.difficultyCode],
       );
       await http
         .post('/api/v1/recommendations/situational')
@@ -207,7 +208,7 @@ describe.skipIf(!databaseUrl)(
 
     it('A31 미션 생성: Idempotency-Key가 있으면 재시도가 같은 미션을 돌려줌', async () => {
       const user = await createUserWith(app, db);
-      const key = randomUUID();
+      const key = newId();
       const send = () =>
         http
           .post('/api/v1/missions')
@@ -306,7 +307,7 @@ describe.skipIf(!databaseUrl)(
       await db.query(
         `INSERT INTO user_notifications (id, user_id, kind, event_key, title, body)
        VALUES ($1, $2, 'system', $3, '제목', '본문')`,
-        [randomUUID(), user.id, `mobile-home-me:${randomUUID()}`],
+        [newId(), user.id, `mobile-home-me:${newId()}`],
       );
       const res = await http
         .get('/api/v1/me/notifications')
@@ -400,7 +401,7 @@ describe.skipIf(!databaseUrl)(
                 (id, user_id, kind, available_delta, balance_after, outstanding_after,
                  source_type, source_id, idempotency_key)
          VALUES ($1,$2,'auto_award',50,50,0,'mission',$3,$4)`,
-          [randomUUID(), user.id, mission.id, `mobile-home-me-${randomUUID()}`],
+          [newId(), user.id, mission.id, `mobile-home-me-${newId()}`],
         );
       });
 
@@ -434,17 +435,17 @@ describe.skipIf(!databaseUrl)(
         .expect(200);
       expect(Array.isArray(species.body)).toBe(true);
       await http
-        .get(`/api/v1/pet-species/${randomUUID()}`)
+        .get(`/api/v1/pet-species/${newId()}`)
         .set(auth(user))
         .expect(404);
       await http
-        .get(`/api/v1/me/pets/${randomUUID()}/evolution-events`)
+        .get(`/api/v1/me/pets/${newId()}/evolution-events`)
         .set(auth(user))
         .expect(404);
       await http
         .put('/api/v1/me/representative-pet')
         .set(auth(user))
-        .send({ petId: randomUUID() })
+        .send({ petId: newId() })
         .expect(404);
       const pets = await http
         .get('/api/v1/me/pets')

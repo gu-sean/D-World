@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, Button, Card, Input, Radio, Select, Switch } from 'antd';
 import { labels } from '../../../constants/labels.js';
+import { ID_PATTERN } from '../../../api/ids.js';
 import { audienceType as audienceLabels, policyDocumentType } from '../labels.js';
 import { useCreateNotice, usePolicyDocuments, useUpdateNotice } from '../queries.js';
 import { fromInputValue, isFuture, toInputValue } from '../time.js';
@@ -9,8 +10,7 @@ import { formStyle } from './formStyle.js';
 
 const TITLE_MAX_LENGTH = 100; // docs/09 M91
 const BODY_MAX_LENGTH = 5000;
-const LINK_SCREEN_PATTERN = /^[a-z][a-z0-9_/.-]*$/; // docs/07 §17 (DB constraint)
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const LINK_SCREEN_PATTERN = /^[a-z][A-Za-z0-9_/.-]*$/; // docs/07 §17 (DB constraint)
 
 const categoryOptions = Object.entries(labels.noticeCategory).map(([value, { text }]) => ({
   value,
@@ -46,7 +46,7 @@ function validate(form) {
   if (form.audienceType === 'users') {
     const ids = splitIds(form.userIdsText);
     if (ids.length === 0) return '받을 회원의 ID를 입력해 주세요.';
-    if (!ids.every((id) => UUID_PATTERN.test(id))) return '회원 ID는 UUID 형식으로 입력해 주세요.';
+    if (!ids.every((id) => ID_PATTERN.test(id))) return '회원 ID는 8자 영문·숫자로 입력해 주세요.';
   }
   if (form.category === 'policy' && !form.policyDocumentVersionId) {
     return '정책 공지는 약관 버전을 선택해 주세요.';

@@ -14,6 +14,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
+import { newId } from '../../../api/ids.js';
 import dayjs from 'dayjs';
 import { DateText } from '../../../components/DateText.jsx';
 import { ImageUploadField } from '../../../components/ImageUploadField.jsx';
@@ -67,7 +68,7 @@ function SpeciesDrawer({ target, onClose }) {
   const createVersion = useCreatePetSpeciesVersion();
   const isNew = target.mode === 'create';
   const [ask, modal] = useConfirmedChange();
-  const newOwnerId = useMemo(() => crypto.randomUUID(), []);
+  const newOwnerId = useMemo(() => newId(), []);
   const ownerId = isNew ? newOwnerId : target.species.id;
   const current = target.species?.versions.find(
     (v) => v.versionNo === target.species.currentVersionNo,

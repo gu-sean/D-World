@@ -4,7 +4,7 @@ import { BASE, checkChange, errorResponse, paginate, sortItems } from '../../moc
 // MSW handlers for M10~M16 (docs/09 §3). The data lives in memory: a change made on one screen
 // is seen on the others until the page is reloaded.
 
-const uuid = (kind, n) => `${kind}0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const uuid = (kind, n) => `${kind}4${String(n).padStart(6, '0')}`;
 
 /** IDs of the fixed records that tests and demos can rely on. */
 export const SEED_IDS = {

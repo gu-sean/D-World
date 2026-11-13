@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -124,7 +124,7 @@ export class DefinitionsService {
          VALUES ($1, 'user', $2, $3, $4, $5, $6, $7, $8, $9, $10, 'private')
          RETURNING ${COLUMNS.replaceAll('d.', '')}`,
         [
-          randomUUID(),
+          newId(),
           userId,
           data.title,
           data.description || null,
@@ -164,9 +164,9 @@ export class DefinitionsService {
          FROM mission_definitions d
          LEFT JOIN profiles p ON p.user_id = d.created_by_user_id
         WHERE d.publication_status = 'public' AND d.deleted_at IS NULL
-          AND ($1::uuid IS NULL OR d.category_id = $1)
-          AND ($2::uuid IS NULL OR d.difficulty_id = $2)
-          AND ($3::timestamptz IS NULL OR (d.created_at, d.id) < ($3::timestamptz, $4::uuid))
+          AND ($1::short_id IS NULL OR d.category_id = $1)
+          AND ($2::short_id IS NULL OR d.difficulty_id = $2)
+          AND ($3::timestamptz IS NULL OR (d.created_at, d.id) < ($3::timestamptz, $4::short_id))
           AND ($6::text IS NULL OR d.exercise_code = $6)
         ORDER BY d.created_at DESC, d.id DESC
         LIMIT $5`,
@@ -207,12 +207,12 @@ export class DefinitionsService {
          FROM mission_definitions d
          LEFT JOIN profiles p ON p.user_id = d.created_by_user_id
         WHERE d.publication_status = 'public' AND d.deleted_at IS NULL
-          AND ($1::uuid IS NULL OR d.category_id = $1)
-          AND ($2::uuid IS NULL OR d.difficulty_id = $2)
+          AND ($1::short_id IS NULL OR d.category_id = $1)
+          AND ($2::short_id IS NULL OR d.difficulty_id = $2)
           AND ($3::text IS NULL OR d.exercise_code = $3)
           AND ($4::int IS NULL
                OR (COALESCE(d.estimated_duration_seconds, 2147483647), d.id)
-                  > ($4::int, $5::uuid))
+                  > ($4::int, $5::short_id))
         ORDER BY COALESCE(d.estimated_duration_seconds, 2147483647), d.id
         LIMIT $6`,
       [
@@ -240,7 +240,7 @@ export class DefinitionsService {
          LEFT JOIN profiles p ON p.user_id = d.created_by_user_id
         WHERE d.created_by_user_id = $1 AND d.origin = 'user' AND d.deleted_at IS NULL
           AND ($2::text IS NULL OR d.publication_status = $2)
-          AND ($3::timestamptz IS NULL OR (d.created_at, d.id) < ($3::timestamptz, $4::uuid))
+          AND ($3::timestamptz IS NULL OR (d.created_at, d.id) < ($3::timestamptz, $4::short_id))
         ORDER BY d.created_at DESC, d.id DESC
         LIMIT $5`,
       [userId, status ?? null, after?.t ?? null, after?.id ?? null, limit + 1],
@@ -300,7 +300,7 @@ export class DefinitionsService {
       `SELECT ${COLUMNS}, p.nickname AS author_nickname
          FROM mission_definitions d
          LEFT JOIN profiles p ON p.user_id = d.created_by_user_id
-        WHERE d.id = ANY($1::uuid[]) AND d.deleted_at IS NULL`,
+        WHERE d.id = ANY($1::short_id[]) AND d.deleted_at IS NULL`,
       [ids],
     );
     await this.attachRewardPreviews(rows);
@@ -472,7 +472,7 @@ export class DefinitionsService {
         `INSERT INTO mission_publication_reviews
                 (id, definition_id, requested_by_user_id, decision)
          VALUES ($1, $2, $3, 'submitted')`,
-        [randomUUID(), definitionId, userId],
+        [newId(), definitionId, userId],
       );
       return this.toView(rows[0], { owner: true });
     });

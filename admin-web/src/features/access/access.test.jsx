@@ -43,7 +43,7 @@ describe('AuditLogPage', () => {
 
     expect(within(rowOf('account_action.lift')).getByRole('link')).toHaveAttribute(
       'href',
-      '/users/a0000000-0000-4000-8000-000000000003',
+      '/users/a4000003',
     );
   });
 

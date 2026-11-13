@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { createTestApp } from '../support/app.js';
 import { createUser } from '../support/users.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -24,15 +25,15 @@ describe.skipIf(!databaseUrl)('회원 탈퇴 (PostgreSQL)', () => {
     http
       .patch(`/admin/v1${path}`)
       .set(admin())
-      .set('Idempotency-Key', randomUUID())
+      .set('Idempotency-Key', newId())
       .send({ reason: '탈퇴 검토', ...body });
 
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
-    const adminId = randomUUID();
+    const adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `wd_${RUN}`, `${adminId}@example.com`],
+      [adminId, `wd_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await db.withTransaction((tx) =>
       app.get(SessionsService).create(tx, 'admin', adminId),

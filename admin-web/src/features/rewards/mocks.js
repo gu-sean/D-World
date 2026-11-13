@@ -16,30 +16,23 @@ const nowIso = () => new Date().toISOString();
 // ---- catalogs ----
 const categories = [
   {
-    id: 'c0000000-0000-4000-8000-000000000001',
+    id: 'c4000001',
     code: 'exercise',
     name: '운동',
     displayOrder: 1,
     isActive: true,
   },
-  {
-    id: 'c0000000-0000-4000-8000-000000000002',
-    code: 'study',
-    name: '공부',
-    displayOrder: 2,
-    isActive: true,
-  },
 ];
 const difficulties = [
   {
-    id: 'd0000000-0000-4000-8000-000000000001',
+    id: 'd4000001',
     code: 'easy',
     name: '쉬움',
     displayOrder: 1,
     isActive: true,
   },
   {
-    id: 'd0000000-0000-4000-8000-000000000002',
+    id: 'd4000002',
     code: 'hard',
     name: '어려움',
     displayOrder: 2,
@@ -48,7 +41,7 @@ const difficulties = [
 ];
 
 // ---- points ----
-const USER = 'a0000000-0000-4000-8000-000000000001';
+const USER = 'a4000001';
 const transactions = [
   {
     id: id(),

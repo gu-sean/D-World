@@ -5,7 +5,7 @@
 //         --db: DATABASE_URL의 DB 이름을 바꿔서 사용(없으면 생성)
 // 대상 DB는 DATABASE_URL, 각 파일은 자체 BEGIN/COMMIT 포함 전제
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import pg from 'pg';
@@ -75,7 +75,17 @@ if (dbName) {
   targetUrl.pathname = `/${dbName}`;
 }
 
-const client = new pg.Client({ connectionString: targetUrl.href });
+// 원격 DB(Supabase 등): DATABASE_SSL=true, 인증서는 DATABASE_SSL_CA 파일로 검증
+const ssl =
+  process.env.DATABASE_SSL === 'true'
+    ? {
+        rejectUnauthorized: true,
+        ...(process.env.DATABASE_SSL_CA
+          ? { ca: readFileSync(process.env.DATABASE_SSL_CA, 'utf8') }
+          : {}),
+      }
+    : undefined;
+const client = new pg.Client({ connectionString: targetUrl.href, ssl });
 await client.connect();
 
 try {

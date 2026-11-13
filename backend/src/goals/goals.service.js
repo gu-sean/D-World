@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AchievementsService } from '../achievements/achievements.service.js';
 import { AppException } from '../common/errors/app-exception.js';
@@ -149,14 +149,14 @@ export class GoalsService {
         `SELECT goal_id, count(*) AS total,
                 count(*) FILTER (WHERE status = 'completed') AS done
            FROM missions
-          WHERE goal_id = ANY($1::uuid[]) AND deleted_at IS NULL AND status <> 'cancelled'
+          WHERE goal_id = ANY($1::short_id[]) AND deleted_at IS NULL AND status <> 'cancelled'
           GROUP BY goal_id`,
         [goalIds],
       ),
       db.query(
         `SELECT goal_id, count(*) AS total,
                 count(*) FILTER (WHERE status = 'completed') AS done
-           FROM goal_steps WHERE goal_id = ANY($1::uuid[]) GROUP BY goal_id`,
+           FROM goal_steps WHERE goal_id = ANY($1::short_id[]) GROUP BY goal_id`,
         [goalIds],
       ),
     ]);
@@ -221,7 +221,7 @@ export class GoalsService {
           data.startDate,
           data.endDate,
           data.targetFrequency ?? null,
-          randomUUID(),
+          newId(),
           data.dailyAvailableMinutes ?? null,
         ],
       );
@@ -260,9 +260,9 @@ export class GoalsService {
          FROM goals
         WHERE user_id = $1 AND deleted_at IS NULL
           AND ($2::text IS NULL OR status = $2)
-          AND ($3::timestamptz IS NULL OR (created_at, id) < ($3::timestamptz, $4::uuid))
+          AND ($3::timestamptz IS NULL OR (created_at, id) < ($3::timestamptz, $4::short_id))
           AND ($6::text[] IS NULL OR status = ANY($6::text[]))
-          AND ($7::uuid IS NULL OR category_id = $7)
+          AND ($7::short_id IS NULL OR category_id = $7)
         ORDER BY created_at DESC, id DESC
         LIMIT $5`,
       [

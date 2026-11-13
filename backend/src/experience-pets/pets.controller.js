@@ -13,7 +13,12 @@ import {
   Req,
   UseInterceptors,
 } from '@nestjs/common';
-import { boolean, string, uuid, validateBody } from '../common/validation.js';
+import {
+  boolean,
+  string,
+  shortId,
+  validateBody,
+} from '../common/validation.js';
 import {
   Idempotent,
   UserIdempotencyInterceptor,
@@ -57,7 +62,7 @@ export class PetsController {
     return this.pets.choosePet(
       request.auth.userId,
       validateBody(body, {
-        speciesId: uuid(),
+        speciesId: shortId(),
         nickname: petName(),
         makeRepresentative: boolean({ optional: true }),
       }),
@@ -67,7 +72,7 @@ export class PetsController {
   @Put('me/pets/representative')
   @Bind(Req(), Body())
   setRepresentative(request, body) {
-    const { petId } = validateBody(body, { petId: uuid() });
+    const { petId } = validateBody(body, { petId: shortId() });
     return this.pets.setRepresentative(request.auth.userId, petId);
   }
 
@@ -81,7 +86,7 @@ export class PetsController {
   @Patch('me/pets/:id')
   @Bind(Req(), Param('id'), Body())
   rename(request, id, body) {
-    const params = validateBody({ id }, { id: uuid() });
+    const params = validateBody({ id }, { id: shortId() });
     const { nickname } = validateBody(body, { nickname: petName() });
     return this.pets.renamePet(request.auth.userId, params.id, nickname);
   }

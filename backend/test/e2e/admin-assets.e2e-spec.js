@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { createTestApp } from '../support/app.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
 import { SessionsService } from '../../src/common/auth/sessions.service.js';
@@ -25,7 +26,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
     http
       .post(path)
       .set(auth())
-      .set('Idempotency-Key', randomUUID())
+      .set('Idempotency-Key', newId())
       .send({ reason: REASON, ...body });
 
   /** 이미지 하나: 티켓 발급 → 업로드 모사 → 완료 */
@@ -47,7 +48,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
     const done = await http
       .post(`/admin/v1/assets/${ticket.body.assetId}/complete`)
       .set(auth())
-      .set('Idempotency-Key', randomUUID())
+      .set('Idempotency-Key', newId())
       .expect(200);
     expect(done.body.assetId).toBe(ticket.body.assetId);
     expect(done.body.imageUrl).toContain('memory://get/');
@@ -72,10 +73,10 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
     storage = app.get(OBJECT_STORAGE);
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `as_${RUN}`, `${adminId}@example.com`],
+      [adminId, `as_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await db.withTransaction((tx) =>
       app.get(SessionsService).create(tx, 'admin', adminId),
@@ -87,7 +88,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order)
        VALUES ($1, $2, $3, 1)`,
-      [randomUUID(), categoryCode, `분야${RUN}`],
+      [newId(), categoryCode, `분야${RUN}`],
     );
   });
 
@@ -99,7 +100,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
     it('2MB 초과·허용 안 하는 형식은 400', async () => {
       const base = {
         assetKind: 'badge',
-        ownerId: randomUUID(),
+        ownerId: newId(),
         mimeType: 'image/png',
         sizeBytes: 100,
       };
@@ -116,7 +117,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
     it('저장소가 형식 뒤에 매개변수를 붙여도(image/png; charset=binary) 같은 형식으로 인정', async () => {
       const ticket = await post('/admin/v1/assets/upload-urls', {
         assetKind: 'badge',
-        ownerId: randomUUID(),
+        ownerId: newId(),
         mimeType: 'image/png',
         sizeBytes: 321,
       }).expect(201);
@@ -131,19 +132,19 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
       await http
         .post(`/admin/v1/assets/${ticket.body.assetId}/complete`)
         .set(auth())
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .expect(200);
       await http
-        .post(`/admin/v1/assets/${randomUUID()}/complete`)
+        .post(`/admin/v1/assets/${newId()}/complete`)
         .set(auth())
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .expect(404);
     });
 
     it('올리지 않고 완료하면 409, 크기·형식이 다르면 409', async () => {
       const ticket = await post('/admin/v1/assets/upload-urls', {
         assetKind: 'badge',
-        ownerId: randomUUID(),
+        ownerId: newId(),
         mimeType: 'image/png',
         sizeBytes: 500,
       }).expect(201);
@@ -151,7 +152,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
         http
           .post(`/admin/v1/assets/${ticket.body.assetId}/complete`)
           .set(auth())
-          .set('Idempotency-Key', randomUUID());
+          .set('Idempotency-Key', newId());
       expect((await complete()).status).toBe(409);
       const { rows } = await db.query(
         'SELECT object_key FROM admin_asset_uploads WHERE id = $1',
@@ -167,7 +168,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
 
   describe('업적 (M76~M78)', () => {
     it('이미지 → 새 업적 → 새 버전, 이전 버전은 남고 현재 버전이 바뀜', async () => {
-      const id = randomUUID();
+      const id = newId();
       const first = await uploadAsset('badge', id);
       const created = await post(
         '/admin/v1/achievements',
@@ -207,7 +208,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
     });
 
     it('공개 버전만 소급 평가 요청이 쌓이고, 작업이 끝까지 처리하면 완료됨', async () => {
-      const publicId = randomUUID();
+      const publicId = newId();
       const publicAsset = await uploadAsset('badge', publicId);
       await post(
         '/admin/v1/achievements',
@@ -217,7 +218,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
           targetCount: 1_000_000,
         }),
       ).expect(201);
-      const draftId = randomUUID();
+      const draftId = newId();
       const draftAsset = await uploadAsset('badge', draftId);
       await post(
         '/admin/v1/achievements',
@@ -259,7 +260,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
     });
 
     it('조건과 맞지 않는 값은 400, 같은 코드는 409', async () => {
-      const id = randomUUID();
+      const id = newId();
       const asset = await uploadAsset('badge', id);
       const bad = await post(
         '/admin/v1/achievements',
@@ -280,7 +281,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
         }),
       ).expect(400);
 
-      const dupId = randomUUID();
+      const dupId = newId();
       const dupAsset = await uploadAsset('badge', dupId);
       const dup = await post(
         '/admin/v1/achievements',
@@ -290,7 +291,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
     });
 
     it('다른 업적에 올린 이미지는 쓸 수 없음', async () => {
-      const ownerA = randomUUID();
+      const ownerA = newId();
       const asset = await uploadAsset('badge', ownerA);
       const { rows } = await db.query(
         'SELECT id FROM achievement_definitions LIMIT 1',
@@ -335,7 +336,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
     }
 
     it('단계 이미지 3장 → 새 종류 → 새 버전', async () => {
-      const id = randomUUID();
+      const id = newId();
       const created = await post(
         '/admin/v1/pet-species',
         speciesBody(await uploadStages(id)),
@@ -377,7 +378,7 @@ describe.skipIf(!databaseUrl)('관리자 업적·펫·이미지 API (PostgreSQL)
     });
 
     it('해금 조건·단계 구성이 맞지 않으면 400', async () => {
-      const id = randomUUID();
+      const id = newId();
       const assets = await uploadStages(id);
       await post(
         '/admin/v1/pet-species',

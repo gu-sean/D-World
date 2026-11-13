@@ -1,5 +1,5 @@
 import hashlib
-from uuid import uuid4
+from tests.conftest import new_id
 
 import pytest
 from app.api.v1 import vision
@@ -44,11 +44,11 @@ def setup(monkeypatch, tmp_path):
 
 
 def request_data(exercise="squat"):
-    record = str(uuid4())
+    record = new_id()
     return {
         "ingestKey": f"vision:{record}:1",
         "recordId": record,
-        "missionId": str(uuid4()),
+        "missionId": new_id(),
         "submissionNo": 1,
         "categoryCode": "exercise",
         "exerciseCode": exercise,
@@ -56,7 +56,7 @@ def request_data(exercise="squat"):
         "targetUnit": "seconds" if exercise == "plank" else "reps",
         "media": [
             {
-                "mediaId": str(uuid4()),
+                "mediaId": new_id(),
                 "objectKey": "clip.mp4",
                 "mimeType": "video/mp4",
                 "mediaKind": "camera_video",
@@ -67,7 +67,7 @@ def request_data(exercise="squat"):
         "recordStartedAt": "2026-11-06T10:00:00Z",
         "submittedAt": "2026-11-06T10:01:00Z",
         "duplicateOfMediaId": None,
-        "criteria": {"versionId": str(uuid4()), "rules": {}},
+        "criteria": {"versionId": new_id(), "rules": {}},
         "callbackUrl": "http://localhost:3000/internal/v1/ai-callbacks",
     }
 

@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { createTestApp } from '../support/app.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
 import { SessionsService } from '../../src/common/auth/sessions.service.js';
@@ -15,15 +16,15 @@ describe.skipIf(!databaseUrl)('관리자 API 공통 규칙 (PostgreSQL)', () => 
   let adminToken;
 
   const auth = () => ({ Authorization: `Bearer ${adminToken}` });
-  const post = (path, body, key = randomUUID()) =>
+  const post = (path, body, key = newId()) =>
     http.post(path).set(auth()).set('Idempotency-Key', key).send(body);
 
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `ac_${RUN}`, `${adminId}@example.com`],
+      [adminId, `ac_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await db.withTransaction((tx) =>
       app.get(SessionsService).create(tx, 'admin', adminId),
@@ -107,7 +108,7 @@ describe.skipIf(!databaseUrl)('관리자 API 공통 규칙 (PostgreSQL)', () => 
   it('이의 제기 목록·상세(M34, M35)는 없는 ID에 404', async () => {
     const list = await http.get('/admin/v1/appeals').set(auth()).expect(200);
     expect(list.body).toMatchObject({ page: 1, size: 20 });
-    await http.get(`/admin/v1/appeals/${randomUUID()}`).set(auth()).expect(404);
+    await http.get(`/admin/v1/appeals/${newId()}`).set(auth()).expect(404);
   });
 
   it('미션 틀 목록(M42)은 출처·공개 상태 필터와 AdminPage 형식', async () => {
@@ -143,7 +144,7 @@ describe.skipIf(!databaseUrl)('관리자 API 공통 규칙 (PostgreSQL)', () => 
         reason: '준비',
       }).expect(201)
     ).body;
-    const difficulty = randomUUID();
+    const difficulty = newId();
     await db.query(
       `INSERT INTO difficulty_levels (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [difficulty, `iud${RUN}`, `사용중난이도${RUN}`],
@@ -152,12 +153,12 @@ describe.skipIf(!databaseUrl)('관리자 API 공통 규칙 (PostgreSQL)', () => 
       `INSERT INTO mission_definitions
               (id, origin, title, category_id, difficulty_id, verification_method, publication_status)
        VALUES ($1,'admin','공개 틀',$2,$3,'camera','public')`,
-      [randomUUID(), category.id, difficulty],
+      [newId(), category.id, difficulty],
     );
     const res = await http
       .patch(`/admin/v1/goal-categories/${category.id}`)
       .set(auth())
-      .set('Idempotency-Key', randomUUID())
+      .set('Idempotency-Key', newId())
       .send({ isActive: false, reason: '정리' })
       .expect(409);
     expect(res.body.error.code).toBe('CATALOG_IN_USE');
@@ -167,11 +168,11 @@ describe.skipIf(!databaseUrl)('관리자 API 공통 규칙 (PostgreSQL)', () => 
     let userId;
 
     beforeAll(async () => {
-      userId = randomUUID();
+      userId = newId();
       await db.query('INSERT INTO users (id) VALUES ($1)', [userId]);
     });
 
-    const adjust = (body, key = randomUUID()) =>
+    const adjust = (body, key = newId()) =>
       post(
         '/admin/v1/point-adjustments',
         { userId, reason: '보상 지급', ...body },
@@ -222,7 +223,7 @@ describe.skipIf(!databaseUrl)('관리자 API 공통 규칙 (PostgreSQL)', () => 
     });
 
     it('같은 키로 다시 보내면 한 번만 반영, 잔액보다 많이 회수하면 422', async () => {
-      const key = randomUUID();
+      const key = newId();
       const first = await adjust(
         { kind: 'manual_grant', amount: 10 },
         key,
@@ -257,7 +258,7 @@ describe.skipIf(!databaseUrl)('관리자 API 공통 규칙 (PostgreSQL)', () => 
       await adjust({
         kind: 'manual_grant',
         amount: 5,
-        userId: randomUUID(),
+        userId: newId(),
       }).expect(404);
     });
 
@@ -351,8 +352,8 @@ describe.skipIf(!databaseUrl)('관리자 API 공통 규칙 (PostgreSQL)', () => 
     let difficultyId;
 
     beforeAll(async () => {
-      categoryId = randomUUID();
-      difficultyId = randomUUID();
+      categoryId = newId();
+      difficultyId = newId();
       await db.query(
         `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
         [categoryId, `md${RUN}`, `틀분야${RUN}`],
@@ -432,7 +433,7 @@ describe.skipIf(!databaseUrl)('관리자 API 공통 규칙 (PostgreSQL)', () => 
       const patched = await http
         .patch(`/admin/v1/mission-definitions/${created.id}`)
         .set(auth())
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .send({
           title: `바뀐 제목 ${RUN}`,
           publicationStatus: 'hidden',
@@ -503,8 +504,8 @@ describe.skipIf(!databaseUrl)('관리자 API 공통 규칙 (PostgreSQL)', () => 
         [categoryId],
       );
 
-      const userDefinition = randomUUID();
-      const userId = randomUUID();
+      const userDefinition = newId();
+      const userId = newId();
       await db.query('INSERT INTO users (id) VALUES ($1)', [userId]);
       await db.query(
         `INSERT INTO mission_definitions
@@ -516,25 +517,25 @@ describe.skipIf(!databaseUrl)('관리자 API 공통 규칙 (PostgreSQL)', () => 
       const conflict = await http
         .patch(`/admin/v1/mission-definitions/${userDefinition}`)
         .set(auth())
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .send({ title: '바꾸기', reason: '시도' })
         .expect(409);
       expect(conflict.body.error.code).toBe('NOT_ADMIN_DEFINITION');
 
       await http
-        .patch(`/admin/v1/mission-definitions/${randomUUID()}`)
+        .patch(`/admin/v1/mission-definitions/${newId()}`)
         .set(auth())
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .send({ title: 'x', reason: '시도' })
         .expect(404);
       await http
         .patch(`/admin/v1/mission-definitions/${userDefinition}`)
         .set(auth())
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .send({ reason: '빈 수정' })
         .expect(400);
       await http
-        .get(`/admin/v1/mission-definitions/${randomUUID()}`)
+        .get(`/admin/v1/mission-definitions/${newId()}`)
         .set(auth())
         .expect(404);
     });

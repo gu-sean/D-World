@@ -3,13 +3,13 @@ import { BASE, paginate, sortItems } from '../../mocks/helpers.js';
 
 // MSW handlers for M101 (docs/09 §10). The log is read-only; the data is generated once.
 
-const uuid = (n) => `a0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const uuid = (n) => `a4${String(n).padStart(6, '0')}`;
 
 /** IDs of the fixed logs that tests and demos can rely on. */
 export const SEED_IDS = {
-  liftRestriction: 'c0000000-0000-4000-8000-000000000001', // has before and after values
-  failedPublish: 'c0000000-0000-4000-8000-000000000002', // result failure
-  noValues: 'c0000000-0000-4000-8000-000000000003', // no before/after
+  liftRestriction: 'c4000001', // has before and after values
+  failedPublish: 'c4000002', // result failure
+  noValues: 'c4000003', // no before/after
 };
 
 const STEP = 60 * 60 * 1000;
@@ -64,7 +64,7 @@ function seedLogs() {
     const [adminLoginId, action, user] = GENERATED[n % GENERATED.length];
     logs.push(
       log(3 + n, {
-        id: `c0000000-0000-4000-8000-${String(100 + n).padStart(12, '0')}`,
+        id: `c4${String(100 + n).padStart(6, '0')}`,
         adminLoginId,
         action,
         targetUserId: user ? uuid(user) : null,

@@ -1,7 +1,8 @@
 import { adminApi } from '../support/admin-api.js';
 import { testNickname } from '../support/users.js';
 import { configureApp } from '../../src/app.setup.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { Test } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import request from 'supertest';
@@ -44,7 +45,7 @@ describe.skipIf(!databaseUrl)(
       });
 
     async function createUser() {
-      const id = randomUUID();
+      const id = newId();
       await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
       await db.query(
         'INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)',
@@ -154,7 +155,7 @@ describe.skipIf(!databaseUrl)(
         .post('/internal/v1/ai-callbacks/verification-results')
         .set('x-internal-token', SECRET)
         .send({
-          ingestKey: randomUUID(),
+          ingestKey: newId(),
           recordId,
           decision,
           engineVersion: 'model-v1',
@@ -240,10 +241,10 @@ describe.skipIf(!databaseUrl)(
       scoring = app.get(ScoringService);
       decisions = app.get(DecisionService);
 
-      adminId = randomUUID();
+      adminId = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-        [adminId, `cs_${RUN}`, `${adminId}@example.com`],
+        [adminId, `cs_${RUN}`, `${adminId.toLowerCase()}@example.com`],
       );
       const session = await tx((t) =>
         app.get(SessionsService).create(t, 'admin', adminId),
@@ -251,8 +252,8 @@ describe.skipIf(!databaseUrl)(
       adminToken = await app
         .get(AccessTokenService)
         .issue('admin', adminId, session.sessionId);
-      categoryId = randomUUID();
-      difficultyId = randomUUID();
+      categoryId = newId();
+      difficultyId = newId();
       await db.query(
         `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
         [categoryId, `csc${RUN}`, `점수카테고리${RUN}`],
@@ -265,7 +266,7 @@ describe.skipIf(!databaseUrl)(
         `INSERT INTO verification_criteria_versions
               (id, category_id, verification_method, version_no, rules_json, effective_at, created_by_admin_id)
        VALUES ($1,$2,'sensor',1,'{}'::jsonb, now() - interval '30 days', $3)`,
-        [randomUUID(), categoryId, adminId],
+        [newId(), categoryId, adminId],
       );
     });
 
@@ -383,7 +384,7 @@ describe.skipIf(!databaseUrl)(
       expect((await ranking(outsider, challenge)).me).toBeNull();
       await http.get(`/api/v1/challenges/${challenge.id}/ranking`).expect(401);
       await http
-        .get(`/api/v1/challenges/${randomUUID()}/ranking`)
+        .get(`/api/v1/challenges/${newId()}/ranking`)
         .set(auth(a.token))
         .expect(404);
       await http
@@ -492,7 +493,7 @@ describe.skipIf(!databaseUrl)(
           }).expect(409)
         ).body.error.code,
       ).toBe('ADMIN_STATE_CONFLICT');
-      await adminPost(`${base}/days/${randomUUID()}/exclude`, {
+      await adminPost(`${base}/days/${newId()}/exclude`, {
         reason: 'x',
       }).expect(404);
       const actions = await db.query(
@@ -539,8 +540,8 @@ describe.skipIf(!databaseUrl)(
     });
 
     it('챌린지 미션의 승인은 "승인 미션 누적" 업적에 세지 않음', async () => {
-      const definitionId = randomUUID();
-      const imageId = randomUUID();
+      const definitionId = newId();
+      const imageId = newId();
       const tag = randomInt(100_000, 999_999);
       await db.query(
         `INSERT INTO achievement_definitions (id, code, status, created_by_admin_id)
@@ -559,7 +560,7 @@ describe.skipIf(!databaseUrl)(
                target_count, reward_points, badge_image_id, effective_at, created_by_admin_id)
        VALUES ($1,$2,1,'첫 승인','승인 미션 1회','common','approved_mission_count',
                1,0,$3, now() - interval '1 day', $4)`,
-        [randomUUID(), definitionId, imageId, adminId],
+        [newId(), definitionId, imageId, adminId],
       );
       try {
         const user = await createUser();

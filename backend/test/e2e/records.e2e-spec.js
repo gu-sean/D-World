@@ -1,6 +1,7 @@
 import { createUser as createUserWith } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -38,7 +39,7 @@ describe.skipIf(!databaseUrl)('수행 회차 (PostgreSQL + 메모리 저장소)'
       status = 'scheduled',
     } = {},
   ) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO missions
               (id, user_id, source_type, title, category_id, difficulty_id,
@@ -110,7 +111,7 @@ describe.skipIf(!databaseUrl)('수행 회차 (PostgreSQL + 메모리 저장소)'
     { decision, ageDays = 0, notified = true, reason = null },
   ) {
     const criteria = await ensureCriteria();
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO verification_results
               (id, record_id, result_no, source, decision, criteria_version_id, engine_version,
@@ -126,7 +127,7 @@ describe.skipIf(!databaseUrl)('수행 회차 (PostgreSQL + 메모리 저장소)'
   let criteriaId = null;
   async function ensureCriteria() {
     if (criteriaId) return criteriaId;
-    criteriaId = randomUUID();
+    criteriaId = newId();
     await db.query(
       `INSERT INTO verification_criteria_versions
               (id, category_id, verification_method, version_no, rules_json, effective_at,
@@ -141,13 +142,13 @@ describe.skipIf(!databaseUrl)('수행 회차 (PostgreSQL + 메모리 저장소)'
     ({ app, http, db } = await createTestApp());
     storage = app.get(OBJECT_STORAGE);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `rc_${RUN}`, `${adminId}@example.com`],
+      [adminId, `rc_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
-    categoryId = randomUUID();
-    difficultyId = randomUUID();
+    categoryId = newId();
+    difficultyId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [categoryId, `rcc${RUN}`, `회차카테고리${RUN}`],
@@ -260,7 +261,7 @@ describe.skipIf(!databaseUrl)('수행 회차 (PostgreSQL + 메모리 저장소)'
       }
       const mine = await createMission(user);
       await start(other, mine).expect(404);
-      await start(user, randomUUID()).expect(404);
+      await start(user, newId()).expect(404);
       await db.query('UPDATE missions SET deleted_at = now() WHERE id = $1', [
         mine,
       ]);
@@ -465,7 +466,7 @@ describe.skipIf(!databaseUrl)('수행 회차 (PostgreSQL + 메모리 저장소)'
       }
       const open = [];
       for (let attempt = 4; attempt <= 6; attempt++) {
-        const id = randomUUID();
+        const id = newId();
         await db.query(
           `INSERT INTO mission_records (id, mission_id, user_id, attempt_no, status)
            VALUES ($1,$2,$3,$4,'recording')`,
@@ -492,7 +493,7 @@ describe.skipIf(!databaseUrl)('수행 회차 (PostgreSQL + 메모리 저장소)'
       const roomy = await createMission(user);
       const ids = [];
       for (let attempt = 1; attempt <= 3; attempt++) {
-        const id = randomUUID();
+        const id = newId();
         await db.query(
           `INSERT INTO mission_records (id, mission_id, user_id, attempt_no, status)
            VALUES ($1,$2,$3,$4,'recording')`,
@@ -555,7 +556,7 @@ describe.skipIf(!databaseUrl)('수행 회차 (PostgreSQL + 메모리 저장소)'
       const missionId = await createMission(user);
       const record = await startedRecord(user, missionId);
       await submit(other, record.id, { metrics: { a: 1 } }).expect(404);
-      await submit(user, randomUUID()).expect(404);
+      await submit(user, newId()).expect(404);
       await submit(user, record.id, { metrics: 'x' }).expect(400);
       await submit(user, record.id, { metrics: [1, 2] }).expect(400);
       await submit(user, record.id, {
@@ -694,7 +695,7 @@ describe.skipIf(!databaseUrl)('수행 회차 (PostgreSQL + 메모리 저장소)'
         .set(auth(other.token))
         .expect(404);
       await http
-        .get(`/api/v1/missions/${randomUUID()}/records`)
+        .get(`/api/v1/missions/${newId()}/records`)
         .set(auth(user.token))
         .expect(404);
       const one = await http
@@ -753,7 +754,7 @@ describe.skipIf(!databaseUrl)('수행 회차 (PostgreSQL + 메모리 저장소)'
       await db.query(
         `INSERT INTO verification_appeals (id, record_id, filed_by_user_id, original_result_id, reason)
          VALUES ($1,$2,$3,$4,'다시 봐주세요')`,
-        [randomUUID(), appealed, user.id, appealedResult],
+        [newId(), appealed, user.id, appealedResult],
       );
 
       const listOf = async (id) =>
@@ -813,7 +814,7 @@ describe.skipIf(!databaseUrl)('수행 회차 (PostgreSQL + 메모리 저장소)'
       await db.query(
         `INSERT INTO account_actions (id, user_id, admin_id, action_type, reason, starts_at, ends_at)
          VALUES ($1,$2,$3,'restriction','사유', now() - interval '1 hour', now() + interval '1 hour')`,
-        [randomUUID(), user.id, adminId],
+        [newId(), user.id, adminId],
       );
 
       expect((await start(user, other).expect(403)).body.error.code).toBe(

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import {
   Bind,
   Body,
@@ -107,7 +107,7 @@ export class AdminPolicyDocumentsController {
              (id, document_type, version, body, effective_at, requires_reconsent)
            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
           [
-            randomUUID(),
+            newId(),
             input.documentType,
             input.version.trim(),
             input.body,

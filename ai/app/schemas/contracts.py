@@ -1,9 +1,11 @@
 
 from datetime import date, datetime
-from typing import Literal
-from uuid import UUID
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+
+# 식별자: 8자 영숫자(대소문자 구분). 백엔드·DB의 short_id와 같은 규칙
+ShortId = Annotated[str, StringConstraints(pattern=r"^[0-9A-Za-z]{8}$")]
 
 
 def to_camel(value: str) -> str:
@@ -36,7 +38,7 @@ Decision = Literal["approved", "rejected", "review_required"]
 # ───────────────────────────────
 
 class MediaItem(ApiModel):
-    media_id: UUID
+    media_id: ShortId
     object_key: str = Field(min_length=1)
     mime_type: str = Field(min_length=1)
     media_kind: Literal[
@@ -51,7 +53,7 @@ class MediaItem(ApiModel):
 
 
 class Criteria(ApiModel):
-    version_id: UUID
+    version_id: ShortId
     rules: dict = Field(default_factory=dict)
 
 
@@ -93,8 +95,8 @@ class AcceptedResponse(ApiModel):
 
 class VisionAnalysisRequest(ApiModel):
     ingest_key: str = Field(min_length=1)
-    record_id: UUID
-    mission_id: UUID
+    record_id: ShortId
+    mission_id: ShortId
     submission_no: int = Field(ge=1)
     category_code: str
     exercise_code: CameraExercise | None
@@ -103,7 +105,7 @@ class VisionAnalysisRequest(ApiModel):
     media: list[MediaItem] = Field(min_length=1, max_length=1)
     record_started_at: datetime
     submitted_at: datetime
-    duplicate_of_media_id: UUID | None
+    duplicate_of_media_id: ShortId | None
     criteria: Criteria
     callback_url: str = Field(min_length=1)
 
@@ -125,7 +127,7 @@ class VisionAnalysisRequest(ApiModel):
 
 class VisionAnalysisCallback(ApiModel):
     ingest_key: str
-    record_id: UUID
+    record_id: ShortId
     status: Literal["completed", "failed"]
     decision: Decision | None = None
     confidence: float | None = Field(default=None, ge=0, le=1)
@@ -150,7 +152,7 @@ class ClientMetrics(ApiModel):
 
 class SensorEvaluationRequest(ApiModel):
     ingest_key: str
-    record_id: UUID
+    record_id: ShortId
     exercise_code: Literal["running"]
     target_value: float = Field(gt=0)
     target_unit: Literal["meters", "seconds"]
@@ -158,7 +160,7 @@ class SensorEvaluationRequest(ApiModel):
     submitted_at: datetime
     media: list[MediaItem] = Field(min_length=1, max_length=1)
     client_metrics: ClientMetrics | None
-    duplicate_of_media_id: UUID | None
+    duplicate_of_media_id: ShortId | None
     criteria: Criteria
 
     @model_validator(mode="after")
@@ -285,7 +287,7 @@ class SituationProfile(ApiModel):
 
 
 class MissionCandidate(ApiModel):
-    definition_id: UUID
+    definition_id: ShortId
     title: str
     category_code: str
     exercise_code: str | None
@@ -305,7 +307,7 @@ class SituationalRecommendationRequest(ApiModel):
 
 class RecommendationItem(ApiModel):
     rank_no: int = Field(ge=1)
-    definition_id: UUID
+    definition_id: ShortId
     reason: str = Field(min_length=1, max_length=200)
 
 
@@ -363,7 +365,7 @@ class ReportStats(ApiModel):
 
 class ReportRequest(ApiModel):
     ingest_key: str
-    run_id: UUID
+    run_id: ShortId
     run_type: Literal["weekly_report", "monthly_report"]
     period_start: date
     period_end: date
@@ -382,7 +384,7 @@ class ReportContent(ApiModel):
 
 class ReportCallback(ApiModel):
     ingest_key: str
-    run_id: UUID
+    run_id: ShortId
     status: Literal["completed", "failed"]
     engine_version: str
     title: str | None
@@ -416,7 +418,7 @@ class AdjustmentCause(ApiModel):
 
 class PlanAdjustmentRequest(ApiModel):
     ingest_key: str
-    run_id: UUID
+    run_id: ShortId
     today: date
     goal: GoalInfo
     before_plan: list[PlanStep]
@@ -428,7 +430,7 @@ class PlanAdjustmentRequest(ApiModel):
 
 class PlanAdjustmentCallback(ApiModel):
     ingest_key: str
-    run_id: UUID
+    run_id: ShortId
     status: Literal["completed", "failed"]
     engine_version: str
     reason: str | None

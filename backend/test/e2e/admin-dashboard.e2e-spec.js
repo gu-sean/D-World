@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { createTestApp } from '../support/app.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
 import { SessionsService } from '../../src/common/auth/sessions.service.js';
@@ -22,10 +23,10 @@ describe.skipIf(!databaseUrl)(
 
     beforeAll(async () => {
       ({ app, http, db } = await createTestApp());
-      const adminId = randomUUID();
+      const adminId = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-        [adminId, `ad_${RUN}`, `${adminId}@example.com`],
+        [adminId, `ad_${RUN}`, `${adminId.toLowerCase()}@example.com`],
       );
       const session = await db.withTransaction((tx) =>
         app.get(SessionsService).create(tx, 'admin', adminId),
@@ -69,17 +70,17 @@ describe.skipIf(!databaseUrl)(
           'withdrawals',
         ]);
 
-        const userId = randomUUID();
+        const userId = newId();
         await db.query('INSERT INTO users (id) VALUES ($1)', [userId]);
         await db.query(
           `INSERT INTO support_tickets
            (id, ticket_type, category, reporter_user_id, subject, body)
          VALUES ($1, 'inquiry', 'account', $2, '제목', '내용')`,
-          [randomUUID(), userId],
+          [newId(), userId],
         );
         await db.query(
           'INSERT INTO account_withdrawal_requests (id, user_id) VALUES ($1, $2)',
-          [randomUUID(), userId],
+          [newId(), userId],
         );
 
         const after = (await summary().expect(200)).body;
@@ -128,7 +129,7 @@ describe.skipIf(!databaseUrl)(
 
     describe('M110', () => {
       it('구독·결제 API는 모두 501 COMMON_NOT_IMPLEMENTED', async () => {
-        const id = randomUUID();
+        const id = newId();
         const calls = [
           () => http.get('/admin/v1/subscriptions').set(auth()),
           () => http.get('/admin/v1/payments').set(auth()),
@@ -136,13 +137,13 @@ describe.skipIf(!databaseUrl)(
             http
               .post(`/admin/v1/payments/${id}/refunds`)
               .set(auth())
-              .set('Idempotency-Key', randomUUID())
+              .set('Idempotency-Key', newId())
               .send({ reason: '테스트' }),
           () =>
             http
               .post(`/admin/v1/users/${id}/entitlements/restore`)
               .set(auth())
-              .set('Idempotency-Key', randomUUID())
+              .set('Idempotency-Key', newId())
               .send({ reason: '테스트' }),
         ];
         for (const call of calls) {

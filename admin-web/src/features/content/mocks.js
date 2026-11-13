@@ -4,7 +4,7 @@ import { BASE, checkChange, errorResponse, paginate } from '../../mocks/helpers.
 // MSW handlers for M90~M100 (docs/09 §9). The data lives in memory: a change made on one screen
 // is seen on the others until the page is reloaded.
 
-const uuid = (kind, n) => `${kind}0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const uuid = (kind, n) => `${kind}4${String(n).padStart(6, '0')}`;
 
 /** IDs of the fixed rows that tests and demos can rely on. */
 export const SEED_IDS = {
@@ -27,8 +27,8 @@ const CONDITION_TYPES = [
   'inactive_days',
   'time_slot',
 ];
-const LINK_SCREEN = /^[a-z][a-z0-9_/.-]*$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const LINK_SCREEN = /^[a-z][A-Za-z0-9_/.-]*$/;
+const ID_FORMAT = /^[0-9A-Za-z]{8}$/;
 
 const nowIso = () => new Date().toISOString();
 const day = (n, hour = 1) => new Date(Date.UTC(2026, 9, n, hour, 0, 0)).toISOString();
@@ -198,7 +198,7 @@ function noticeInputIsValid(input) {
   if (!['all', 'users'].includes(input.audienceType)) return false;
   if (input.audienceType === 'users') {
     if (!Array.isArray(input.userIds) || input.userIds.length === 0) return false;
-    if (!input.userIds.every((id) => UUID.test(id))) return false;
+    if (!input.userIds.every((id) => ID_FORMAT.test(id))) return false;
   }
   if (typeof input.showInList !== 'boolean' || typeof input.sendPush !== 'boolean') return false;
   if (input.category === 'policy' && !input.policyDocumentVersionId) return false;

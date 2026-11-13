@@ -38,8 +38,8 @@ $$;
 
 -- 같은 Idempotency-Key + 같은 request_hash는 저장된 응답 재생, 다르면 오류
 CREATE TABLE admin_idempotency_keys (
-    id uuid PRIMARY KEY,
-    admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY,
+    admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     idempotency_key text NOT NULL
         CHECK (length(btrim(idempotency_key)) > 0),
     operation varchar(80) NOT NULL CHECK (length(btrim(operation)) > 0),
@@ -86,8 +86,8 @@ FOR EACH ROW EXECUTE FUNCTION guard_admin_idempotency_key();
 -- 앱 API 멱등 키 (admin_idempotency_keys와 같은 규칙)
 -- 같은 user_id + idempotency_key + 같은 request_hash는 저장된 응답 재생, 다르면 오류
 CREATE TABLE user_idempotency_keys (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     idempotency_key text NOT NULL
         CHECK (length(btrim(idempotency_key)) > 0),
     operation varchar(80) NOT NULL CHECK (length(btrim(operation)) > 0),
@@ -134,8 +134,8 @@ FOR EACH ROW EXECUTE FUNCTION guard_user_idempotency_key();
 -- 지급 재시도 상태, 워커는 locked_until로 행을 임대
 -- 지급 멱등성은 challenge_reward_grants와 원장 키가 보장
 CREATE TABLE challenge_reward_payment_attempts (
-    run_id uuid NOT NULL,
-    participation_id uuid NOT NULL,
+    run_id short_id NOT NULL,
+    participation_id short_id NOT NULL,
     attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
     last_error text,
     last_attempt_at timestamptz,

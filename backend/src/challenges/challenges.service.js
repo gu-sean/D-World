@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AdminMutationService } from '../admin-auth/admin-mutation.service.js';
 import { adminPage } from '../common/pagination/admin-page.js';
@@ -126,8 +126,8 @@ export class ChallengesService {
         WHERE c.publication_status = 'public'
           AND ($1::text IS NULL OR (CASE WHEN ${TODAY_SQL} < c.start_date THEN 'recruiting'
                  WHEN ${TODAY_SQL} <= c.end_date THEN 'ongoing' ELSE 'ended' END) = $1)
-          AND ($2::uuid IS NULL OR c.category_id = $2)
-          AND ($3::date IS NULL OR (c.start_date, c.id) > ($3::date, $4::uuid))
+          AND ($2::short_id IS NULL OR c.category_id = $2)
+          AND ($3::date IS NULL OR (c.start_date, c.id) > ($3::date, $4::short_id))
         ORDER BY c.start_date, c.id
         LIMIT $5`,
       [
@@ -158,7 +158,7 @@ export class ChallengesService {
     if (challengeIds.length === 0) return new Map();
     const { rows } = await this.database.query(
       `SELECT id, challenge_id, status FROM challenge_participations
-        WHERE user_id = $1 AND challenge_id = ANY($2::uuid[])`,
+        WHERE user_id = $1 AND challenge_id = ANY($2::short_id[])`,
       [userId, challengeIds],
     );
     return new Map(
@@ -201,7 +201,7 @@ export class ChallengesService {
     const where = `($1::text IS NULL OR publication_status = $1)
           AND ($2::text IS NULL OR settlement_status = $2)
           AND ($3::text IS NULL OR phase = $3)
-          AND ($4::uuid IS NULL OR category_id = $4)
+          AND ($4::short_id IS NULL OR category_id = $4)
           AND ($5::text IS NULL OR origin = $5)`;
     const [{ rows }, count] = await Promise.all([
       this.database.query(
@@ -308,7 +308,7 @@ export class ChallengesService {
         this.assertExercise(input.exerciseCode, input.verificationMethod);
         await this.assertRefs(tx, input);
 
-        const id = randomUUID();
+        const id = newId();
         try {
           await tx.query(
             `INSERT INTO challenges
@@ -499,7 +499,7 @@ export class ChallengesService {
         await tx.query(
           `INSERT INTO challenge_rule_events (id, challenge_id, admin_id, event_type, reason)
            VALUES ($1,$2,$3,'published','공개')`,
-          [randomUUID(), id, adminId],
+          [newId(), id, adminId],
         );
         const { rows } = await tx.query(`${SELECT} WHERE c.id = $1`, [id]);
         return { result: toView(rows[0]) };
@@ -528,14 +528,14 @@ export class ChallengesService {
         await tx.query(
           `INSERT INTO challenge_rule_events (id, challenge_id, admin_id, event_type, reason)
            VALUES ($1,$2,$3,'hidden',$4)`,
-          [randomUUID(), id, adminId, reason],
+          [newId(), id, adminId, reason],
         );
         if (current.origin === 'user') {
           await tx.query(
             `INSERT INTO challenge_publication_reviews
                     (id, challenge_id, reviewed_by_admin_id, decision, reason)
              VALUES ($1,$2,$3,'hidden',$4)`,
-            [randomUUID(), id, adminId, reason],
+            [newId(), id, adminId, reason],
           );
         }
         const { rows } = await tx.query(`${SELECT} WHERE c.id = $1`, [id]);

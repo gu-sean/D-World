@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import {
   BadRequestException,
   Bind,
@@ -29,7 +29,7 @@ import {
   oneOf,
   string,
   timestamp,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -138,7 +138,7 @@ export class AdminRecommendationMessagesController {
     return adminPage(rows.map(view), paging, count.rows[0].n);
   }
 
-  /** M99: categoryCode는 전역 인터셉터가 categoryId(UUID)로 바꿔 줌 */
+  /** M99: categoryCode는 전역 인터셉터가 categoryId(ID)로 바꿔 줌 */
   @Post()
   @Bind(Req(), Body())
   create(request, body) {
@@ -146,7 +146,7 @@ export class AdminRecommendationMessagesController {
       message: string({ min: 1, max: 200, pattern: /\S/ }),
       conditionType: oneOf(CONDITIONS),
       conditionParams: jsonObject({ optional: true }),
-      categoryId: uuid({ optional: true }),
+      categoryId: shortId({ optional: true }),
       priority: integer({ min: 0, max: 100, optional: true }),
       startsAt: timestamp({ optional: true }),
       endsAt: timestamp({ optional: true }),
@@ -169,7 +169,7 @@ export class AdminRecommendationMessagesController {
            VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10, $10)
            RETURNING *`,
           [
-            randomUUID(),
+            newId(),
             input.message.trim(),
             input.conditionType,
             JSON.stringify(params),
@@ -203,7 +203,7 @@ export class AdminRecommendationMessagesController {
       message: string({ min: 1, max: 200, pattern: /\S/, optional: true }),
       conditionType: oneOf(CONDITIONS, { optional: true }),
       conditionParams: jsonObject({ optional: true }),
-      categoryId: nullable(uuid({ optional: true })),
+      categoryId: nullable(shortId({ optional: true })),
       priority: integer({ min: 0, max: 100, optional: true }),
       startsAt: nullable(timestamp({ optional: true })),
       endsAt: nullable(timestamp({ optional: true })),

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import {
   BadRequestException,
   Bind,
@@ -22,7 +22,7 @@ import {
   oneOf,
   string,
   timestamp,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -43,19 +43,19 @@ const versionRules = () => ({
   description: string({ min: 1, max: 2000, optional: true }),
   personality: string({ min: 1, max: 2000, optional: true }),
   worldText: string({ min: 1, max: 4000, optional: true }),
-  // categoryCode는 전역 인터셉터가 categoryId(UUID)로 바꿔 줌
-  categoryId: uuid(),
+  // categoryCode는 전역 인터셉터가 categoryId(ID)로 바꿔 줌
+  categoryId: shortId(),
   unlockConditionType: oneOf(UNLOCK_TYPES),
   unlockTargetCount: integer({ min: 1, max: 1_000_000, optional: true }),
   unlockCategoryCode: string({ min: 1, max: 40, optional: true }),
-  unlockAchievementId: uuid({ optional: true }),
+  unlockAchievementId: shortId({ optional: true }),
   hatchMissionCount: integer({ min: 0, max: 1_000_000 }),
   stages: array(
     object({
       stageNo: integer({ min: 1, max: 3 }),
       minTotalXp: integer({ min: 0, max: 2_000_000_000 }),
       bonusBasisPoints: integer({ min: 0, max: 2000 }),
-      imageAssetId: uuid(),
+      imageAssetId: shortId(),
     }),
     { min: 3, max: 3 },
   ),
@@ -282,7 +282,7 @@ export class AdminPetSpeciesController {
       [speciesId],
     );
     const versionNo = next[0].next;
-    const versionId = randomUUID();
+    const versionId = newId();
     await tx.query(
       `INSERT INTO pet_species_versions
          (id, species_id, version_no, name, description, personality, world_text,
@@ -333,14 +333,14 @@ export class AdminPetSpeciesController {
   async load(db, onlyId = null) {
     const { rows: species } = await db.query(
       `SELECT id, code, status, created_at, updated_at FROM pet_species
-        WHERE ($1::uuid IS NULL OR id = $1) ORDER BY created_at, id`,
+        WHERE ($1::short_id IS NULL OR id = $1) ORDER BY created_at, id`,
       [onlyId],
     );
     const { rows: versions } = await db.query(
       `SELECT v.*, c.code AS unlock_category_code
          FROM pet_species_versions v
          LEFT JOIN goal_categories c ON c.id = v.unlock_category_id
-        WHERE ($1::uuid IS NULL OR v.species_id = $1)
+        WHERE ($1::short_id IS NULL OR v.species_id = $1)
         ORDER BY v.species_id, v.version_no`,
       [onlyId],
     );
@@ -348,7 +348,7 @@ export class AdminPetSpeciesController {
       `SELECT s.*, i.r2_object_key
          FROM pet_stage_versions s
          JOIN pet_stage_images i ON i.id = s.image_id
-        WHERE ($1::uuid IS NULL OR s.species_id = $1)
+        WHERE ($1::short_id IS NULL OR s.species_id = $1)
         ORDER BY s.species_version_id, s.stage_no`,
       [onlyId],
     );

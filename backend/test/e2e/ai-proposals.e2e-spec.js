@@ -1,6 +1,7 @@
 import { createUser as createUserWith } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -33,8 +34,8 @@ describe.skipIf(!databaseUrl)('AI 제안 수락·거절·만료 (PostgreSQL)', (
 
   async function createReference({ rate = true } = {}) {
     const tag = next();
-    const category = randomUUID();
-    const difficulty = randomUUID();
+    const category = newId();
+    const difficulty = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [category, `pc${tag}`, `제안카테고리${tag}`],
@@ -45,7 +46,7 @@ describe.skipIf(!databaseUrl)('AI 제안 수락·거절·만료 (PostgreSQL)', (
     );
     let rateId = null;
     if (rate) {
-      rateId = randomUUID();
+      rateId = newId();
       await db.query(
         `INSERT INTO mission_reward_rate_versions
                 (id, category_id, difficulty_id, version_no, points, user_xp, pet_xp,
@@ -85,7 +86,7 @@ describe.skipIf(!databaseUrl)('AI 제안 수락·거절·만료 (PostgreSQL)', (
     goalId,
     { generationNo, status = 'draft', ageDays = 0 } = {},
   ) {
-    const id = randomUUID();
+    const id = newId();
     const no =
       generationNo ??
       (
@@ -136,10 +137,10 @@ describe.skipIf(!databaseUrl)('AI 제안 수락·거절·만료 (PostgreSQL)', (
     proposalsService = app.get(ProposalsService);
     goalsService = app.get(GoalsService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `ap_${RUN}`, `${adminId}@example.com`],
+      [adminId, `ap_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
   });
 
@@ -313,7 +314,7 @@ describe.skipIf(!databaseUrl)('AI 제안 수락·거절·만료 (PostgreSQL)', (
         404,
       );
       expect(wrongGoal.body.error.code).toBe('PROPOSAL_NOT_FOUND');
-      await accept(user, goal.id, randomUUID(), plan).expect(404);
+      await accept(user, goal.id, newId(), plan).expect(404);
       expect(
         await row('SELECT 1 FROM missions WHERE user_id = $1', [user.id]),
       ).toHaveLength(0);
@@ -437,7 +438,7 @@ describe.skipIf(!databaseUrl)('AI 제안 수락·거절·만료 (PostgreSQL)', (
           'STEP_DUE_OUT_OF_PERIOD',
         ],
         [
-          { missions: [mission(), mission({ categoryId: randomUUID() })] },
+          { missions: [mission(), mission({ categoryId: newId() })] },
           'INACTIVE_REFERENCE',
         ],
       ];
@@ -507,7 +508,7 @@ describe.skipIf(!databaseUrl)('AI 제안 수락·거절·만료 (PostgreSQL)', (
           `INSERT INTO missions (id, user_id, source_type, title, category_id, difficulty_id,
                                  verification_method, scheduled_date)
            VALUES ($1,$2,'user','기존',$3,$4,'sensor',$5)`,
-          [randomUUID(), user.id, ref.category, ref.difficulty, busy],
+          [newId(), user.id, ref.category, ref.difficulty, busy],
         );
       }
       const over = await accept(user, goal.id, proposalId, {
@@ -703,7 +704,7 @@ describe.skipIf(!databaseUrl)('AI 제안 수락·거절·만료 (PostgreSQL)', (
                                difficulty_id, verification_method, scheduled_date, status)
          VALUES ($1,$2,$3,$4,'user','끝난 미션',$5,$6,'sensor',$7,'completed')`,
         [
-          randomUUID(),
+          newId(),
           user.id,
           goal.id,
           step.body.id,
@@ -775,7 +776,7 @@ describe.skipIf(!databaseUrl)('AI 제안 수락·거절·만료 (PostgreSQL)', (
         code: 'PLAN_PROPOSAL_NOT_DRAFT',
         details: { status: 'accepted' },
       });
-      await reject(user, randomUUID()).expect(404);
+      await reject(user, newId()).expect(404);
     });
 
     it('목록은 최신 생성순 커서 페이지네이션과 상태 필터, 원안과 확정안·만료 시각을 포함', async () => {
@@ -895,7 +896,7 @@ describe.skipIf(!databaseUrl)('AI 제안 수락·거절·만료 (PostgreSQL)', (
       await db.query(
         `INSERT INTO account_actions (id, user_id, admin_id, action_type, reason, starts_at, ends_at)
          VALUES ($1,$2,$3,'restriction','사유', now() - interval '1 hour', now() + interval '1 hour')`,
-        [randomUUID(), user.id, adminId],
+        [newId(), user.id, adminId],
       );
       const blocked = await accept(user, goal.id, toAccept, {
         missions: [mission()],
@@ -919,9 +920,9 @@ describe.skipIf(!databaseUrl)('AI 제안 수락·거절·만료 (PostgreSQL)', (
     });
 
     it('인증이 필요', async () => {
-      await http.get(`/api/v1/goals/${randomUUID()}/proposals`).expect(401);
+      await http.get(`/api/v1/goals/${newId()}/proposals`).expect(401);
       await http
-        .post(`/api/v1/goals/${randomUUID()}/proposals/${randomUUID()}/accept`)
+        .post(`/api/v1/goals/${newId()}/proposals/${newId()}/accept`)
         .send({})
         .expect(401);
     });

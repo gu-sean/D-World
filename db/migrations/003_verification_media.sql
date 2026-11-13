@@ -7,9 +7,9 @@ ALTER TABLE missions
     ADD CONSTRAINT missions_id_user_id_uq UNIQUE (id, user_id);
 
 CREATE TABLE mission_records (
-    id uuid PRIMARY KEY,
-    mission_id uuid NOT NULL,
-    user_id uuid NOT NULL,
+    id short_id PRIMARY KEY,
+    mission_id short_id NOT NULL,
+    user_id short_id NOT NULL,
     attempt_no integer NOT NULL CHECK (attempt_no > 0),
     submission_no smallint CHECK (submission_no BETWEEN 1 AND 4),
     status varchar(24) NOT NULL DEFAULT 'recording'
@@ -129,15 +129,15 @@ BEFORE INSERT OR UPDATE ON mission_records
 FOR EACH ROW EXECUTE FUNCTION guard_mission_record_write();
 
 CREATE TABLE verification_criteria_versions (
-    id uuid PRIMARY KEY,
-    category_id uuid NOT NULL
+    id short_id PRIMARY KEY,
+    category_id short_id NOT NULL
         REFERENCES goal_categories(id) ON DELETE RESTRICT,
     verification_method varchar(30) NOT NULL
         CHECK (verification_method IN ('camera', 'sensor')),
     version_no integer NOT NULL CHECK (version_no > 0),
     rules_json jsonb NOT NULL CHECK (jsonb_typeof(rules_json) = 'object'),
     effective_at timestamptz NOT NULL,
-    created_by_admin_id uuid NOT NULL
+    created_by_admin_id short_id NOT NULL
         REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (category_id, verification_method, version_no)
@@ -160,20 +160,20 @@ BEFORE UPDATE OR DELETE ON verification_criteria_versions
 FOR EACH ROW EXECUTE FUNCTION protect_verification_criteria_version();
 
 CREATE TABLE verification_results (
-    id uuid PRIMARY KEY,
-    record_id uuid NOT NULL
+    id short_id PRIMARY KEY,
+    record_id short_id NOT NULL
         REFERENCES mission_records(id) ON DELETE CASCADE,
     result_no integer NOT NULL CHECK (result_no > 0),
     source varchar(20) NOT NULL CHECK (source IN ('ai', 'admin')),
     decision varchar(20) NOT NULL
         CHECK (decision IN ('approved', 'rejected', 'review_required')),
-    criteria_version_id uuid NOT NULL
+    criteria_version_id short_id NOT NULL
         REFERENCES verification_criteria_versions(id) ON DELETE RESTRICT,
     engine_version varchar(80),
     confidence numeric(5,4) CHECK (confidence BETWEEN 0 AND 1),
     metrics jsonb CHECK (metrics IS NULL OR jsonb_typeof(metrics) = 'object'),
     reason text,
-    reviewed_by_admin_id uuid
+    reviewed_by_admin_id short_id
         REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     is_current boolean NOT NULL DEFAULT true,
     decided_at timestamptz NOT NULL DEFAULT now(),
@@ -203,9 +203,9 @@ CREATE INDEX verification_results_record_recent_idx
 CREATE FUNCTION validate_verification_result_criteria() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
-    mission_category_id uuid;
+    mission_category_id short_id;
     mission_method varchar(30);
-    criteria_category_id uuid;
+    criteria_category_id short_id;
     criteria_method varchar(30);
     criteria_effective_at timestamptz;
 BEGIN
@@ -260,17 +260,17 @@ BEFORE UPDATE ON verification_results
 FOR EACH ROW EXECUTE FUNCTION protect_verification_result();
 
 CREATE TABLE verification_appeals (
-    id uuid PRIMARY KEY,
-    record_id uuid NOT NULL,
-    filed_by_user_id uuid NOT NULL,
-    original_result_id uuid NOT NULL,
+    id short_id PRIMARY KEY,
+    record_id short_id NOT NULL,
+    filed_by_user_id short_id NOT NULL,
+    original_result_id short_id NOT NULL,
     reason text NOT NULL CHECK (length(btrim(reason)) > 0),
     status varchar(20) NOT NULL DEFAULT 'open'
         CHECK (status IN ('open', 'accepted', 'rejected')),
     filed_at timestamptz NOT NULL DEFAULT now(),
-    reviewed_by_admin_id uuid
+    reviewed_by_admin_id short_id
         REFERENCES admin_accounts(id) ON DELETE RESTRICT,
-    resolution_result_id uuid,
+    resolution_result_id short_id,
     resolved_at timestamptz,
     UNIQUE (original_result_id),
     FOREIGN KEY (record_id, filed_by_user_id)
@@ -337,9 +337,9 @@ BEFORE INSERT OR UPDATE OF status, resolution_result_id ON verification_appeals
 FOR EACH ROW EXECUTE FUNCTION guard_verification_appeal();
 
 CREATE TABLE media_files (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL,
-    record_id uuid NOT NULL,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL,
+    record_id short_id NOT NULL,
     object_key text NOT NULL UNIQUE CHECK (length(object_key) > 0),
     media_kind varchar(24) NOT NULL
         CHECK (media_kind IN ('camera_photo', 'camera_video', 'sensor_raw')),

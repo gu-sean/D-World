@@ -1,7 +1,8 @@
 import { createTestApp } from '../support/app.js';
 import { testNickname } from '../support/users.js';
 import { adminApi } from '../support/admin-api.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -28,7 +29,7 @@ describe.skipIf(!databaseUrl)('사용자 개설 챌린지와 검수 (PostgreSQL)
     adminApi(http, adminToken).post(path, body);
 
   async function createUser() {
-    const id = randomUUID();
+    const id = newId();
     await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
     await db.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
       id,
@@ -76,10 +77,10 @@ describe.skipIf(!databaseUrl)('사용자 개설 챌린지와 검수 (PostgreSQL)
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `uc_${RUN}`, `${adminId}@example.com`],
+      [adminId, `uc_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await tx((t) =>
       app.get(SessionsService).create(t, 'admin', adminId),
@@ -87,8 +88,8 @@ describe.skipIf(!databaseUrl)('사용자 개설 챌린지와 검수 (PostgreSQL)
     adminToken = await app
       .get(AccessTokenService)
       .issue('admin', adminId, session.sessionId);
-    categoryId = randomUUID();
-    difficultyId = randomUUID();
+    categoryId = newId();
+    difficultyId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [categoryId, `ucc${RUN}`, `개설카테고리${RUN}`],
@@ -157,7 +158,7 @@ describe.skipIf(!databaseUrl)('사용자 개설 챌린지와 검수 (PostgreSQL)
       422,
       'VERIFY_EVIDENCE_KIND_MISMATCH',
     );
-    await bad({ categoryId: randomUUID() }, 404, 'CATALOG_NOT_FOUND');
+    await bad({ categoryId: newId() }, 404, 'CATALOG_NOT_FOUND');
     await bad({ title: ' ' }, 400);
 
     await http.post('/api/v1/challenges').send(definition()).expect(401);
@@ -165,7 +166,7 @@ describe.skipIf(!databaseUrl)('사용자 개설 챌린지와 검수 (PostgreSQL)
     await db.query(
       `INSERT INTO account_actions (id, user_id, admin_id, action_type, reason, starts_at, ends_at)
        VALUES ($1,$2,$3,'restriction','테스트', now() - interval '1 minute', now() + interval '1 day')`,
-      [randomUUID(), restricted.id, adminId],
+      [newId(), restricted.id, adminId],
     );
     expect((await create(restricted).expect(403)).body.error.code).toBe(
       'AUTH_ACCOUNT_RESTRICTED',
@@ -247,7 +248,7 @@ describe.skipIf(!databaseUrl)('사용자 개설 챌린지와 검수 (PostgreSQL)
     await http
       .patch(`/admin/v1/challenges/${challenge.id}`)
       .set(auth(adminToken))
-      .set('Idempotency-Key', randomUUID())
+      .set('Idempotency-Key', newId())
       .send({ title: 'x', reason: '시도' })
       .expect(409);
 
@@ -350,7 +351,7 @@ describe.skipIf(!databaseUrl)('사용자 개설 챌린지와 검수 (PostgreSQL)
       reason: '보완 확인',
     }).expect(200);
 
-    await review(randomUUID(), { decision: 'approve' }).expect(404);
+    await review(newId(), { decision: 'approve' }).expect(404);
     const official = (
       await adminPost('/admin/v1/challenges', {
         title: `공식 ${RUN}`,

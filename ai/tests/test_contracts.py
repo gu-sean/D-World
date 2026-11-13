@@ -1,5 +1,5 @@
 
-from uuid import uuid4
+from tests.conftest import new_id
 
 
 
@@ -14,7 +14,7 @@ HEADERS = {
 
 def make_goal_request():
     return {
-        "ingestKey": f"goal-plan:{uuid4()}:1",
+        "ingestKey": f"goal-plan:{new_id()}:1",
         "today": "2026-11-06",
         "goal": {
             "title": "스쿼트 꾸준히 하기",

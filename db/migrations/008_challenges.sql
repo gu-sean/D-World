@@ -34,14 +34,14 @@ ALTER TABLE experience_awards ADD CONSTRAINT experience_awards_source_type_check
     CHECK(source_type IN ('mission','achievement','streak','challenge'));
 
 CREATE TABLE challenges (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     origin varchar(8) NOT NULL CHECK(origin IN ('admin','user')),
-    created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-    created_by_admin_id uuid REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_user_id short_id REFERENCES users(id) ON DELETE SET NULL,
+    created_by_admin_id short_id REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     title varchar(200) NOT NULL CHECK(length(btrim(title))>0),
     description text NOT NULL CHECK(length(btrim(description))>0),
-    category_id uuid NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
-    difficulty_id uuid NOT NULL REFERENCES difficulty_levels(id) ON DELETE RESTRICT,
+    category_id short_id NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
+    difficulty_id short_id NOT NULL REFERENCES difficulty_levels(id) ON DELETE RESTRICT,
     verification_method varchar(30) NOT NULL CHECK(verification_method IN ('camera','sensor')),
     target_value numeric(10,2) CHECK(target_value>0),
     target_unit varchar(20),
@@ -106,11 +106,11 @@ CREATE TRIGGER challenges_guard BEFORE INSERT OR UPDATE ON challenges
 FOR EACH ROW EXECUTE FUNCTION guard_challenge();
 
 CREATE TABLE challenge_reward_packages (
-    challenge_id uuid PRIMARY KEY REFERENCES challenges(id) ON DELETE CASCADE,
+    challenge_id short_id PRIMARY KEY REFERENCES challenges(id) ON DELETE CASCADE,
     points integer NOT NULL DEFAULT 0 CHECK(points>=0),
     user_xp integer NOT NULL DEFAULT 0 CHECK(user_xp>=0),
     pet_xp integer NOT NULL DEFAULT 0 CHECK(pet_xp>=0),
-    badge_achievement_version_id uuid UNIQUE REFERENCES achievement_versions(id) ON DELETE RESTRICT,
+    badge_achievement_version_id short_id UNIQUE REFERENCES achievement_versions(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE FUNCTION guard_challenge_reward_package() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -136,9 +136,9 @@ END $$;
 CREATE TRIGGER challenge_reward_packages_guard BEFORE INSERT OR UPDATE ON challenge_reward_packages
 FOR EACH ROW EXECUTE FUNCTION guard_challenge_reward_package();
 CREATE TABLE challenge_publication_reviews (
-    id uuid PRIMARY KEY, challenge_id uuid NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
-    requested_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-    reviewed_by_admin_id uuid REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY, challenge_id short_id NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+    requested_by_user_id short_id REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_by_admin_id short_id REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     decision varchar(12) NOT NULL CHECK(decision IN ('submitted','approved','rejected','hidden')),
     reason text, created_at timestamptz NOT NULL DEFAULT now(),
     CHECK((decision='submitted' AND reviewed_by_admin_id IS NULL)
@@ -146,9 +146,9 @@ CREATE TABLE challenge_publication_reviews (
     CHECK(decision NOT IN ('rejected','hidden') OR length(btrim(reason))>0)
 );
 CREATE TABLE challenge_rule_events (
-    id uuid PRIMARY KEY, challenge_id uuid NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
-    admin_id uuid REFERENCES admin_accounts(id) ON DELETE RESTRICT,
-    requested_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    id short_id PRIMARY KEY, challenge_id short_id NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+    admin_id short_id REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    requested_by_user_id short_id REFERENCES users(id) ON DELETE SET NULL,
     event_type varchar(20) NOT NULL CHECK(event_type IN ('published','cancelled','hidden','rescheduled')),
     reason text NOT NULL CHECK(length(btrim(reason))>0),
     occurred_at timestamptz NOT NULL DEFAULT now()
@@ -167,8 +167,8 @@ CREATE TRIGGER users_scrub_challenge_logs BEFORE DELETE ON users
 FOR EACH ROW EXECUTE FUNCTION scrub_user_challenge_logs();
 
 CREATE TABLE challenge_participations (
-    id uuid PRIMARY KEY, challenge_id uuid NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY, challenge_id short_id NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     status varchar(16) NOT NULL DEFAULT 'enrolled'
         CHECK(status IN ('enrolled','withdrawn','disqualified','completed','failed')),
     joined_at timestamptz NOT NULL DEFAULT now(), withdrawn_at timestamptz,
@@ -219,12 +219,12 @@ CREATE TRIGGER challenge_participations_guard BEFORE INSERT OR UPDATE ON challen
 FOR EACH ROW EXECUTE FUNCTION guard_challenge_participation();
 
 CREATE TABLE challenge_daily_missions (
-    id uuid PRIMARY KEY, participation_id uuid NOT NULL,
-    challenge_id uuid NOT NULL, user_id uuid NOT NULL,
-    challenge_date date NOT NULL, mission_id uuid NOT NULL UNIQUE,
+    id short_id PRIMARY KEY, participation_id short_id NOT NULL,
+    challenge_id short_id NOT NULL, user_id short_id NOT NULL,
+    challenge_date date NOT NULL, mission_id short_id NOT NULL UNIQUE,
     status varchar(12) NOT NULL DEFAULT 'pending'
         CHECK(status IN ('pending','success','failed','excluded','cancelled')),
-    qualifying_record_id uuid, qualifying_result_id uuid,
+    qualifying_record_id short_id, qualifying_result_id short_id,
     judged_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE(participation_id,challenge_date), UNIQUE(id,participation_id),
@@ -280,11 +280,11 @@ END $$;
 CREATE TRIGGER challenge_daily_missions_guard BEFORE INSERT OR UPDATE ON challenge_daily_missions
 FOR EACH ROW EXECUTE FUNCTION guard_challenge_daily_mission();
 CREATE TABLE challenge_moderation_actions (
-    id uuid PRIMARY KEY, participation_id uuid NOT NULL REFERENCES challenge_participations(id) ON DELETE CASCADE,
-    daily_mission_id uuid, admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY, participation_id short_id NOT NULL REFERENCES challenge_participations(id) ON DELETE CASCADE,
+    daily_mission_id short_id, admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     action varchar(16) NOT NULL CHECK(action IN ('disqualify','restore','exclude_day','restore_day')),
     reason text NOT NULL CHECK(length(btrim(reason))>0),
-    evidence_result_id uuid REFERENCES verification_results(id) ON DELETE SET NULL,
+    evidence_result_id short_id REFERENCES verification_results(id) ON DELETE SET NULL,
     occurred_at timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY(daily_mission_id,participation_id)
         REFERENCES challenge_daily_missions(id,participation_id) ON DELETE CASCADE,
@@ -292,7 +292,7 @@ CREATE TABLE challenge_moderation_actions (
 );
 
 CREATE TABLE challenge_score_snapshots (
-    challenge_id uuid NOT NULL, participation_id uuid NOT NULL,
+    challenge_id short_id NOT NULL, participation_id short_id NOT NULL,
     successful_days integer NOT NULL CHECK(successful_days>=0),
     score integer GENERATED ALWAYS AS (successful_days*100) STORED,
     last_qualifying_submitted_at timestamptz,
@@ -329,11 +329,11 @@ SELECT cp.challenge_id, cp.id AS participation_id, cp.user_id,
  GROUP BY cp.challenge_id,cp.id,cp.user_id,pf.nickname,
           last_success.submitted_at;
 CREATE TABLE challenge_settlement_runs (
-    id uuid PRIMARY KEY, challenge_id uuid NOT NULL REFERENCES challenges(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY, challenge_id short_id NOT NULL REFERENCES challenges(id) ON DELETE RESTRICT,
     run_no integer NOT NULL CHECK(run_no>0),
     status varchar(12) NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','confirmed','superseded')),
     based_on_at timestamptz NOT NULL DEFAULT now(),
-    confirmed_by_admin_id uuid REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    confirmed_by_admin_id short_id REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     confirmed_at timestamptz, reason text,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE(challenge_id,run_no), UNIQUE(id,challenge_id),
@@ -345,7 +345,7 @@ CREATE TABLE challenge_settlement_runs (
 CREATE UNIQUE INDEX challenge_one_current_settlement_uq ON challenge_settlement_runs(challenge_id)
  WHERE status='confirmed';
 CREATE TABLE challenge_settlement_entries (
-    run_id uuid NOT NULL, challenge_id uuid NOT NULL, participation_id uuid NOT NULL,
+    run_id short_id NOT NULL, challenge_id short_id NOT NULL, participation_id short_id NOT NULL,
     successful_days integer NOT NULL CHECK(successful_days>=0),
     score integer GENERATED ALWAYS AS (successful_days*100) STORED,
     last_qualifying_submitted_at timestamptz,
@@ -457,8 +457,8 @@ END $$;
 CREATE TRIGGER challenge_settlement_runs_guard BEFORE INSERT OR UPDATE ON challenge_settlement_runs
 FOR EACH ROW EXECUTE FUNCTION guard_challenge_settlement_run();
 CREATE TABLE challenge_final_rankings (
-    id uuid PRIMARY KEY, run_id uuid NOT NULL REFERENCES challenge_settlement_runs(id) ON DELETE RESTRICT,
-    participation_id uuid REFERENCES challenge_participations(id) ON DELETE SET NULL,
+    id short_id PRIMARY KEY, run_id short_id NOT NULL REFERENCES challenge_settlement_runs(id) ON DELETE RESTRICT,
+    participation_id short_id REFERENCES challenge_participations(id) ON DELETE SET NULL,
     rank_no integer NOT NULL CHECK(rank_no>0), score integer NOT NULL CHECK(score>=0),
     display_name varchar(32) NOT NULL CHECK(length(btrim(display_name))>0),
     anonymized_at timestamptz,
@@ -504,14 +504,14 @@ CREATE TRIGGER challenge_participation_anonymize BEFORE DELETE ON challenge_part
 FOR EACH ROW EXECUTE FUNCTION anonymize_challenge_ranking();
 
 CREATE TABLE challenge_reward_grants (
-    id uuid PRIMARY KEY, participation_id uuid NOT NULL UNIQUE,
-    challenge_id uuid NOT NULL, user_id uuid NOT NULL,
-    first_settlement_run_id uuid NOT NULL,
+    id short_id PRIMARY KEY, participation_id short_id NOT NULL UNIQUE,
+    challenge_id short_id NOT NULL, user_id short_id NOT NULL,
+    first_settlement_run_id short_id NOT NULL,
     promised_points integer NOT NULL CHECK(promised_points>=0),
     paid_points integer NOT NULL CHECK(paid_points>=0),
     user_xp integer NOT NULL CHECK(user_xp>=0),
     pet_xp integer NOT NULL CHECK(pet_xp>=0),
-    recipient_pet_id uuid, badge_grant_id uuid,
+    recipient_pet_id short_id, badge_grant_id short_id,
     status varchar(12) NOT NULL CHECK(status IN ('active','revoked')),
     granted_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE(id,user_id),
@@ -525,7 +525,7 @@ CREATE TABLE challenge_reward_grants (
 );
 CREATE FUNCTION guard_challenge_reward_grant() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE pkg challenge_reward_packages%ROWTYPE; run_status text;
-        entry_paid integer; badge_version uuid;
+        entry_paid integer; badge_version short_id;
 BEGIN
     SELECT * INTO pkg FROM challenge_reward_packages WHERE challenge_id=NEW.challenge_id;
     SELECT status INTO run_status FROM challenge_settlement_runs WHERE id=NEW.first_settlement_run_id;
@@ -564,9 +564,9 @@ FOR EACH ROW EXECUTE FUNCTION guard_challenge_reward_grant();
 -- (스트릭 005, 업적 006, 챌린지가 모두 만들어진 이 자리에서 한 번에)
 ALTER TABLE point_recovery_claims ALTER COLUMN mission_id DROP NOT NULL;
 ALTER TABLE point_recovery_claims
-    ADD COLUMN challenge_reward_grant_id uuid,
-    ADD COLUMN streak_milestone_award_id uuid,
-    ADD COLUMN user_achievement_id uuid,
+    ADD COLUMN challenge_reward_grant_id short_id,
+    ADD COLUMN streak_milestone_award_id short_id,
+    ADD COLUMN user_achievement_id short_id,
     ADD CONSTRAINT point_recovery_challenge_grant_owner_fk
         FOREIGN KEY(challenge_reward_grant_id,user_id)
         REFERENCES challenge_reward_grants(id,user_id) ON DELETE CASCADE,
@@ -625,7 +625,7 @@ CREATE FUNCTION guard_point_recovery_claim_source() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
     expected_source_type varchar(32);
-    expected_source_id uuid;
+    expected_source_id short_id;
 BEGIN
     IF NEW.streak_milestone_award_id IS NOT NULL THEN
         expected_source_type := 'streak';
@@ -685,14 +685,14 @@ DECLARE
     definition_status varchar(16);
     version_condition varchar(40);
     version_target integer;
-    version_category uuid;
+    version_category short_id;
     version_points integer;
-    version_image_id uuid;
+    version_image_id short_id;
     version_effective_at timestamptz;
-    current_version_id uuid;
+    current_version_id short_id;
     source_goal_status varchar(20);
     source_mission_status varchar(20);
-    source_mission_category uuid;
+    source_mission_category short_id;
     source_streak_target integer;
     source_streak_status varchar(12);
     qualifying_count integer;
@@ -849,9 +849,9 @@ $$;
 -- (007의 가드를 챌린지 분기와 함께 교체, UPDATE 분기만 007과 다름)
 CREATE OR REPLACE FUNCTION guard_experience_award() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE expected_user_xp integer; expected_pet_xp integer;
-        source_status text; source_user uuid; snapshot_pet uuid;
+        source_status text; source_user short_id; snapshot_pet short_id;
         snapshot_stage smallint; snapshot_bonus integer;
-        snapshot_species_version uuid;
+        snapshot_species_version short_id;
 BEGIN
     IF TG_OP='UPDATE' THEN
         IF ROW(OLD.user_id,OLD.source_type,OLD.source_id,OLD.base_user_xp,OLD.base_pet_xp,OLD.bonus_pet_xp)

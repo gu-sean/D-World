@@ -4,7 +4,7 @@ import {
   number,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { VERIFICATION_METHODS } from '../missions/missions.constants.js';
@@ -69,8 +69,8 @@ export class DefinitionsController {
   list(request, query) {
     const filters = validateBody(query, {
       scope: oneOf(['public', 'mine'], { optional: true }),
-      categoryId: uuid({ optional: true }),
-      difficultyId: uuid({ optional: true }),
+      categoryId: shortId({ optional: true }),
+      difficultyId: shortId({ optional: true }),
       exerciseCode: oneOf(EXERCISE_CODES, { optional: true }),
       sort: oneOf(['recent', 'duration'], { optional: true }),
       status: oneOf(PUBLICATION_STATUSES, { optional: true }),
@@ -122,8 +122,8 @@ export class DefinitionsController {
       validateBody(body, {
         title: title(),
         description: description(),
-        categoryId: uuid(),
-        difficultyId: uuid(),
+        categoryId: shortId(),
+        difficultyId: shortId(),
         verificationMethod: oneOf(VERIFICATION_METHODS),
         targetValue: targetValue(),
         targetUnit: targetUnit(),
@@ -141,8 +141,8 @@ export class DefinitionsController {
       validateBody(body, {
         title: title({ optional: true }),
         description: description(),
-        categoryId: uuid({ optional: true }),
-        difficultyId: uuid({ optional: true }),
+        categoryId: shortId({ optional: true }),
+        difficultyId: shortId({ optional: true }),
         verificationMethod: oneOf(VERIFICATION_METHODS, { optional: true }),
         targetValue: targetValue(),
         targetUnit: targetUnit(),

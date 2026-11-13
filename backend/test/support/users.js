@@ -1,4 +1,5 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
 import { SessionsService } from '../../src/common/auth/sessions.service.js';
 
@@ -17,7 +18,7 @@ export function testNickname(prefix = 'u') {
 
 /** 프로필이 있는 사용자와 access token을 만든다 → { id, token } */
 export async function createUser(app, db) {
-  const id = randomUUID();
+  const id = newId();
   await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
   await db.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
     id,

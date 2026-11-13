@@ -71,7 +71,7 @@ export function captureVideo() {
 }
 
 /**
- * 학습·생활습관 미션 사진 촬영.
+ * 사진 촬영 (사진 인증용).
  * @returns {Promise<{path: string, sizeBytes: number|null, mimeType: 'image/jpeg'}>}
  * @throws {AppError} `PERMISSION_DENIED` · `CAPTURE_CANCELLED`
  */

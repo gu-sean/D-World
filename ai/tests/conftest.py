@@ -1,4 +1,6 @@
-﻿import os
+import os
+import secrets
+import string
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,6 +13,14 @@ os.environ.update({
     "SENSOR_ENGINE": "fixed",
     "INTERNAL_API_TOKEN": "dev-internal-token",
 })
+
+_ID_ALPHABET = string.ascii_letters + string.digits
+
+
+def new_id() -> str:
+    """테스트용 8자 영숫자 ID (백엔드 short_id와 같은 규칙)"""
+    return "".join(secrets.choice(_ID_ALPHABET) for _ in range(8))
+
 
 from app.core.settings import get_settings
 

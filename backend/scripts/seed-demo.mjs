@@ -5,7 +5,7 @@
 //   (npm run db:seed:demo 는 build까지 함께 실행)
 // 재실행 안전: 시연 사용자가 이미 있으면 아무것도 하지 않음
 // 로그인: 휴대폰 01000000002 / DEMO_USER_PASSWORD
-import { randomUUID } from 'node:crypto';
+import { newId } from '../src/common/ids.js';
 import argon2 from 'argon2';
 import request from 'supertest';
 
@@ -25,11 +25,11 @@ if (!password || !process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const ADMIN_ID = 'd0000000-0000-4000-8000-000000000001'; // 001 시드의 dev_admin
-const USER_ID = 'd0000000-0000-4000-8000-000000000801';
+const ADMIN_ID = 'd4000001'; // 001 시드의 dev_admin
+const USER_ID = 'd4000801';
 const PHONE = '+821000000002';
-const CHALLENGE_ID = 'd0000000-0000-4000-8000-000000000701'; // 002 시드의 공개 챌린지
-const SPECIES_ID = 'd0000000-0000-4000-8000-000000000101'; // 002 시드의 꾸준냥이
+const CHALLENGE_ID = 'd4000701'; // 002 시드의 공개 챌린지
+const SPECIES_ID = 'd4000101'; // 002 시드의 꾸준냥이
 
 const { NestFactory } = await import('@nestjs/core');
 const { AppModule } = await import('../dist/app.module.js');
@@ -61,7 +61,7 @@ let adminToken;
 
 const call = (method, path, token, body, { expect: status } = {}) => {
   const req = http[method](path).set('Authorization', `Bearer ${token}`);
-  if (method !== 'get') req.set('Idempotency-Key', randomUUID());
+  if (method !== 'get') req.set('Idempotency-Key', newId());
   return (body === undefined ? req : req.send(body)).then((res) => {
     if (status !== undefined && res.status !== status) {
       throw new Error(
@@ -143,11 +143,11 @@ try {
     await tx.query(
       `INSERT INTO user_identities (id, user_id, provider, provider_subject, email)
        VALUES ($1, $2, 'google', 'demo-google-subject', 'demo@example.test')`,
-      [randomUUID(), USER_ID],
+      [newId(), USER_ID],
     );
     await tx.query(
       `INSERT INTO consent_records (id, user_id, document_version_id, granted)
-       SELECT gen_random_uuid(), $1, p.id, true
+       SELECT new_short_id(), $1, p.id, true
          FROM policy_document_versions p WHERE p.version = 'dev-1'`,
       [USER_ID],
     );
@@ -306,7 +306,7 @@ try {
     '/api/v1/goals',
     {
       title: '첫 걸음',
-      categoryCode: 'lifestyle',
+      categoryCode: 'exercise',
       difficultyCode: 'easy',
       startDate: today,
       endDate: addDays(today, 7),
@@ -329,7 +329,7 @@ try {
   await asUser(
     'post',
     '/api/v1/shop/orders',
-    { itemId: 'd0000000-0000-4000-8000-000000000401', quantity: 1 },
+    { itemId: 'd4000401', quantity: 1 },
     201,
   );
   log('포인트 500P 지급 → 펫 간식 1개 구매(인벤토리 반영)');
@@ -394,7 +394,7 @@ try {
   log('서울 격자(60,127) 시간별 날씨 1건 + 상황 추천 1건');
 
   // ---------- 12. 주간 AI 리포트 ----------
-  const runId = randomUUID();
+  const runId = newId();
   const monday = addDays(
     today,
     -(((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7) + 7),

@@ -1,6 +1,7 @@
 import { createUser as createUserWith } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import request from 'supertest';
@@ -44,7 +45,7 @@ describe.skipIf(!databaseUrl)('정기 작업 (PostgreSQL + 메모리 저장소)'
     user,
     { status = 'scheduled', date = kstDate(), dueAt, method = 'sensor' } = {},
   ) {
-    const id = randomUUID();
+    const id = newId();
     await bypass(
       `INSERT INTO missions
               (id, user_id, source_type, title, category_id, difficulty_id, verification_method,
@@ -113,13 +114,13 @@ describe.skipIf(!databaseUrl)('정기 작업 (PostgreSQL + 메모리 저장소)'
     storage = app.get(OBJECT_STORAGE);
     jobs = app.get(JobsService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `jb_${RUN}`, `${adminId}@example.com`],
+      [adminId, `jb_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
-    categoryId = randomUUID();
-    difficultyId = randomUUID();
+    categoryId = newId();
+    difficultyId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [categoryId, `jbc${RUN}`, `작업카테고리${RUN}`],
@@ -134,7 +135,7 @@ describe.skipIf(!databaseUrl)('정기 작업 (PostgreSQL + 메모리 저장소)'
                 (id, category_id, verification_method, version_no, rules_json, effective_at,
                  created_by_admin_id)
          VALUES ($1,$2,$3,1,'{"minSteps":1}'::jsonb, now() - interval '30 days', $4)`,
-        [randomUUID(), categoryId, method, adminId],
+        [newId(), categoryId, method, adminId],
       );
     }
   });
@@ -184,12 +185,12 @@ describe.skipIf(!databaseUrl)('정기 작업 (PostgreSQL + 메모리 저장소)'
 
     it('멱등 키 정리: 보관 기간이 지난 앱·관리자 키만 삭제', async () => {
       const user = await createUser();
-      const tag = randomUUID();
+      const tag = newId();
       const insert = (table, ownerColumn, ownerId, key, age) =>
         db.query(
           `INSERT INTO ${table} (id, ${ownerColumn}, idempotency_key, operation, request_hash, created_at)
            VALUES ($1, $2, $3, 'test.op', 'hash', now() - $4::interval)`,
-          [randomUUID(), ownerId, key, age],
+          [newId(), ownerId, key, age],
         );
       await insert(
         'user_idempotency_keys',
@@ -526,7 +527,7 @@ describe.skipIf(!databaseUrl)('정기 작업 (PostgreSQL + 메모리 저장소)'
         .post('/internal/v1/ai-callbacks/verification-results')
         .set('x-internal-token', SECRET)
         .send({
-          ingestKey: randomUUID(),
+          ingestKey: newId(),
           recordId: record.id,
           decision: 'review_required',
           engineVersion: 'model-v1',

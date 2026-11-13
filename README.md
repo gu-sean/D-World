@@ -1,5 +1,5 @@
 ### 시험 계정으로 실행하기
-develop을 받고 `cd backend && npm install && npm run demo`
+develop을 받고 `backend/.env.supabase`(팀에서 따로 받음)를 둔 뒤 `cd backend && npm install && npm run demo:supabase`
 
 시험 계정
 - id: 01099999999

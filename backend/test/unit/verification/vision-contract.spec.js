@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../../../src/common/ids.js';
 import { parseCallback } from '../../../src/verification/ai/ai-ingest.controller.js';
 import {
   pickMedia,
@@ -11,9 +11,9 @@ const SHA = 'AB'.repeat(32);
 
 function internalRequest(overrides = {}) {
   return {
-    recordId: randomUUID(),
-    missionId: randomUUID(),
-    userId: randomUUID(),
+    recordId: newId(),
+    missionId: newId(),
+    userId: newId(),
     verificationMethod: 'camera',
     submissionNo: 2,
     categoryCode: 'exercise',
@@ -22,10 +22,10 @@ function internalRequest(overrides = {}) {
     targetUnit: 'reps',
     recordStartedAt: new Date('2026-11-09T01:00:00Z'),
     submittedAt: '2026-11-09T01:05:00.000Z',
-    criteria: { versionId: randomUUID(), versionNo: 3, rules: { minReps: 5 } },
+    criteria: { versionId: newId(), versionNo: 3, rules: { minReps: 5 } },
     files: [
       {
-        id: randomUUID(),
+        id: newId(),
         mediaKind: 'camera_video',
         mimeType: 'video/mp4',
         sizeBytes: 1024,
@@ -79,7 +79,7 @@ describe('toVisionAnalysisRequest', () => {
     const video = internalRequest().files[0];
     const photo = {
       ...video,
-      id: randomUUID(),
+      id: newId(),
       mediaKind: 'camera_photo',
       mimeType: 'image/jpeg',
     };
@@ -89,7 +89,7 @@ describe('toVisionAnalysisRequest', () => {
 
     const wire = toVisionAnalysisRequest(
       internalRequest({
-        files: [photo, video, { ...photo, id: randomUUID() }],
+        files: [photo, video, { ...photo, id: newId() }],
       }),
       CALLBACK,
     );
@@ -112,7 +112,11 @@ describe('toVisionAnalysisRequest', () => {
 
   it('사진은 AI_PHOTO_ENABLED가 꺼져 있으면 보낼 수 없는 회차(관리자 검수), 영상은 영향 없음', () => {
     const video = internalRequest().files[0];
-    const photo = { ...video, mediaKind: 'camera_photo', mimeType: 'image/jpeg' };
+    const photo = {
+      ...video,
+      mediaKind: 'camera_photo',
+      mimeType: 'image/jpeg',
+    };
     expect(() =>
       toVisionAnalysisRequest(internalRequest({ files: [photo] }), CALLBACK, {
         photoEnabled: false,
@@ -163,7 +167,7 @@ describe('toVisionAnalysisRequest', () => {
 describe('parseCallback', () => {
   const base = {
     ingestKey: 'vision:abc:1',
-    recordId: randomUUID(),
+    recordId: newId(),
     engineVersion: 'vision-rule@0.1.0',
   };
 

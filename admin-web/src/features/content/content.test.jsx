@@ -169,10 +169,7 @@ describe('NoticePage', () => {
       await user.type(screen.getByRole('textbox', { name: '제목' }), '당첨 안내');
       await user.type(screen.getByRole('textbox', { name: '내용' }), '축하해요');
       await user.click(screen.getByRole('radio', { name: '지정 회원' }));
-      await user.type(
-        screen.getByRole('textbox', { name: '회원 ID' }),
-        'a0000000-0000-4000-8000-000000000001, a0000000-0000-4000-8000-000000000002',
-      );
+      await user.type(screen.getByRole('textbox', { name: '회원 ID' }), 'a4000001, a4000002');
       await user.click(screen.getByRole('button', { name: '저장' }));
       await typeReasonAndConfirm(user, '당첨 공지');
 
@@ -180,7 +177,7 @@ describe('NoticePage', () => {
       expect(seen[0].body).toMatchObject({
         category: 'event',
         audienceType: 'users',
-        userIds: ['a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000002'],
+        userIds: ['a4000001', 'a4000002'],
       });
       expect(within(rowOf('당첨 안내')).getByText('지정 회원 2명')).toBeInTheDocument();
     },

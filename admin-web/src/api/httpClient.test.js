@@ -7,7 +7,7 @@ const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 
 const makeSession = (accessToken) => ({
   admin: {
-    id: '3f2c6a2e-0000-4000-8000-000000000001',
+    id: 'N5jkYLM6',
     loginId: 'dev_admin',
     email: 'd***@example.com',
   },

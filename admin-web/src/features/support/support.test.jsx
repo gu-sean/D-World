@@ -319,10 +319,7 @@ describe('AbuseTicketDetailPage', () => {
     renderAbuse(SEED_IDS.userReport);
 
     expect(await screen.findByText('챌린지 댓글에서 욕설을 반복해서 썼어요.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '회원05' })).toHaveAttribute(
-      'href',
-      '/users/a0000000-0000-4000-8000-000000000005',
-    );
+    expect(screen.getByRole('link', { name: '회원05' })).toHaveAttribute('href', '/users/a4000005');
     expect(screen.getByText('2건')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '목록으로' })).toHaveAttribute(
       'href',

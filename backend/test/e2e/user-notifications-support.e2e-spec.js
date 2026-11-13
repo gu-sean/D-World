@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { createTestApp } from '../support/app.js';
 import { createUser } from '../support/users.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -25,14 +26,14 @@ describe.skipIf(!databaseUrl)('앱 알림·공지·문의 (PostgreSQL)', () => {
     http
       .post(`/admin/v1${path}`)
       .set(admin())
-      .set('Idempotency-Key', randomUUID())
+      .set('Idempotency-Key', newId())
       .send({ reason: '테스트', ...body });
 
   /** 관리자 API로 공지를 만들어 즉시 게시 */
   async function publishNotice(userIds, extra = {}) {
     const created = await adminPost('/notices', {
       category: 'service',
-      title: `공지${RUN}-${randomUUID().slice(0, 6)}`,
+      title: `공지${RUN}-${newId().slice(0, 6)}`,
       body: '내용',
       audienceType: 'users',
       userIds,
@@ -50,10 +51,10 @@ describe.skipIf(!databaseUrl)('앱 알림·공지·문의 (PostgreSQL)', () => {
     ({ app, http, db } = await createTestApp());
     a = await createUser(app, db);
     b = await createUser(app, db);
-    const adminId = randomUUID();
+    const adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `un_${RUN}`, `${adminId}@example.com`],
+      [adminId, `un_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await db.withTransaction((tx) =>
       app.get(SessionsService).create(tx, 'admin', adminId),
@@ -102,7 +103,7 @@ describe.skipIf(!databaseUrl)('앱 알림·공지·문의 (PostgreSQL)', () => {
 
       // 남의 알림·없는 알림은 404
       await post(b, `/me/notifications/${item.id}/read`).expect(404);
-      await post(a, `/me/notifications/${randomUUID()}/read`).expect(404);
+      await post(a, `/me/notifications/${newId()}/read`).expect(404);
     });
 
     it('unreadOnly·커서·전체 읽음', async () => {
@@ -184,7 +185,7 @@ describe.skipIf(!databaseUrl)('앱 알림·공지·문의 (PostgreSQL)', () => {
 
   describe('푸시 기기', () => {
     it('등록·갱신·다른 회원으로 이전·해제', async () => {
-      const token = `device-${randomUUID()}`;
+      const token = `device-${newId()}`;
       const first = await http
         .put('/api/v1/me/push-devices')
         .set(user(a))
@@ -257,7 +258,7 @@ describe.skipIf(!databaseUrl)('앱 알림·공지·문의 (PostgreSQL)', () => {
     });
 
     it('같은 Idempotency-Key로 다시 보내면 접수가 한 번만 생김', async () => {
-      const key = randomUUID();
+      const key = newId();
       const send = () =>
         http
           .post('/api/v1/me/support-tickets')
@@ -281,7 +282,7 @@ describe.skipIf(!databaseUrl)('앱 알림·공지·문의 (PostgreSQL)', () => {
           `INSERT INTO support_tickets
              (id, ticket_type, category, reporter_user_id, subject, body)
            VALUES ($1, 'inquiry', 'other', $2, '제목', '내용')`,
-          [randomUUID(), c.id],
+          [newId(), c.id],
         );
       }
       const res = await post(c, '/me/support-tickets', inquiry()).expect(429);
@@ -326,7 +327,7 @@ describe.skipIf(!databaseUrl)('앱 알림·공지·문의 (PostgreSQL)', () => {
       await post(
         a,
         '/me/support-tickets',
-        report({ kind: 'user', id: randomUUID() }),
+        report({ kind: 'user', id: newId() }),
       ).expect(404);
       const ok = await post(
         a,

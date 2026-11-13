@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../../../src/common/ids.js';
 import {
   sensorResponseToDecisionInput,
   toSensorEvaluationRequest,
@@ -9,8 +9,8 @@ const SHA = 'AB'.repeat(32);
 
 function runRequest(overrides = {}) {
   return {
-    recordId: randomUUID(),
-    missionId: randomUUID(),
+    recordId: newId(),
+    missionId: newId(),
     verificationMethod: 'sensor',
     submissionNo: 1,
     exerciseCode: 'running',
@@ -24,10 +24,10 @@ function runRequest(overrides = {}) {
       appVersion: '1.2.0',
       extra: 1,
     },
-    criteria: { versionId: randomUUID(), rules: { minDurationSeconds: 300 } },
+    criteria: { versionId: newId(), rules: { minDurationSeconds: 300 } },
     files: [
       {
-        id: randomUUID(),
+        id: newId(),
         mediaKind: 'sensor_raw',
         mimeType: 'application/gzip',
         sizeBytes: 2048,
@@ -96,7 +96,7 @@ describe('I02 센서 판정 요청', () => {
   });
 
   it('AI 응답을 콜백 입력으로 바꾸고, 계약과 다르면 거부', () => {
-    const recordId = randomUUID();
+    const recordId = newId();
     const response = {
       ingestKey: `sensor:${recordId}:1`,
       decision: 'review_required',

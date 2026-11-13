@@ -3,13 +3,10 @@ import { delay, http as mswHttp, HttpResponse } from 'msw';
 // MSW handlers for the mission screens (M40~M50, M74~M75). Used with VITE_USE_MSW=true, no backend needed. State lives in memory.
 const BASE = import.meta.env.VITE_ADMIN_API_BASE_URL ?? '/admin/v1';
 
-const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const id = (n) => `04${String(n).padStart(6, '0')}`;
 const NOW = '2026-11-04T01:00:00.000Z';
 
-const categories = [
-  { id: id(1), code: 'exercise', name: '운동', displayOrder: 1, isActive: true },
-  { id: id(2), code: 'study', name: '학습', displayOrder: 2, isActive: true },
-];
+const categories = [{ id: id(1), code: 'exercise', name: '운동', displayOrder: 1, isActive: true }];
 const difficulties = [
   { id: id(11), code: 'easy', name: '쉬움', displayOrder: 1, isActive: true },
   { id: id(12), code: 'hard', name: '어려움', displayOrder: 2, isActive: true },

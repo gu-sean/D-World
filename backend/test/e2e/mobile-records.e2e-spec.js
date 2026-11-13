@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { kstDate } from '../../src/common/time/kst.js';
 import { createTestApp } from '../support/app.js';
 import { createUser as createUserWith } from '../support/users.js';
@@ -40,13 +41,13 @@ describe.skipIf(!databaseUrl)(
 
     beforeAll(async () => {
       ({ app, http, db } = await createTestApp());
-      const adminId = randomUUID();
+      const adminId = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-        [adminId, `mr_${RUN}`, `${adminId}@example.com`],
+        [adminId, `mr_${RUN}`, `${adminId.toLowerCase()}@example.com`],
       );
-      const category = randomUUID();
-      const difficulty = randomUUID();
+      const category = newId();
+      const difficulty = newId();
       await db.query(
         `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
         [category, `mrc${RUN}`, `모바일인증${RUN}`],
@@ -60,7 +61,7 @@ describe.skipIf(!databaseUrl)(
               (id, category_id, difficulty_id, version_no, points, user_xp, pet_xp,
                effective_at, created_by_admin_id)
        VALUES ($1,$2,$3,1,100,10,5, now() - interval '1 day', $4)`,
-        [randomUUID(), category, difficulty, adminId],
+        [newId(), category, difficulty, adminId],
       );
       ref = { categoryCode: `mrc${RUN}`, difficultyCode: `mrd${RUN}` };
     });
@@ -174,12 +175,12 @@ describe.skipIf(!databaseUrl)(
     it('A46 없는 판정 ID는 404, 사유가 짧으면 400', async () => {
       const user = await createUserWith(app, db);
       await http
-        .post(`/api/v1/verification-results/${randomUUID()}/appeals`)
+        .post(`/api/v1/verification-results/${newId()}/appeals`)
         .set(auth(user))
         .send({ reason: '자세가 정확했다고 생각해요.' })
         .expect(404);
       await http
-        .post(`/api/v1/verification-results/${randomUUID()}/appeals`)
+        .post(`/api/v1/verification-results/${newId()}/appeals`)
         .set(auth(user))
         .send({ reason: '짧음' })
         .expect(400);

@@ -1,6 +1,7 @@
 import { configureApp } from '../../src/app.setup.js';
 import { testNickname } from '../support/users.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { Test } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import argon2 from 'argon2';
@@ -14,9 +15,9 @@ import { DatabaseService } from '../../src/database/database.service.js';
 const databaseUrl = process.env.DATABASE_URL;
 
 const POLICIES = {
-  terms: '00000000-0000-4000-8000-0000000000a1',
-  privacy: '00000000-0000-4000-8000-0000000000a2',
-  marketing: '00000000-0000-4000-8000-0000000000a3',
+  terms: '040000a1',
+  privacy: '040000a2',
+  marketing: '040000a3',
 };
 const PASSWORD = 'correct-horse-battery';
 
@@ -375,7 +376,7 @@ describe.skipIf(!databaseUrl)('인증 흐름 (PostgreSQL)', () => {
 
   describe('소셜', () => {
     it('미가입은 404, 가입 후 로그인, 같은 소셜 재가입은 409', async () => {
-      const token = randomUUID();
+      const token = newId();
       const notRegistered = await http
         .post('/api/v1/auth/login/social')
         .send({ provider: 'google', token })
@@ -411,7 +412,7 @@ describe.skipIf(!databaseUrl)('인증 흐름 (PostgreSQL)', () => {
 
     it('로그인 상태에서 소셜·휴대폰 연결, 이미 연결된 수단은 409', async () => {
       const user = await signup();
-      const token = randomUUID();
+      const token = newId();
       await http
         .post('/api/v1/me/identities/naver')
         .set(auth(user.accessToken))
@@ -427,7 +428,7 @@ describe.skipIf(!databaseUrl)('인증 흐름 (PostgreSQL)', () => {
       await http
         .post('/api/v1/me/identities/naver')
         .set(auth(user.accessToken))
-        .send({ token: randomUUID() })
+        .send({ token: newId() })
         .expect(409);
       const other = await signup();
       await http
@@ -437,7 +438,7 @@ describe.skipIf(!databaseUrl)('인증 흐름 (PostgreSQL)', () => {
         .expect(409);
 
       // 소셜 가입자가 휴대폰 연결
-      const socialToken = randomUUID();
+      const socialToken = newId();
       const social = await http
         .post('/api/v1/auth/signup/social')
         .send({
@@ -532,7 +533,7 @@ describe.skipIf(!databaseUrl)('인증 흐름 (PostgreSQL)', () => {
 
     it('재동의 필수 약관이 게시되면 대상이 되고 동의하면 해제', async () => {
       const user = await signup();
-      const id = randomUUID();
+      const id = newId();
       await db.query(
         `INSERT INTO policy_document_versions
                 (id, document_type, version, body, effective_at, requires_reconsent, published_at)
@@ -571,7 +572,7 @@ describe.skipIf(!databaseUrl)('인증 흐름 (PostgreSQL)', () => {
     let adminId;
 
     beforeAll(async () => {
-      adminId = randomUUID();
+      adminId = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash)
          VALUES ($1, $2, $3, $4)`,
@@ -656,7 +657,7 @@ describe.skipIf(!databaseUrl)('인증 흐름 (PostgreSQL)', () => {
 
     it('5회 연속 실패 시 잠금과 감사 기록', async () => {
       const login = `lock_${randomInt(100_000, 999_999)}`;
-      const id = randomUUID();
+      const id = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash)
          VALUES ($1, $2, $3, $4)`,
@@ -685,7 +686,7 @@ describe.skipIf(!databaseUrl)('인증 흐름 (PostgreSQL)', () => {
         `INSERT INTO admin_accounts (id, login_id, email, password_hash, status)
          VALUES ($1, $2, $3, $4, 'disabled')`,
         [
-          randomUUID(),
+          newId(),
           login,
           `${login}@example.com`,
           await argon2.hash(adminPassword),
@@ -705,11 +706,15 @@ describe.skipIf(!databaseUrl)('인증 흐름 (PostgreSQL)', () => {
         (await import('../../src/accounts/restriction.service.js'))
           .RestrictionService,
       );
-      const adminId = randomUUID();
+      const adminId = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash)
          VALUES ($1, $2, $3, 'x')`,
-        [adminId, `r_${randomInt(100_000, 999_999)}`, `${adminId}@example.com`],
+        [
+          adminId,
+          `r_${randomInt(100_000, 999_999)}`,
+          `${adminId.toLowerCase()}@example.com`,
+        ],
       );
       const insert = (type, startsAgo, endsIn, lifted = false) =>
         db.query(
@@ -719,7 +724,7 @@ describe.skipIf(!databaseUrl)('인증 흐름 (PostgreSQL)', () => {
                    CASE WHEN $8::text = 'restriction' THEN now() + make_interval(hours => $6) END,
                    CASE WHEN $7 THEN now() END)`,
           [
-            randomUUID(),
+            newId(),
             user.userId,
             adminId,
             type,

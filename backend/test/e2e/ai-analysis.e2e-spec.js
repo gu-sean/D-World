@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { addDays, kstDate } from '../../src/common/time/kst.js';
 import { AiReportsService } from '../../src/ai-analysis/ai-reports.service.js';
 import { PlanAdjustmentRunsService } from '../../src/ai-analysis/plan-adjustment-runs.service.js';
@@ -63,13 +64,13 @@ describe.skipIf(!databaseUrl)(
       await new Promise((resolve) => ai.listen(0, '127.0.0.1', resolve));
       aiPort = ai.address().port;
 
-      const adminId = randomUUID();
+      const adminId = newId();
       await db.query(
         `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-        [adminId, `an_${RUN}`, `${adminId}@example.com`],
+        [adminId, `an_${RUN}`, `${adminId.toLowerCase()}@example.com`],
       );
-      const category = randomUUID();
-      const difficulty = randomUUID();
+      const category = newId();
+      const difficulty = newId();
       await db.query(
         `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
         [category, `anc${RUN}`, `분석카테고리${RUN}`],
@@ -83,7 +84,7 @@ describe.skipIf(!databaseUrl)(
               (id, category_id, difficulty_id, version_no, points, user_xp, pet_xp,
                effective_at, created_by_admin_id)
        VALUES ($1,$2,$3,1,100,10,5, now() - interval '1 day', $4)`,
-        [randomUUID(), category, difficulty, adminId],
+        [newId(), category, difficulty, adminId],
       );
       ref = { categoryCode: `anc${RUN}`, difficultyCode: `and${RUN}` };
     });
@@ -286,7 +287,7 @@ describe.skipIf(!databaseUrl)(
       it('콜백 검증: 인증, 형식, 실행과 맞지 않는 ingestKey, 없는 실행', async () => {
         const base = {
           ingestKey: 'report:abcdef12',
-          runId: randomUUID(),
+          runId: newId(),
           status: 'completed',
           engineVersion: 'v',
           title: 't',
@@ -562,7 +563,7 @@ describe.skipIf(!databaseUrl)(
         // 키의 실행 id와 본문의 runId가 다름
         await callback('plan-adjustments', {
           ...base,
-          runId: randomUUID(),
+          runId: newId(),
           status: 'failed',
         }).expect(400);
         await http

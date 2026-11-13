@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../../common/ids.js';
 import { Dependencies, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -134,7 +134,7 @@ export class AiClient {
         headers: {
           'content-type': 'application/json',
           'x-internal-token': this.config.get('INTERNAL_API_TOKEN'),
-          'x-request-id': requestId ?? randomUUID(),
+          'x-request-id': requestId ?? newId(),
         },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(

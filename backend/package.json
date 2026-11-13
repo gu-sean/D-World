@@ -24,10 +24,7 @@
     "db:reset": "node --env-file-if-exists=.env scripts/migrate.mjs reset",
     "db:seed": "node --env-file-if-exists=.env scripts/seed.mjs",
     "db:seed:demo": "nest build && node --env-file-if-exists=.env scripts/seed-demo.mjs",
-    "demo": "node scripts/demo.mjs",
-    "demo:reset": "node scripts/demo.mjs --force",
-    "demo:dump": "node scripts/demo.mjs --dump",
-    "demo:refresh": "node scripts/demo-refresh.mjs",
+    "demo:supabase": "node scripts/supabase.mjs",
     "demo:fill": "node --env-file=.env scripts/seed-demo-fill.mjs",
     "push:check": "node --env-file-if-exists=.env scripts/push-check.mjs",
     "weather:check": "node --env-file-if-exists=.env scripts/weather-check.mjs",
@@ -72,6 +69,8 @@
     "node": ">=22.9"
   },
   "overrides": {
-    "multer": "2.5.0"
+    "multer": "2.5.0",
+    "minimatch": "^11.0.8",
+    "glob": "^14.0.6"
   }
 }

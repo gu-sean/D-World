@@ -6,7 +6,7 @@ import {
   normalizeKoreanPhone,
   object,
   phone,
-  uuid,
+  shortId,
   validateBody,
 } from '../../../src/common/validation.js';
 
@@ -63,9 +63,11 @@ describe('validateBody', () => {
     expect(rule('열세글자열세글자열세글자열').error).toBeDefined();
   });
 
-  it('배열·중첩 객체·UUID 검증', () => {
-    const rule = array(object({ id: uuid(), granted: boolean() }), { max: 2 });
-    const id = '3f1c2d4e-1111-4222-8333-444455556666';
+  it('배열·중첩 객체·ID 검증', () => {
+    const rule = array(object({ id: shortId(), granted: boolean() }), {
+      max: 2,
+    });
+    const id = 'QgGYprtI';
     expect(rule([{ id, granted: true }]).value).toEqual([
       { id, granted: true },
     ]);
@@ -73,11 +75,16 @@ describe('validateBody', () => {
     expect(rule([{}, {}, {}]).error).toBeDefined();
   });
 
-  it('UUID는 대문자로 와도 소문자로 통일하고, 선택 값은 비어 있어도 됨', () => {
-    const upper = '3F1C2D4E-1111-4222-8333-444455556666';
-    expect(uuid()(upper).value).toBe(upper.toLowerCase());
-    expect(uuid()('not-a-uuid').error).toBeDefined();
-    expect(uuid()(undefined).error).toBeDefined();
-    expect(uuid({ optional: true })(undefined)).toEqual({ value: undefined });
+  it('ID는 8자 영숫자이고 대소문자를 그대로 유지하며, 선택 값은 비어 있어도 됨', () => {
+    expect(shortId()('QgGYprtI').value).toBe('QgGYprtI');
+    expect(shortId()('qggyprti').value).toBe('qggyprti');
+    expect(shortId()('QgGYprt').error).toBeDefined();
+    expect(shortId()('QgGYprtI9').error).toBeDefined();
+    expect(shortId()('QgGY-prt').error).toBeDefined();
+    expect(shortId()('not-a-uuid').error).toBeDefined();
+    expect(shortId()(undefined).error).toBeDefined();
+    expect(shortId({ optional: true })(undefined)).toEqual({
+      value: undefined,
+    });
   });
 });

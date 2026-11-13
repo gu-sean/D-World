@@ -130,7 +130,7 @@ describe('UserListPage', () => {
 
     await user.click(await screen.findByText('회원07'));
 
-    expect(screen.getByTestId('location')).toHaveTextContent(/^\/users\/a0000000-/);
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/users\/a4\w{6}$/);
   });
 
   test('shows the forbidden state for a 403', async () => {
@@ -163,7 +163,7 @@ describe('UserDetailPage', () => {
 
   test('shows a message for a user that does not exist', async () => {
     useMockData();
-    renderDetail('a0000000-0000-4000-8000-00000000ffff');
+    renderDetail('a400ffff');
 
     expect(await screen.findByText('찾을 수 없어요.')).toBeInTheDocument();
   });

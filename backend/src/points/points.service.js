@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -325,7 +325,7 @@ export class PointsService {
     }
 
     if (shortfall > 0) {
-      const claimId = randomUUID();
+      const claimId = newId();
       // 컬럼 이름은 고정 목록에서만 선택
       await tx.query(
         `INSERT INTO point_recovery_claims
@@ -479,7 +479,7 @@ export class PointsService {
     }
 
     const wallet = await lockWallet(tx, userId);
-    const adjustmentId = randomUUID();
+    const adjustmentId = newId();
     const key = `admin_adjustment:${adjustmentId}`;
     const common = {
       sourceType: 'admin_adjustment',
@@ -700,7 +700,7 @@ export class PointsService {
               occurred_at::text AS occurred_at_raw
          FROM point_transactions
         WHERE user_id = $1
-          AND ($2::timestamptz IS NULL OR (occurred_at, id) < ($2::timestamptz, $3::uuid))
+          AND ($2::timestamptz IS NULL OR (occurred_at, id) < ($2::timestamptz, $3::short_id))
         ORDER BY occurred_at DESC, id DESC
         LIMIT $4`,
       [userId, after?.t ?? null, after?.id ?? null, limit + 1],

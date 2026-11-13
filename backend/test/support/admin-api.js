@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 
 // 관리자 챌린지 API 테스트 클라이언트 (팀 문서 09 M51~M61)
 // 챌린지 테스트가 쓰는 동작 단위 경로(/challenges/:id/publish 등)를 실제 경로·본문으로 바꿔 보냄
@@ -10,7 +10,7 @@ const ID = '([^/]+)';
 export function adminApi(http, token) {
   const headers = { Authorization: `Bearer ${token}` };
 
-  const request = (method, path, body, key = randomUUID()) => {
+  const request = (method, path, body, key = newId()) => {
     const req = http[method](path).set(headers);
     if (key !== null) req.set('Idempotency-Key', key);
     return req.send(body ?? {});

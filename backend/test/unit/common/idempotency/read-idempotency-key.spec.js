@@ -18,9 +18,7 @@ const responseOf = (value) => {
 describe('readIdempotencyKey', () => {
   it('공백 없는 출력 가능 ASCII 8~128자는 그대로 통과 (UUID일 필요 없음)', () => {
     expect(readIdempotencyKey(requestWith('k-12345678'))).toBe('k-12345678');
-    expect(
-      readIdempotencyKey(requestWith('3f2504e0-4f89-41d3-9a0c-0305e82c3301')),
-    ).toBe('3f2504e0-4f89-41d3-9a0c-0305e82c3301');
+    expect(readIdempotencyKey(requestWith('MslObBtL'))).toBe('MslObBtL');
     expect(readIdempotencyKey(requestWith('a'.repeat(128)))).toHaveLength(128);
   });
 

@@ -52,7 +52,7 @@ describe('challenge screens', () => {
   it('shows the ranking and blocks disqualifying without a reason', async () => {
     const user = userEvent.setup();
     renderAt(
-      '/challenges/c0000000-0000-4000-8000-000000000001/rankings',
+      '/challenges/c4000001/rankings',
       '/challenges/:challengeId/rankings',
       <ChallengeRankingReviewPage />,
     );
@@ -67,7 +67,7 @@ describe('challenge screens', () => {
   it('creates a settlement draft and shows its entries', async () => {
     const user = userEvent.setup();
     renderAt(
-      '/challenges/c0000000-0000-4000-8000-000000000001/settlement',
+      '/challenges/c4000001/settlement',
       '/challenges/:challengeId/settlement',
       <ChallengeSettlementPage />,
     );
@@ -90,7 +90,7 @@ describe('challenge screens', () => {
     );
     const user = userEvent.setup();
     renderAt(
-      '/challenges/c0000000-0000-4000-8000-000000000001/settlement',
+      '/challenges/c4000001/settlement',
       '/challenges/:challengeId/settlement',
       <ChallengeSettlementPage />,
     );

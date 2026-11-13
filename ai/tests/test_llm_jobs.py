@@ -1,6 +1,6 @@
 """I05 리포트·I06 계획 재조정: 접수 → 생성 → 콜백 (Gemini는 가짜로 대체)."""
 
-from uuid import uuid4
+from tests.conftest import new_id
 
 import pytest
 from app.api.v1 import llm_jobs
@@ -28,7 +28,7 @@ def setup(monkeypatch):
 
 
 def report_body():
-    run = str(uuid4())
+    run = new_id()
     return {
         "ingestKey": f"report:{run}",
         "runId": run,
@@ -63,8 +63,8 @@ GOOD_REPORT = {
 
 
 def adjust_body():
-    run = str(uuid4())
-    goal_id = str(uuid4())
+    run = new_id()
+    goal_id = new_id()
     mission = {
         "scheduledDate": "2026-11-12",
         "title": "스쿼트 10개",

@@ -1,6 +1,7 @@
 import { createUser as createUserWith } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -32,8 +33,8 @@ describe.skipIf(!databaseUrl)('미션 (PostgreSQL)', () => {
   /** 카테고리·난이도 한 쌍, rate를 주면 보상표 버전 1도 함께 만듦 */
   async function createReference({ rate, isActive = true } = {}) {
     const tag = next();
-    const category = randomUUID();
-    const difficulty = randomUUID();
+    const category = newId();
+    const difficulty = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order, is_active) VALUES ($1,$2,$3,1,$4)`,
       [category, `mc${tag}`, `미션카테고리${tag}`, isActive],
@@ -63,7 +64,7 @@ describe.skipIf(!databaseUrl)('미션 (PostgreSQL)', () => {
       effectiveAt = "now() - interval '1 day'",
     },
   ) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO mission_reward_rate_versions
               (id, category_id, difficulty_id, version_no, points, user_xp, pet_xp,
@@ -139,7 +140,7 @@ describe.skipIf(!databaseUrl)('미션 (PostgreSQL)', () => {
       date = day(1),
     } = {},
   ) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO missions
               (id, user_id, goal_id, goal_step_id, source_type, title, category_id,
@@ -176,7 +177,7 @@ describe.skipIf(!databaseUrl)('미션 (PostgreSQL)', () => {
       deleted = false,
     } = {},
   ) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO mission_definitions
               (id, origin, created_by_user_id, title, description, category_id, difficulty_id,
@@ -207,10 +208,10 @@ describe.skipIf(!databaseUrl)('미션 (PostgreSQL)', () => {
     ({ app, http, db } = await createTestApp());
     goalsService = app.get(GoalsService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `ms_${RUN}`, `${adminId}@example.com`],
+      [adminId, `ms_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
   });
 
@@ -365,7 +366,7 @@ describe.skipIf(!databaseUrl)('미션 (PostgreSQL)', () => {
         { estimatedDurationSeconds: 0 },
         { scheduledDates: [day(1), day(2)], dueAt: new Date().toISOString() },
         { dueAt: '2026-11-05 10:00' },
-        { stepId: randomUUID() }, // goalId 없이
+        { stepId: newId() }, // goalId 없이
         { categoryId: undefined }, // 목표 없이 생략
       ];
       for (const overrides of bad) {
@@ -442,7 +443,7 @@ describe.skipIf(!databaseUrl)('미션 (PostgreSQL)', () => {
       });
       const res = await post(user, body(inactive), 422);
       expect(res.body.error.code).toBe('INACTIVE_REFERENCE');
-      await post(user, body(inactive, { categoryId: randomUUID() }), 422);
+      await post(user, body(inactive, { categoryId: newId() }), 422);
     });
 
     it('인증이 필요', async () => {
@@ -626,7 +627,7 @@ describe.skipIf(!databaseUrl)('미션 (PostgreSQL)', () => {
         ownerId: user.id,
         deleted: true,
       });
-      for (const definitionId of [hidden, deleted, randomUUID()]) {
+      for (const definitionId of [hidden, deleted, newId()]) {
         await post(user, { definitionId, scheduledDates: [day(1)] }, 404);
       }
     });
@@ -1081,7 +1082,7 @@ describe.skipIf(!databaseUrl)('미션 (PostgreSQL)', () => {
         .expect(409);
       expect(blocked.body.error.code).toBe('MISSION_LOCKED_AFTER_START');
       await http
-        .post(`/api/v1/missions/${randomUUID()}/cancel`)
+        .post(`/api/v1/missions/${newId()}/cancel`)
         .set(auth(user.token))
         .expect(404);
     });
@@ -1198,7 +1199,7 @@ describe.skipIf(!databaseUrl)('미션 (PostgreSQL)', () => {
         `INSERT INTO account_actions
                 (id, user_id, admin_id, action_type, reason, starts_at, ends_at)
          VALUES ($1,$2,$3,'restriction','사유', now() - interval '1 hour', now() + interval '1 hour')`,
-        [randomUUID(), user.id, adminId],
+        [newId(), user.id, adminId],
       );
 
       const create = await post(user, body(ref), 403);

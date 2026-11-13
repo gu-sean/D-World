@@ -7,13 +7,13 @@ ALTER TABLE mission_definitions
     ADD COLUMN base_points integer NOT NULL DEFAULT 0 CHECK (base_points >= 0);
 
 CREATE TABLE mission_reward_rate_versions (
-    id uuid PRIMARY KEY,
-    category_id uuid NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
-    difficulty_id uuid NOT NULL REFERENCES difficulty_levels(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY,
+    category_id short_id NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
+    difficulty_id short_id NOT NULL REFERENCES difficulty_levels(id) ON DELETE RESTRICT,
     version_no integer NOT NULL CHECK (version_no > 0),
     points integer NOT NULL CHECK (points >= 0),
     effective_at timestamptz NOT NULL,
-    created_by_admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (category_id, difficulty_id, version_no),
     UNIQUE (id, category_id, difficulty_id)
@@ -37,7 +37,7 @@ FOR EACH ROW EXECUTE FUNCTION protect_mission_reward_rate();
 
 ALTER TABLE missions
     ADD COLUMN reward_points integer NOT NULL DEFAULT 0 CHECK (reward_points >= 0),
-    ADD COLUMN reward_rate_version_id uuid,
+    ADD COLUMN reward_rate_version_id short_id,
     ADD CONSTRAINT missions_reward_rate_matches_category_difficulty
         FOREIGN KEY (reward_rate_version_id, category_id, difficulty_id)
         REFERENCES mission_reward_rate_versions(id, category_id, difficulty_id)
@@ -103,14 +103,14 @@ BEFORE UPDATE ON missions
 FOR EACH ROW EXECUTE FUNCTION lock_mission_reward();
 
 CREATE TABLE point_monthly_cap_policies (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     effective_month date NOT NULL UNIQUE,
     monthly_limit_points integer NOT NULL CHECK (monthly_limit_points >= 0),
-    created_by_admin_id uuid REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_admin_id short_id REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(),
     CHECK (EXTRACT(DAY FROM effective_month) = 1),
     CHECK (created_by_admin_id IS NOT NULL OR
-        id = '00000000-0000-0000-0000-000000000004'::uuid)
+        id = '00000004'::short_id)
 );
 
 CREATE FUNCTION guard_point_cap_policy() RETURNS trigger
@@ -137,12 +137,12 @@ FOR EACH ROW EXECUTE FUNCTION protect_mission_reward_rate();
 INSERT INTO point_monthly_cap_policies
     (id, effective_month, monthly_limit_points)
 VALUES
-    ('00000000-0000-0000-0000-000000000004',
+    ('00000004',
      date_trunc('month', now() AT TIME ZONE 'Asia/Seoul')::date,
      100000);
 
 CREATE TABLE point_wallets (
-    user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    user_id short_id PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     available_points bigint NOT NULL DEFAULT 0 CHECK (available_points >= 0),
     outstanding_recovery_points bigint NOT NULL DEFAULT 0
         CHECK (outstanding_recovery_points >= 0),
@@ -150,7 +150,7 @@ CREATE TABLE point_wallets (
 );
 
 CREATE TABLE point_monthly_usage (
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     month_start_date date NOT NULL,
     gross_auto_awarded_points bigint NOT NULL DEFAULT 0
         CHECK (gross_auto_awarded_points >= 0),
@@ -163,9 +163,9 @@ CREATE TABLE point_monthly_usage (
 );
 
 CREATE TABLE mission_point_awards (
-    mission_id uuid PRIMARY KEY,
-    user_id uuid NOT NULL,
-    first_approved_result_id uuid NOT NULL REFERENCES verification_results(id)
+    mission_id short_id PRIMARY KEY,
+    user_id short_id NOT NULL,
+    first_approved_result_id short_id NOT NULL REFERENCES verification_results(id)
         ON DELETE CASCADE,
     original_points integer NOT NULL CHECK (original_points >= 0),
     paid_points integer NOT NULL CHECK (paid_points >= 0),
@@ -185,7 +185,7 @@ CREATE FUNCTION guard_mission_point_award() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
     expected_points integer;
-    result_mission_id uuid;
+    result_mission_id short_id;
     result_decision varchar(20);
     result_is_current boolean;
 BEGIN
@@ -231,10 +231,10 @@ BEFORE UPDATE ON mission_point_awards
 FOR EACH ROW EXECUTE FUNCTION lock_mission_point_award_identity();
 
 CREATE TABLE point_recovery_claims (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    mission_id uuid NOT NULL,
-    original_award_transaction_id uuid NOT NULL,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    mission_id short_id NOT NULL,
+    original_award_transaction_id short_id NOT NULL,
     target_points bigint NOT NULL CHECK (target_points > 0),
     outstanding_points bigint NOT NULL CHECK (outstanding_points >= 0),
     settled_points bigint NOT NULL DEFAULT 0 CHECK (settled_points >= 0),
@@ -252,8 +252,8 @@ CREATE INDEX point_recovery_claims_pending_idx
     WHERE outstanding_points > 0 AND NOT is_cancelled;
 
 CREATE TABLE point_transactions (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     kind varchar(32) NOT NULL CHECK (kind IN
         ('auto_award', 'award_offset', 'spend', 'refund', 'refund_offset',
          'recovery', 'recovery_claim', 'recovery_settlement',
@@ -266,13 +266,13 @@ CREATE TABLE point_transactions (
     source_type varchar(32) NOT NULL CHECK (source_type IN
         ('mission', 'streak', 'achievement', 'challenge',
          'shop_order', 'admin_adjustment')),
-    source_id uuid NOT NULL,
-    original_transaction_id uuid,
-    recovery_claim_id uuid,
+    source_id short_id NOT NULL,
+    original_transaction_id short_id,
+    recovery_claim_id short_id,
     cap_month date,
     cap_delta bigint NOT NULL DEFAULT 0,
     idempotency_key text NOT NULL UNIQUE CHECK (length(btrim(idempotency_key)) > 0),
-    created_by_admin_id uuid REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_admin_id short_id REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     reason text,
     occurred_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (id, user_id),
@@ -305,7 +305,7 @@ LANGUAGE plpgsql AS $$
 DECLARE
     wallet_available bigint;
     wallet_outstanding bigint;
-    claim_user_id uuid;
+    claim_user_id short_id;
 BEGIN
     -- 지갑 행 잠금으로 사용자별 거래를 직렬화, 스냅샷은 잠근 뒤 값과 일치해야 함
     SELECT available_points, outstanding_recovery_points

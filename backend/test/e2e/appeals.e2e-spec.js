@@ -1,6 +1,7 @@
 import { createUser as createUserWith } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -28,7 +29,7 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
   const createUser = () => createUserWith(app, db);
 
   async function createMission(user) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO missions
               (id, user_id, source_type, title, category_id, difficulty_id, verification_method,
@@ -57,7 +58,7 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
       .post('/internal/v1/ai-callbacks/verification-results')
       .set('x-internal-token', SECRET)
       .send({
-        ingestKey: randomUUID(),
+        ingestKey: newId(),
         recordId,
         decision,
         engineVersion: 'model-v1',
@@ -81,12 +82,7 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
       .post(`/api/v1/records/${recordId}/appeals`)
       .set(auth(user.token))
       .send({ reason });
-  const resolve = (
-    appealId,
-    outcome,
-    reason = '검토 결과',
-    key = randomUUID(),
-  ) => {
+  const resolve = (appealId, outcome, reason = '검토 결과', key = newId()) => {
     const req = http
       .post(`/admin/v1/appeals/${appealId}/resolution`)
       .set(auth(adminToken));
@@ -134,10 +130,10 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `ap_${RUN}`, `${adminId}@example.com`],
+      [adminId, `ap_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const adminSession = await tx((t) =>
       app.get(SessionsService).create(t, 'admin', adminId),
@@ -146,9 +142,9 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
       .get(AccessTokenService)
       .issue('admin', adminId, adminSession.sessionId);
 
-    categoryId = randomUUID();
-    difficultyId = randomUUID();
-    rateId = randomUUID();
+    categoryId = newId();
+    difficultyId = newId();
+    rateId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [categoryId, `apc${RUN}`, `이의카테고리${RUN}`],
@@ -169,7 +165,7 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
               (id, category_id, verification_method, version_no, rules_json, effective_at,
                created_by_admin_id)
        VALUES ($1,$2,'sensor',1,'{}'::jsonb, now() - interval '30 days', $3)`,
-      [randomUUID(), categoryId, adminId],
+      [newId(), categoryId, adminId],
     );
     for (const [table, thresholds] of [
       [
@@ -189,7 +185,7 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
         ],
       ],
     ]) {
-      const policyId = randomUUID();
+      const policyId = newId();
       await db.query(
         `INSERT INTO ${table} (id, version_no, effective_at, created_by_admin_id)
          VALUES ($1,$2, now() - interval '30 days', $3)`,
@@ -249,7 +245,7 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
         .set(auth(other.token))
         .expect(404);
       await file(user, 'not-a-uuid').expect(400);
-      await file(user, randomUUID()).expect(404);
+      await file(user, newId()).expect(404);
       await http
         .post(`/api/v1/records/${recordId}/appeals`)
         .send({ reason: 'x' })
@@ -287,7 +283,7 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
       await http
         .post(`/admin/v1/verifications/${held}/decisions`)
         .set(auth(adminToken))
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .send({ decision: 'rejected', reason: '미충족' })
         .expect(200);
       const adminRejected = await file(user, held).expect(422);
@@ -331,7 +327,7 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
       await db.query(
         `INSERT INTO account_actions (id, user_id, admin_id, action_type, reason, starts_at, ends_at)
          VALUES ($1,$2,$3,'restriction','테스트 제한', now() - interval '1 minute', now() + interval '1 day')`,
-        [randomUUID(), restricted.id, adminId],
+        [newId(), restricted.id, adminId],
       );
       await http
         .post(`/api/v1/missions/${await createMission(restricted)}/records`)
@@ -369,7 +365,7 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
       expect(await missionStatus(missionId)).toBe('failed');
       const appeal = (await file(user, last).expect(201)).body;
 
-      const key = randomUUID();
+      const key = newId();
       const res = await resolve(
         appeal.id,
         'accepted',
@@ -510,17 +506,17 @@ describe.skipIf(!databaseUrl)('이의 제기 (PostgreSQL)', () => {
         await http
           .post(`/admin/v1/appeals/${appeal.id}/resolution`)
           .set(auth(adminToken))
-          .set('Idempotency-Key', randomUUID())
+          .set('Idempotency-Key', newId())
           .send(payload)
           .expect(400);
       }
       await resolve(appeal.id, 'accepted', '사유', null).expect(400);
-      await resolve(randomUUID(), 'accepted').expect(404);
+      await resolve(newId(), 'accepted').expect(404);
       await resolve('bad-id', 'accepted').expect(400);
       await http
         .post(`/admin/v1/appeals/${appeal.id}/resolution`)
         .set(auth(user.token))
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .send({ decision: 'approved', reason: '사유' })
         .expect(401);
 

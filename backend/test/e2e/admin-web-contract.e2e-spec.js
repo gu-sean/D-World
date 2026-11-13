@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import argon2 from 'argon2';
 import { createTestApp } from '../support/app.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -25,10 +26,10 @@ describe.skipIf(!databaseUrl)('관리자 웹 응답 계약 (PostgreSQL)', () => 
 
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
-    const adminId = randomUUID();
+    const adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `wc_${RUN}`, `${adminId}@example.com`],
+      [adminId, `wc_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await db.withTransaction((tx) =>
       app.get(SessionsService).create(tx, 'admin', adminId),
@@ -37,7 +38,7 @@ describe.skipIf(!databaseUrl)('관리자 웹 응답 계약 (PostgreSQL)', () => 
       .get(AccessTokenService)
       .issue('admin', adminId, session.sessionId);
 
-    userId = randomUUID();
+    userId = newId();
     await db.query('INSERT INTO users (id) VALUES ($1)', [userId]);
     await db.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
       userId,
@@ -48,7 +49,7 @@ describe.skipIf(!databaseUrl)('관리자 웹 응답 계약 (PostgreSQL)', () => 
        VALUES ($1, $2, 'x', now(), now())`,
       [userId, `+8210${String(RUN).padStart(8, '0')}`],
     );
-    ticketId = randomUUID();
+    ticketId = newId();
     await db.query(
       `INSERT INTO support_tickets (id, ticket_type, category, reporter_user_id, subject, body)
        VALUES ($1, 'inquiry', 'account', $2, '제목', '내용')`,
@@ -66,9 +67,9 @@ describe.skipIf(!databaseUrl)('관리자 웹 응답 계약 (PostgreSQL)', () => 
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,$4)`,
       [
-        randomUUID(),
+        newId(),
         loginId,
-        `${loginId}@example.com`,
+        `${loginId.toLowerCase()}@example.com`,
         await argon2.hash(password, { type: argon2.argon2id }),
       ],
     );
@@ -80,7 +81,7 @@ describe.skipIf(!databaseUrl)('관리자 웹 응답 계약 (PostgreSQL)', () => 
       admin: {
         id: expect.any(String),
         loginId,
-        email: `${loginId}@example.com`,
+        email: `${loginId.toLowerCase()}@example.com`,
       },
       accessToken: expect.any(String),
       expiresAt: expect.any(String),
@@ -142,7 +143,7 @@ describe.skipIf(!databaseUrl)('관리자 웹 응답 계약 (PostgreSQL)', () => 
   it('M15 탈퇴 요청: 처리 범위 건수', async () => {
     await db.query(
       'INSERT INTO account_withdrawal_requests (id, user_id) VALUES ($1, $2)',
-      [randomUUID(), userId],
+      [newId(), userId],
     );
     const res = await get('/withdrawal-requests?size=100').expect(200);
     const mine = res.body.items.find((item) => item.userId === userId);

@@ -1,5 +1,6 @@
 import { createTestApp } from '../support/app.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
@@ -26,12 +27,12 @@ describe.skipIf(!databaseUrl)('관리자 핵심 정책 API (PostgreSQL)', () => 
       ? { ...body, reason: '테스트 사유' }
       : body;
   const auth = (token) => ({ Authorization: `Bearer ${token}` });
-  const post = (path, body, key = randomUUID()) => {
+  const post = (path, body, key = newId()) => {
     const req = http.post(path).set(auth(adminToken));
     if (key !== null) req.set('Idempotency-Key', key);
     return req.send(withReason(body));
   };
-  const patch = (path, body, key = randomUUID()) =>
+  const patch = (path, body, key = newId()) =>
     http
       .patch(path)
       .set(auth(adminToken))
@@ -60,10 +61,10 @@ describe.skipIf(!databaseUrl)('관리자 핵심 정책 API (PostgreSQL)', () => 
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `pl_${RUN}`, `${adminId}@example.com`],
+      [adminId, `pl_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const adminSession = await tx((t) =>
       app.get(SessionsService).create(t, 'admin', adminId),
@@ -72,7 +73,7 @@ describe.skipIf(!databaseUrl)('관리자 핵심 정책 API (PostgreSQL)', () => 
       .get(AccessTokenService)
       .issue('admin', adminId, adminSession.sessionId);
 
-    const userId = randomUUID();
+    const userId = newId();
     await db.query('INSERT INTO users (id) VALUES ($1)', [userId]);
     const session = await tx((t) =>
       app.get(SessionsService).create(t, 'user', userId),
@@ -95,7 +96,7 @@ describe.skipIf(!databaseUrl)('관리자 핵심 정책 API (PostgreSQL)', () => 
       await http
         .post('/admin/v1/goal-categories')
         .set(auth(userToken))
-        .set('Idempotency-Key', randomUUID())
+        .set('Idempotency-Key', newId())
         .send({ code: 'x', name: 'x', displayOrder: 0 })
         .expect(401);
       const missing = await post(
@@ -107,7 +108,7 @@ describe.skipIf(!databaseUrl)('관리자 핵심 정책 API (PostgreSQL)', () => 
     });
 
     it('같은 키로 다시 보내면 저장된 응답을 재생하고 내용이 다르면 409', async () => {
-      const key = randomUUID();
+      const key = newId();
       const body = {
         code: `replay${RUN}`,
         name: `재생${RUN}`,
@@ -183,7 +184,7 @@ describe.skipIf(!databaseUrl)('관리자 핵심 정책 API (PostgreSQL)', () => 
       expect(updated.body.name).not.toBe(created.name);
 
       await patch(`/admin/v1/difficulty-levels/${created.id}`, {}).expect(400);
-      await patch(`/admin/v1/difficulty-levels/${randomUUID()}`, {
+      await patch(`/admin/v1/difficulty-levels/${newId()}`, {
         displayOrder: 1,
       }).expect(404);
       await patch('/admin/v1/difficulty-levels/not-a-uuid', {
@@ -248,7 +249,7 @@ describe.skipIf(!databaseUrl)('관리자 핵심 정책 API (PostgreSQL)', () => 
         (
           await post('/admin/v1/mission-reward-rates', {
             ...body,
-            categoryId: randomUUID(),
+            categoryId: newId(),
           }).expect(404)
         ).body.error.code,
       ).toBe('CATALOG_NOT_FOUND');
@@ -349,7 +350,7 @@ describe.skipIf(!databaseUrl)('관리자 핵심 정책 API (PostgreSQL)', () => 
         }).expect(400);
       }
       await post('/admin/v1/verification-criteria', {
-        categoryId: randomUUID(),
+        categoryId: newId(),
         verificationMethod: 'camera',
         rules: {},
       }).expect(404);

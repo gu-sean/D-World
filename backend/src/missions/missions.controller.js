@@ -28,7 +28,7 @@ import {
   oneOf,
   string,
   timestamp,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { addDays } from '../common/time/kst.js';
@@ -70,8 +70,8 @@ const duration = (options) => integer({ min: 1, max: 86_400, ...options });
 
 const CREATE_COMMON = {
   scheduledDates: array(dateString(), { min: 1, max: MAX_DATES_PER_REQUEST }),
-  goalId: uuid({ optional: true }),
-  stepId: uuid({ optional: true }),
+  goalId: shortId({ optional: true }),
+  stepId: shortId({ optional: true }),
   isRequired: boolean({ optional: true }),
   memo: text(1000),
 };
@@ -111,12 +111,12 @@ export class MissionsController {
     }
     const input =
       body && typeof body === 'object' && body.definitionId !== undefined
-        ? validateBody(body, { definitionId: uuid(), ...CREATE_COMMON })
+        ? validateBody(body, { definitionId: shortId(), ...CREATE_COMMON })
         : validateBody(body, {
             title: title(),
             description: text(2000),
-            categoryId: uuid({ optional: true }),
-            difficultyId: uuid({ optional: true }),
+            categoryId: shortId({ optional: true }),
+            difficultyId: shortId({ optional: true }),
             exerciseCode: oneOf(EXERCISE_CODES, { optional: true }),
             // 모바일 미션 만들기 폼(08 A31 MissionInput)은 인증 방식을 보내지 않음 → 생략하면 서버가 정함
             verificationMethod: oneOf(VERIFICATION_METHODS, { optional: true }),
@@ -144,9 +144,9 @@ export class MissionsController {
       date: dateString({ optional: true }),
       from: dateString({ optional: true }),
       to: dateString({ optional: true }),
-      goalId: uuid({ optional: true }),
-      stepId: uuid({ optional: true }),
-      categoryId: uuid({ optional: true }),
+      goalId: shortId({ optional: true }),
+      stepId: shortId({ optional: true }),
+      categoryId: shortId({ optional: true }),
       status: string({ min: 1, max: 100, optional: true }),
       cursor: string({ min: 1, max: 500, optional: true }),
     });
@@ -195,7 +195,7 @@ export class MissionsController {
   get(request, id) {
     return this.missions.getDetail(
       request.auth.userId,
-      validateBody({ id }, { id: uuid() }).id,
+      validateBody({ id }, { id: shortId() }).id,
     );
   }
 
@@ -223,13 +223,13 @@ export class MissionsController {
       scheduledDate: dateString({ optional: true }),
       dueAt: timestamp({ optional: true }),
       isRequired: boolean({ optional: true }),
-      stepId: uuid({ optional: true }),
+      stepId: shortId({ optional: true }),
       memo: text(1000),
     });
     if (clearStep) patch.stepId = null;
     const view = await this.missions.updateMission(
       request.auth.userId,
-      validateBody({ id }, { id: uuid() }).id,
+      validateBody({ id }, { id: shortId() }).id,
       patch,
     );
     return this.missions.toDetail(view);
@@ -242,7 +242,7 @@ export class MissionsController {
   async cancel(request, id) {
     const view = await this.missions.cancelMission(
       request.auth.userId,
-      validateBody({ id }, { id: uuid() }).id,
+      validateBody({ id }, { id: shortId() }).id,
     );
     return this.missions.attachChallengeIds(view);
   }
@@ -253,7 +253,7 @@ export class MissionsController {
   async remove(request, id) {
     await this.missions.deleteMission(
       request.auth.userId,
-      validateBody({ id }, { id: uuid() }).id,
+      validateBody({ id }, { id: shortId() }).id,
     );
   }
 }

@@ -9,8 +9,6 @@ import colors from './colors';
 
 const STYLES = {
   exercise: { color: colors.category.exercise, icon: 'run' },
-  study: { color: colors.category.study, icon: 'book' },
-  lifestyle: { color: colors.category.lifestyle, icon: 'leaf' },
 };
 
 const FALLBACK = { color: colors.textSub, icon: 'dot' };

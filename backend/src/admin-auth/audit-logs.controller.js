@@ -1,7 +1,7 @@
 import { Bind, Controller, Dependencies, Get, Query } from '@nestjs/common';
 import { AdminOnly } from '../common/auth/admin-auth.guard.js';
 import { parseAdminPage, pickEnum } from '../common/pagination/admin-page.js';
-import { timestamp, uuid, validateBody } from '../common/validation.js';
+import { timestamp, shortId, validateBody } from '../common/validation.js';
 import { AuditService } from './audit.service.js';
 
 /** M101 감사 로그 조회 (읽기 전용) */
@@ -17,8 +17,8 @@ export class AuditLogsController {
   @Bind(Query())
   list(query) {
     const filters = validateBody(query, {
-      adminId: uuid({ optional: true }),
-      targetUserId: uuid({ optional: true }),
+      adminId: shortId({ optional: true }),
+      targetUserId: shortId({ optional: true }),
       from: timestamp({ optional: true }),
       to: timestamp({ optional: true }),
     });

@@ -6,7 +6,7 @@ import {
   object,
   oneOf,
   string,
-  uuid,
+  shortId,
 } from '../common/validation.js';
 import {
   DEFAULT_LIMIT,
@@ -32,7 +32,7 @@ const rewardRule = (optional = false) =>
       points: integer({ min: 0, max: 1_000_000 }),
       userXp: integer({ min: 0, max: 1_000_000 }),
       petXp: integer({ min: 0, max: 1_000_000 }),
-      badgeAchievementVersionId: uuid({ optional: true }),
+      badgeAchievementVersionId: shortId({ optional: true }),
     },
     { optional },
   );
@@ -40,8 +40,8 @@ const rewardRule = (optional = false) =>
 export const definitionRules = (optional) => ({
   title: text(200, optional),
   description: text(5000, optional),
-  categoryId: uuid({ optional }),
-  difficultyId: uuid({ optional }),
+  categoryId: shortId({ optional }),
+  difficultyId: shortId({ optional }),
   verificationMethod: oneOf(VERIFICATION_METHODS, { optional }),
   exerciseCode: oneOf(EXERCISE_CODES, { optional: true }),
   targetValue: number({ min: 0.01, max: 99_999_999, optional: true }),

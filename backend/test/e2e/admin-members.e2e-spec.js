@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { createTestApp } from '../support/app.js';
 import { AccessTokenService } from '../../src/common/auth/access-token.service.js';
 import { SessionsService } from '../../src/common/auth/sessions.service.js';
@@ -17,7 +18,7 @@ describe.skipIf(!databaseUrl)('관리자 회원·문의 API (PostgreSQL)', () =>
 
   const auth = () => ({ Authorization: `Bearer ${adminToken}` });
   const get = (path) => http.get(path).set(auth());
-  const post = (path, body, key = randomUUID()) =>
+  const post = (path, body, key = newId()) =>
     http
       .post(path)
       .set(auth())
@@ -27,11 +28,11 @@ describe.skipIf(!databaseUrl)('관리자 회원·문의 API (PostgreSQL)', () =>
     http
       .patch(path)
       .set(auth())
-      .set('Idempotency-Key', randomUUID())
+      .set('Idempotency-Key', newId())
       .send({ reason: REASON, ...body });
 
   async function createUser(nickname) {
-    const id = randomUUID();
+    const id = newId();
     await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
     await db.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
       id,
@@ -41,7 +42,7 @@ describe.skipIf(!databaseUrl)('관리자 회원·문의 API (PostgreSQL)', () =>
   }
 
   async function createTicket({ type = 'report', reporterId, targetUserId }) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO support_tickets
          (id, ticket_type, category, reporter_user_id, subject, body,
@@ -61,10 +62,10 @@ describe.skipIf(!databaseUrl)('관리자 회원·문의 API (PostgreSQL)', () =>
 
   beforeAll(async () => {
     ({ app, http, db } = await createTestApp());
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `am_${RUN}`, `${adminId}@example.com`],
+      [adminId, `am_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const session = await db.withTransaction((tx) =>
       app.get(SessionsService).create(tx, 'admin', adminId),
@@ -112,7 +113,7 @@ describe.skipIf(!databaseUrl)('관리자 회원·문의 API (PostgreSQL)', () =>
       const res = await get(`/admin/v1/users/${userId}`).expect(200);
       expect(res.body.phone).toMatch(/^010-\*{4}-\d{4}$/);
       expect(res.body.accountActions).toEqual([]);
-      await get(`/admin/v1/users/${randomUUID()}`).expect(404);
+      await get(`/admin/v1/users/${newId()}`).expect(404);
     });
 
     it('M13 제한 부여 후 중복 제한은 409, 경고는 가능, 알림 생성', async () => {
@@ -199,7 +200,7 @@ describe.skipIf(!databaseUrl)('관리자 회원·문의 API (PostgreSQL)', () =>
   describe('탈퇴 요청 (M15·M16)', () => {
     it('보류 → 처리 시작은 되고 되돌리면 409, 처리 시작하면 회원 상태가 바뀜', async () => {
       const userId = await createUser(`탈퇴${RUN}`);
-      const requestId = randomUUID();
+      const requestId = newId();
       await db.query(
         `INSERT INTO account_withdrawal_requests (id, user_id) VALUES ($1, $2)`,
         [requestId, userId],
@@ -252,7 +253,7 @@ describe.skipIf(!databaseUrl)('관리자 회원·문의 API (PostgreSQL)', () =>
       expect(detail.body.target).toMatchObject({ kind: 'user', id: target });
       expect(detail.body.reporterNickname).toBe(`신고자${RUN}`);
       expect(detail.body.resolution).toBeNull();
-      await get(`/admin/v1/support-tickets/${randomUUID()}`).expect(404);
+      await get(`/admin/v1/support-tickets/${newId()}`).expect(404);
     });
 
     it('M22 담당 지정하면 접수 → 검토 중, 이벤트 기록', async () => {

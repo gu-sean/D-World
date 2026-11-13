@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable } from '@nestjs/common';
 import { AdminMutationService } from '../admin-auth/admin-mutation.service.js';
 import {
@@ -105,7 +105,7 @@ export class AdminDefinitionsService {
           input.difficultyId,
         );
 
-        const id = randomUUID();
+        const id = newId();
         await tx.query(
           `INSERT INTO mission_definitions
                   (id, origin, title, description, category_id, difficulty_id, exercise_code,

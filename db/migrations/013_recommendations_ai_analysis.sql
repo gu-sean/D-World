@@ -2,19 +2,19 @@
 BEGIN;
 
 CREATE TABLE recommendation_messages (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     message varchar(200) NOT NULL CHECK (length(btrim(message)) > 0),
     condition_type varchar(20) NOT NULL CHECK (condition_type IN
         ('always', 'no_mission_today', 'streak_at_risk', 'inactive_days', 'time_slot')),
     condition_params jsonb NOT NULL DEFAULT '{}'::jsonb
         CHECK (jsonb_typeof(condition_params) = 'object'),
-    category_id uuid REFERENCES goal_categories(id) ON DELETE RESTRICT,
+    category_id short_id REFERENCES goal_categories(id) ON DELETE RESTRICT,
     priority smallint NOT NULL DEFAULT 50 CHECK (priority BETWEEN 0 AND 100),
     starts_at timestamptz,
     ends_at timestamptz,
     is_active boolean NOT NULL DEFAULT true,
-    created_by_admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
-    updated_by_admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    updated_by_admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CHECK (starts_at IS NULL OR ends_at IS NULL OR ends_at > starts_at),
@@ -44,8 +44,8 @@ CREATE INDEX recommendation_messages_active_idx
     ON recommendation_messages (priority DESC, id) WHERE is_active;
 
 CREATE TABLE ai_analysis_runs (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     run_type varchar(28) NOT NULL CHECK (run_type IN
         ('plan_adjustment', 'situational_recommendation',
          'weekly_report', 'monthly_report')),
@@ -100,12 +100,12 @@ CREATE INDEX ai_runs_pending_idx
     ON ai_analysis_runs (requested_at) WHERE status = 'requested';
 
 CREATE TABLE plan_adjustment_proposals (
-    id uuid PRIMARY KEY,
-    run_id uuid NOT NULL,
+    id short_id PRIMARY KEY,
+    run_id short_id NOT NULL,
     run_type varchar(28) NOT NULL DEFAULT 'plan_adjustment'
         CHECK (run_type = 'plan_adjustment'),
-    user_id uuid NOT NULL,
-    goal_id uuid NOT NULL,
+    user_id short_id NOT NULL,
+    goal_id short_id NOT NULL,
     status varchar(10) NOT NULL DEFAULT 'proposed'
         CHECK (status IN ('proposed', 'accepted', 'rejected', 'expired')),
     proposal_json jsonb NOT NULL CHECK (jsonb_typeof(proposal_json) = 'object'),
@@ -137,9 +137,9 @@ CREATE INDEX plan_adjustment_open_idx
     ON plan_adjustment_proposals (user_id, created_at DESC) WHERE status = 'proposed';
 
 CREATE TABLE ai_reports (
-    run_id uuid PRIMARY KEY,
+    run_id short_id PRIMARY KEY,
     run_type varchar(28) NOT NULL CHECK (run_type IN ('weekly_report', 'monthly_report')),
-    user_id uuid NOT NULL,
+    user_id short_id NOT NULL,
     title varchar(160) NOT NULL CHECK (length(btrim(title)) > 0),
     summary text NOT NULL CHECK (length(btrim(summary)) > 0),
     content_json jsonb NOT NULL CHECK (jsonb_typeof(content_json) = 'object'),
@@ -157,13 +157,13 @@ CREATE TABLE ai_reports (
 CREATE INDEX ai_reports_user_recent_idx ON ai_reports (user_id, generated_at DESC);
 
 CREATE TABLE ai_mission_recommendations (
-    id uuid PRIMARY KEY,
-    run_id uuid NOT NULL,
+    id short_id PRIMARY KEY,
+    run_id short_id NOT NULL,
     run_type varchar(28) NOT NULL DEFAULT 'situational_recommendation'
         CHECK (run_type = 'situational_recommendation'),
-    user_id uuid NOT NULL,
+    user_id short_id NOT NULL,
     rank_no smallint NOT NULL CHECK (rank_no BETWEEN 1 AND 20),
-    mission_definition_id uuid REFERENCES mission_definitions(id) ON DELETE CASCADE,
+    mission_definition_id short_id REFERENCES mission_definitions(id) ON DELETE CASCADE,
     suggestion_text varchar(200)
         CHECK (suggestion_text IS NULL OR length(btrim(suggestion_text)) > 0),
     reason text,
@@ -176,7 +176,7 @@ CREATE TABLE ai_mission_recommendations (
     expires_at timestamptz,
     decided_at timestamptz,
     -- 추천은 생성된 미션을 가리킬 수 있다
-    mission_id uuid,
+    mission_id short_id,
     UNIQUE (run_id, rank_no),
     FOREIGN KEY (run_id, user_id) REFERENCES ai_analysis_runs(id, user_id) ON DELETE CASCADE,
     FOREIGN KEY (run_id, run_type) REFERENCES ai_analysis_runs(id, run_type) ON DELETE CASCADE,

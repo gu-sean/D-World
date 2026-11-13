@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -110,7 +110,7 @@ export class ExperienceService {
       speciesVersionId = pet.speciesVersionId;
     }
 
-    const awardId = randomUUID();
+    const awardId = newId();
     await tx.query(
       `INSERT INTO experience_awards
               (id, user_id, source_type, source_id, recipient_pet_id,
@@ -331,7 +331,7 @@ export class ExperienceService {
         userId: award.user_id,
         delta: userMissing,
         kind: 'admin_adjustment',
-        resultId: `admin:${randomUUID()}`,
+        resultId: `admin:${newId()}`,
         adminId,
         reason,
       });
@@ -348,7 +348,7 @@ export class ExperienceService {
           petId: award.recipient_pet_id,
           delta: petMissing,
           kind: 'admin_adjustment',
-          resultId: `admin:${randomUUID()}`,
+          resultId: `admin:${newId()}`,
           adminId,
           reason,
         });
@@ -502,7 +502,7 @@ export class ExperienceService {
         `INSERT INTO pet_evolution_events
                 (id, user_pet_id, from_stage_no, to_stage_no, total_xp_after, reason, occurred_at)
          VALUES ($1, $2, $3, $4, $5, $6, clock_timestamp())`,
-        [randomUUID(), petId, stage, stage + step, totalXpAfter, reason],
+        [newId(), petId, stage, stage + step, totalXpAfter, reason],
       );
     }
   }

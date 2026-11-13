@@ -1,6 +1,7 @@
 import { createUser as createUserWith } from '../support/users.js';
 import { createTestApp } from '../support/app.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { newId } from '../../src/common/ids.js';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module.js';
@@ -44,7 +45,7 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
     user,
     { points = 100, method = 'sensor', date = today() } = {},
   ) {
-    const id = randomUUID();
+    const id = newId();
     await db.query(
       `INSERT INTO missions
               (id, user_id, source_type, title, category_id, difficulty_id, verification_method,
@@ -84,7 +85,7 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
   }
 
   const ingestBody = (recordId, decision, overrides = {}) => ({
-    ingestKey: randomUUID(),
+    ingestKey: newId(),
     recordId,
     decision,
     engineVersion: 'model-v1',
@@ -154,7 +155,7 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
     recordId,
     decision,
     reason = '검수 결과',
-    key = randomUUID(),
+    key = newId(),
   ) => {
     const req = http
       .post(`/admin/v1/verifications/${recordId}/decisions`)
@@ -180,10 +181,10 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
     storage = app.get(OBJECT_STORAGE);
     decisions = app.get(DecisionService);
 
-    adminId = randomUUID();
+    adminId = newId();
     await db.query(
       `INSERT INTO admin_accounts (id, login_id, email, password_hash) VALUES ($1,$2,$3,'x')`,
-      [adminId, `dc_${RUN}`, `${adminId}@example.com`],
+      [adminId, `dc_${RUN}`, `${adminId.toLowerCase()}@example.com`],
     );
     const adminSession = await tx((t) =>
       app.get(SessionsService).create(t, 'admin', adminId),
@@ -192,9 +193,9 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
       .get(AccessTokenService)
       .issue('admin', adminId, adminSession.sessionId);
 
-    categoryId = randomUUID();
-    difficultyId = randomUUID();
-    rateId = randomUUID();
+    categoryId = newId();
+    difficultyId = newId();
+    rateId = newId();
     await db.query(
       `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
       [categoryId, `dcc${RUN}`, `판정카테고리${RUN}`],
@@ -216,7 +217,7 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
                 (id, category_id, verification_method, version_no, rules_json, effective_at,
                  created_by_admin_id)
          VALUES ($1,$2,$3,1,'{}'::jsonb, now() - interval '30 days', $4)`,
-        [randomUUID(), categoryId, method, adminId],
+        [newId(), categoryId, method, adminId],
       );
     }
     // 레벨 정책: 다른 스위트의 정책이 있으면 그쪽이 우선하도록 오래된 시행일
@@ -238,7 +239,7 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
         ],
       ],
     ]) {
-      const policyId = randomUUID();
+      const policyId = newId();
       await db.query(
         `INSERT INTO ${table} (id, version_no, effective_at, created_by_admin_id)
          VALUES ($1,$2, now() - interval '30 days', $3)`,
@@ -303,7 +304,7 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
         const res = await ingest(payload);
         expect(res.status, JSON.stringify(payload)).toBe(400);
       }
-      await ingest(ingestBody(randomUUID(), 'approved')).expect(404);
+      await ingest(ingestBody(newId(), 'approved')).expect(404);
     });
 
     it('승인: 회차 승인, 미션 완료, 포인트·XP 지급, 판정 이력(원본·ingestKey·안내 시각) 기록', async () => {
@@ -407,17 +408,17 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
       const user = await createUser();
       const { recordId } = await submittedMission(user);
       const mismatch = await ingest(
-        ingestBody(recordId, 'approved', { criteriaVersionId: randomUUID() }),
+        ingestBody(recordId, 'approved', { criteriaVersionId: newId() }),
       ).expect(422);
       expect(mismatch.body.error.code).toBe('VERIFY_EVIDENCE_KIND_MISMATCH');
 
       // 기준이 없는 카테고리
-      const otherCategory = randomUUID();
+      const otherCategory = newId();
       await db.query(
         `INSERT INTO goal_categories (id, code, name, display_order) VALUES ($1,$2,$3,1)`,
         [otherCategory, `dcn${next()}`, `기준없음${next()}`],
       );
-      const missionId = randomUUID();
+      const missionId = newId();
       await db.query(
         `INSERT INTO missions (id, user_id, source_type, title, category_id, difficulty_id,
                                verification_method, scheduled_date)
@@ -598,7 +599,7 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
       const { missionId, recordId } = await submittedMission(user);
       await ingest(ingestBody(recordId, 'review_required')).expect(200);
 
-      const key = randomUUID();
+      const key = newId();
       const res = await adminDecide(
         recordId,
         'approved',
@@ -668,7 +669,7 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
         await http
           .post(`/admin/v1/verifications/${recordId}/decisions`)
           .set(auth(adminToken))
-          .set('Idempotency-Key', randomUUID())
+          .set('Idempotency-Key', newId())
           .send(payload)
           .expect(400);
       }
@@ -699,7 +700,7 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
         (await adminDecide(open.id, 'approved').expect(409)).body.error.details
           .status,
       ).toBe('recording');
-      await adminDecide(randomUUID(), 'approved').expect(404);
+      await adminDecide(newId(), 'approved').expect(404);
     });
 
     it('상세: 미션 조건, 판정 이력, 증거 파일의 조회용 URL', async () => {
@@ -753,7 +754,7 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
       expect(detail.body.files).toHaveLength(1);
       expect(detail.body.files[0].url).toContain(rows[0].object_key);
       await http
-        .get(`/admin/v1/verifications/${randomUUID()}`)
+        .get(`/admin/v1/verifications/${newId()}`)
         .set(auth(adminToken))
         .expect(404);
       await http
@@ -964,9 +965,9 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
       const user = await createUser();
       const makeSpecies = async () => {
         const tag = next();
-        const speciesId = randomUUID();
-        const versionId = randomUUID();
-        const imageId = randomUUID();
+        const speciesId = newId();
+        const versionId = newId();
+        const imageId = newId();
         await db.query(
           `INSERT INTO pet_species (id, code, name, status, created_by_admin_id)
            VALUES ($1,$2,$3,'public',$4)`,
@@ -1064,14 +1065,14 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
 
     it('업적 평가: 승인이 조건을 채우면 지급, 번복으로 무너지면 회수', async () => {
       const user = await createUser();
-      const definitionId = randomUUID();
+      const definitionId = newId();
       const tag = next();
       await db.query(
         `INSERT INTO achievement_definitions (id, code, status, created_by_admin_id)
          VALUES ($1,$2,'public',$3)`,
         [definitionId, `dm_${tag}`, adminId],
       );
-      const imageId = randomUUID();
+      const imageId = newId();
       await db.query(
         `INSERT INTO achievement_badge_images
                 (id, achievement_id, version_no, r2_object_key, mime_type, size_bytes, uploaded_at, created_by_admin_id)
@@ -1084,7 +1085,7 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
                  target_count, reward_points, badge_image_id, effective_at, created_by_admin_id)
          VALUES ($1,$2,1,'첫 승인','승인 미션 1회','common','approved_mission_count',
                  1,0,$3, now() - interval '1 day', $4)`,
-        [randomUUID(), definitionId, imageId, adminId],
+        [newId(), definitionId, imageId, adminId],
       );
       try {
         const { recordId } = await submittedMission(user);
@@ -1110,8 +1111,8 @@ describe.skipIf(!databaseUrl)('판정 반영 (PostgreSQL + 메모리 저장소)'
 
     it('승인으로 단계의 필수 미션이 모두 끝나면 종료일이 지난 단계가 완료됨', async () => {
       const user = await createUser();
-      const goalId = randomUUID();
-      const stepId = randomUUID();
+      const goalId = newId();
+      const stepId = newId();
       await db.query(
         `INSERT INTO goals (id, user_id, category_id, difficulty_id, title, start_date, end_date)
          VALUES ($1,$2,$3,$4,'지난 목표','2020-01-01','2020-12-31')`,

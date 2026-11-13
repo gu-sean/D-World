@@ -4,13 +4,13 @@
 BEGIN;
 
 CREATE TABLE streak_days (
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     streak_date date NOT NULL,
     status varchar(12) NOT NULL
         CHECK (status IN ('pending', 'success', 'failed')),
-    qualifying_mission_id uuid,
-    qualifying_record_id uuid,
-    qualifying_result_id uuid,
+    qualifying_mission_id short_id,
+    qualifying_record_id short_id,
+    qualifying_result_id short_id,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, streak_date),
@@ -82,7 +82,7 @@ ON streak_days
 FOR EACH ROW EXECUTE FUNCTION validate_streak_success();
 
 CREATE TABLE streak_states (
-    user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    user_id short_id PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     current_success_days integer NOT NULL DEFAULT 0
         CHECK (current_success_days >= 0),
     longest_success_days integer NOT NULL DEFAULT 0
@@ -94,13 +94,13 @@ CREATE TABLE streak_states (
 );
 
 CREATE TABLE streak_milestone_policy_versions (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     target_success_days integer NOT NULL
         CHECK (target_success_days IN (7, 30, 100)),
     version_no integer NOT NULL CHECK (version_no > 0),
     points integer NOT NULL CHECK (points >= 0),
     effective_at timestamptz NOT NULL,
-    created_by_admin_id uuid NOT NULL
+    created_by_admin_id short_id NOT NULL
         REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (target_success_days, version_no),
@@ -124,11 +124,11 @@ BEFORE UPDATE OR DELETE ON streak_milestone_policy_versions
 FOR EACH ROW EXECUTE FUNCTION protect_streak_milestone_policy();
 
 CREATE TABLE streak_milestone_awards (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     target_success_days integer NOT NULL
         CHECK (target_success_days IN (7, 30, 100)),
-    policy_version_id uuid NOT NULL,
+    policy_version_id short_id NOT NULL,
     awarded_points integer NOT NULL CHECK (awarded_points >= 0),
     paid_points integer NOT NULL CHECK (paid_points >= 0),
     first_achieved_date date NOT NULL,
