@@ -133,7 +133,7 @@ export default function AppealListPage() {
   const count = (n) => (typeof n === 'number' ? ` (${n})` : '');
 
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       <Typography.Title level={3}>처리 대기</Typography.Title>
       <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
         AI가 먼저 판정하고, 관리자는 회원이 이의를 낸 건과 AI가 판정을 보류한 건만 처리해요. 모든

@@ -83,7 +83,7 @@ export class MobileRewardsService {
                OR ($2 = 'earn' AND t.available_delta > 0)
                OR ($2 = 'spend' AND t.available_delta < 0))
           AND ($3::timestamptz IS NULL
-               OR (t.occurred_at, t.id) < ($3::timestamptz, $4::uuid))
+               OR (t.occurred_at, t.id) < ($3::timestamptz, $4::short_id))
         ORDER BY t.occurred_at DESC, t.id DESC
         LIMIT $5`,
       [

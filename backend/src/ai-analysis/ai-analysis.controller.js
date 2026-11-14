@@ -18,7 +18,7 @@ import {
   object,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { AiReportsService } from './ai-reports.service.js';
@@ -26,7 +26,7 @@ import { PlanAdjustmentRunsService } from './plan-adjustment-runs.service.js';
 
 const common = () => ({
   ingestKey: string({ min: 8, max: 200, pattern: /^[\x21-\x7e]+$/ }),
-  runId: uuid(),
+  runId: shortId(),
   status: oneOf(['completed', 'failed']),
   engineVersion: string({ min: 1, max: 80, pattern: /\S/ }),
   failureReason: string({ min: 0, max: 500, optional: true }),

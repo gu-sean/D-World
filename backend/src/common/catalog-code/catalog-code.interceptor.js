@@ -2,10 +2,10 @@ import { BadRequestException, Dependencies, Injectable } from '@nestjs/common';
 import { from, mergeMap } from 'rxjs';
 import { DatabaseService } from '../../database/database.service.js';
 
-// 분야·난이도는 환경마다 UUID가 다르므로 API에서는 code로 주고받음 (팀 문서 03 §7)
-//   요청: categoryCode / difficultyCode → 서비스 안쪽에서 쓰는 categoryId / difficultyId (UUID)
-//   응답: categoryId / difficultyId (UUID) → categoryCode / difficultyCode
-//        (관리자 API는 화면의 폼·필터가 UUID를 쓰므로 categoryId / difficultyId도 함께 유지)
+// 분야·난이도는 환경마다 ID가 다르므로 API에서는 code로 주고받음 (팀 문서 03 §7)
+//   요청: categoryCode / difficultyCode → 서비스 안쪽에서 쓰는 categoryId / difficultyId (ID)
+//   응답: categoryId / difficultyId (ID) → categoryCode / difficultyCode
+//        (관리자 API는 화면의 폼·필터가 ID를 쓰므로 categoryId / difficultyId도 함께 유지)
 const PAIRS = [
   { code: 'categoryCode', id: 'categoryId', table: 'goal_categories' },
   { code: 'difficultyCode', id: 'difficultyId', table: 'difficulty_levels' },
@@ -13,8 +13,8 @@ const PAIRS = [
 const CACHE_MS = 5000;
 
 /**
- * 전역 인터셉터: 앱·관리자 API의 요청/응답에서 분야·난이도 code ↔ UUID를 바꿈
- * 내부 호출(/internal/)은 제외. 서비스·검증 코드는 UUID 기준 그대로 둠
+ * 전역 인터셉터: 앱·관리자 API의 요청/응답에서 분야·난이도 code ↔ ID를 바꿈
+ * 내부 호출(/internal/)은 제외. 서비스·검증 코드는 ID 기준 그대로 둠
  */
 @Injectable()
 @Dependencies(DatabaseService)

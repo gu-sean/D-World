@@ -19,7 +19,7 @@ import {
   integer,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { REASON_RULE_OPTIONS } from '../admin-members/admin-members.service.js';
@@ -36,13 +36,13 @@ export class AdminAssetsController {
     this.assets = assets;
   }
 
-  /** M84: ownerId는 기존 업적·펫 종류 id, 새로 만들 항목이면 미리 정한 uuid */
+  /** M84: ownerId는 기존 업적·펫 종류 id, 새로 만들 항목이면 미리 정한 id */
   @Post('upload-urls')
   @Bind(Req(), Body())
   createUploadUrl(request, body) {
     const input = validateBody(body, {
       assetKind: oneOf(['badge', 'pet_stage']),
-      ownerId: uuid(),
+      ownerId: shortId(),
       mimeType: oneOf(['image/png', 'image/webp', 'image/jpeg']),
       sizeBytes: integer({ min: 1, max: MAX_ASSET_BYTES }),
       reason: string(REASON_RULE_OPTIONS),

@@ -2,22 +2,22 @@
 BEGIN;
 
 CREATE TABLE support_tickets (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     ticket_type varchar(10) NOT NULL CHECK (ticket_type IN ('inquiry', 'report')),
     category varchar(30) NOT NULL,
-    reporter_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    reporter_user_id short_id REFERENCES users(id) ON DELETE SET NULL,
     subject varchar(120) NOT NULL CHECK (length(btrim(subject)) > 0),
     body text NOT NULL CHECK (length(btrim(body)) > 0),
-    target_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-    target_mission_definition_id uuid
+    target_user_id short_id REFERENCES users(id) ON DELETE SET NULL,
+    target_mission_definition_id short_id
         REFERENCES mission_definitions(id) ON DELETE SET NULL,
-    target_challenge_id uuid REFERENCES challenges(id) ON DELETE SET NULL,
+    target_challenge_id short_id REFERENCES challenges(id) ON DELETE SET NULL,
     -- 대상 행이 사라진 뒤에도 유지된다
     target_kind varchar(20)
         CHECK (target_kind IN ('user', 'mission_definition', 'challenge')),
     status varchar(12) NOT NULL DEFAULT 'received'
         CHECK (status IN ('received', 'in_review', 'completed')),
-    assigned_admin_id uuid REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    assigned_admin_id short_id REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     received_at timestamptz NOT NULL DEFAULT now(),
     completed_at timestamptz,
     UNIQUE (id, ticket_type),
@@ -71,9 +71,9 @@ CREATE UNIQUE INDEX support_open_report_challenge_uq
       AND reporter_user_id IS NOT NULL AND target_challenge_id IS NOT NULL;
 
 CREATE TABLE support_ticket_events (
-    id uuid PRIMARY KEY,
-    ticket_id uuid NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
-    admin_id uuid REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY,
+    ticket_id short_id NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+    admin_id short_id REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     event_type varchar(20) NOT NULL
         CHECK (event_type IN ('received', 'assigned', 'status_changed', 'reply', 'note')),
     visibility varchar(10) NOT NULL DEFAULT 'internal'
@@ -90,15 +90,15 @@ CREATE INDEX support_ticket_events_ticket_idx
     ON support_ticket_events (ticket_id, created_at, id);
 
 CREATE TABLE support_ticket_resolutions (
-    ticket_id uuid PRIMARY KEY,
+    ticket_id short_id PRIMARY KEY,
     ticket_type varchar(10) NOT NULL,
     outcome varchar(16) NOT NULL CHECK (outcome IN
         ('no_action', 'reply_only', 'account_action', 'content_action', 'both')),
     user_reply text,
     -- 경고받은 회원이 탈퇴해 조치 행이 삭제되면 SET NULL
-    account_action_id uuid REFERENCES account_actions(id) ON DELETE SET NULL,
+    account_action_id short_id REFERENCES account_actions(id) ON DELETE SET NULL,
     content_action varchar(10) CHECK (content_action IN ('hidden', 'deleted')),
-    resolved_by_admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    resolved_by_admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     resolved_at timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (ticket_id, ticket_type)
         REFERENCES support_tickets(id, ticket_type) ON DELETE CASCADE,
@@ -117,7 +117,7 @@ CREATE TABLE support_ticket_resolutions (
 );
 
 ALTER TABLE account_actions
-    ADD COLUMN source_ticket_id uuid REFERENCES support_tickets(id) ON DELETE SET NULL;
+    ADD COLUMN source_ticket_id short_id REFERENCES support_tickets(id) ON DELETE SET NULL;
 
 CREATE INDEX account_actions_source_ticket_idx
     ON account_actions (source_ticket_id) WHERE source_ticket_id IS NOT NULL;
@@ -168,8 +168,8 @@ CREATE FUNCTION guard_support_resolution() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
     ticket_status varchar(12);
-    ticket_target uuid;
-    action_user uuid;
+    ticket_target short_id;
+    action_user short_id;
 BEGIN
     SELECT status, target_user_id INTO ticket_status, ticket_target
       FROM support_tickets WHERE id = NEW.ticket_id;

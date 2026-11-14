@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { rethrowConstraint } from '../common/errors/constraint.js';
@@ -46,7 +46,7 @@ export class PetsService {
          ) v ON true
          JOIN goal_categories gc ON gc.id = v.category_id
         WHERE s.status = 'public'
-          AND ($1::uuid IS NULL OR s.id = $1)
+          AND ($1::short_id IS NULL OR s.id = $1)
           AND (SELECT count(*) FROM pet_stage_versions sv
                 WHERE sv.species_version_id = v.id) = 3
         ORDER BY s.code`,
@@ -134,7 +134,7 @@ export class PetsService {
       this.unlockProgress(db, userId),
       db.query(
         `SELECT species_version_id, stage_no, stage_code, min_total_xp, bonus_basis_points
-           FROM pet_stage_versions WHERE species_version_id = ANY($1::uuid[])
+           FROM pet_stage_versions WHERE species_version_id = ANY($1::short_id[])
           ORDER BY species_version_id, stage_no`,
         [species.map((s) => s.version_id)],
       ),
@@ -204,7 +204,7 @@ export class PetsService {
           throw new Error('활성 펫 레벨 정책이 없음');
         }
 
-        const petId = randomUUID();
+        const petId = newId();
         await tx.query(
           `INSERT INTO user_pets
                   (id, user_id, species_id, species_version_id,
@@ -277,7 +277,7 @@ export class PetsService {
          JOIN pet_stage_versions sv
            ON sv.species_version_id = p.species_version_id AND sv.stage_no = p.stage_no
          LEFT JOIN profiles pr ON pr.user_id = p.user_id
-        WHERE p.user_id = $1 AND ($2::uuid IS NULL OR p.id = $2)
+        WHERE p.user_id = $1 AND ($2::short_id IS NULL OR p.id = $2)
         ORDER BY p.selected_at, p.id`,
       [userId, petId],
     );

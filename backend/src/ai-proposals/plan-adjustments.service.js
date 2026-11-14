@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { conflict } from '../common/errors/http-errors.js';
@@ -75,10 +75,10 @@ export class PlanAdjustmentsService {
     const { rows } = await this.database.query(
       `${SELECT}
         WHERE p.user_id = $1
-          AND ($2::uuid IS NULL OR p.goal_id = $2)
+          AND ($2::short_id IS NULL OR p.goal_id = $2)
           AND ($3::text[] IS NULL OR p.status = ANY($3::text[]))
           AND ($4::timestamptz IS NULL
-               OR (p.created_at, p.id) < ($4::timestamptz, $5::uuid))
+               OR (p.created_at, p.id) < ($4::timestamptz, $5::short_id))
         ORDER BY p.created_at DESC, p.id DESC
         LIMIT $6`,
       [
@@ -140,10 +140,10 @@ export class PlanAdjustmentsService {
     const plan = validatePlan(await this.mobileProposals.toPlan(steps));
 
     // 미션의 출처가 되는 계획 제안 행(draft)을 만들고 같은 규칙으로 수락
-    const proposalId = randomUUID();
+    const proposalId = newId();
     await this.database.query(
       `INSERT INTO ai_plan_proposals (id, user_id, goal_id, generation_no, proposal_json)
-       SELECT $1, $2, $3, coalesce(max(generation_no), 0) + 1, $4::jsonb
+       SELECT $1, $2, $3::short_id, coalesce(max(generation_no), 0) + 1, $4::jsonb
          FROM ai_plan_proposals WHERE goal_id = $3`,
       [
         proposalId,

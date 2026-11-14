@@ -148,7 +148,7 @@ def recommend_missions(
   "items": [
     {
       "rankNo": 1,
-      "definitionId": "후보에 있는 UUID",
+      "definitionId": "후보에 있는 ID",
       "reason": "추천 이유"
     }
   ]

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../ids.js';
 import {
   BadRequestException,
   Dependencies,
@@ -85,7 +85,7 @@ export class AdminIdempotencyService {
   }
 
   async begin(adminId, key, operation, requestHash) {
-    const id = randomUUID();
+    const id = newId();
     const inserted = await this.database.query(
       `INSERT INTO admin_idempotency_keys
               (id, admin_id, idempotency_key, operation, request_hash)

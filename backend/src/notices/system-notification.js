@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 
 /**
  * 회원에게 시스템 알림 한 건 (알림함에 쌓이고, 알림을 켠 회원은 푸시 대기)
@@ -11,12 +11,12 @@ export async function createSystemNotification(
   await tx.query(
     `INSERT INTO user_notifications
        (id, user_id, kind, event_key, title, body, link_screen, push_status)
-     SELECT $1, $2, 'system', $3, $4, $5, $6,
+     SELECT $1, $2::short_id, 'system', $3, $4, $5, $6,
             CASE WHEN COALESCE(p.notification_enabled, false)
                  THEN 'pending' ELSE 'none' END
        FROM users u LEFT JOIN profiles p ON p.user_id = u.id
       WHERE u.id = $2
      ON CONFLICT (user_id, event_key) DO NOTHING`,
-    [randomUUID(), userId, eventKey, title, body, linkScreen],
+    [newId(), userId, eventKey, title, body, linkScreen],
   );
 }

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 
 /**
  * 포인트 원장 내부 도구, 호출자가 연 트랜잭션(tx)에서만 사용
@@ -100,7 +100,7 @@ export async function recordTransaction(
     [wallet.userId, wallet.available, wallet.outstanding],
   );
 
-  const id = randomUUID();
+  const id = newId();
   await tx.query(
     `INSERT INTO point_transactions
             (id, user_id, kind, available_delta, outstanding_delta,

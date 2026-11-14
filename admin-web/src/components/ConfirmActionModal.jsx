@@ -67,7 +67,7 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
       okButtonProps={{ danger }}
       cancelButtonProps={{ disabled: submitting }}
       confirmLoading={submitting}
-      maskClosable={false}
+      mask={{ closable: false }}
       keyboard={!submitting}
       onOk={handleOk}
       onCancel={submitting ? undefined : onCancel}

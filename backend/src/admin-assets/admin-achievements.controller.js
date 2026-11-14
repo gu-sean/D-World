@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import {
   BadRequestException,
   Bind,
@@ -20,7 +20,7 @@ import {
   oneOf,
   string,
   timestamp,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -41,13 +41,13 @@ const versionRules = () => ({
   rarity: oneOf(['common', 'rare', 'legendary']),
   conditionType: oneOf(CONDITION_TYPES),
   targetCount: integer({ min: 1, max: 1_000_000 }),
-  // categoryCode는 전역 인터셉터가 categoryId(UUID)로 바꿔 줌
-  categoryId: uuid({ optional: true }),
+  // categoryCode는 전역 인터셉터가 categoryId(ID)로 바꿔 줌
+  categoryId: shortId({ optional: true }),
   rewardPoints: integer({ min: 0, max: MAX_REWARD }),
   // 관리자 화면에서 사용자 XP를 뺐다: 없으면 0 (assertCondition에서 채움)
   rewardUserXp: integer({ min: 0, max: MAX_REWARD, optional: true }),
   rewardPetXp: integer({ min: 0, max: MAX_REWARD }),
-  badgeAssetId: uuid(),
+  badgeAssetId: shortId(),
   status: oneOf(['draft', 'public']),
   effectiveAt: timestamp(),
   reason: string(REASON_RULE_OPTIONS),
@@ -233,7 +233,7 @@ export class AdminAchievementsController {
       [achievementId],
     );
     const versionNo = rows[0].next;
-    const versionId = randomUUID();
+    const versionId = newId();
     await tx.query(
       `INSERT INTO achievement_versions
          (id, achievement_id, version_no, title, description, rarity,
@@ -269,7 +269,7 @@ export class AdminAchievementsController {
       `INSERT INTO achievement_backfill_runs
          (id, achievement_id, version_id, requested_by_admin_id)
        VALUES ($1, $2, $3, $4)`,
-      [randomUUID(), achievementId, versionId, adminId],
+      [newId(), achievementId, versionId, adminId],
     );
   }
 
@@ -278,7 +278,7 @@ export class AdminAchievementsController {
     const { rows: defs } = await db.query(
       `SELECT id, code, status, created_at, updated_at
          FROM achievement_definitions
-        WHERE ($1::uuid IS NULL OR id = $1)
+        WHERE ($1::short_id IS NULL OR id = $1)
         ORDER BY created_at, id`,
       [onlyId],
     );
@@ -286,7 +286,7 @@ export class AdminAchievementsController {
       `SELECT v.*, i.r2_object_key
          FROM achievement_versions v
          JOIN achievement_badge_images i ON i.id = v.badge_image_id
-        WHERE ($1::uuid IS NULL OR v.achievement_id = $1)
+        WHERE ($1::short_id IS NULL OR v.achievement_id = $1)
         ORDER BY v.achievement_id, v.version_no`,
       [onlyId],
     );

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../admin-auth/audit.service.js';
 import { AdminIdempotencyService } from '../common/idempotency/admin-idempotency.service.js';
@@ -90,7 +90,7 @@ export class ParticipationService {
             [participation.id],
           );
         } else {
-          participation = { id: randomUUID() };
+          participation = { id: newId() };
           await tx.query(
             `INSERT INTO challenge_participations (id, challenge_id, user_id) VALUES ($1,$2,$3)`,
             [participation.id, challengeId, userId],
@@ -119,7 +119,7 @@ export class ParticipationService {
   }
 
   async insertMission(tx, userId, challenge, date, dayNo) {
-    const missionId = randomUUID();
+    const missionId = newId();
     await tx.query(
       `INSERT INTO missions
               (id, user_id, source_type, title, category_id, difficulty_id, target_value,
@@ -174,14 +174,7 @@ export class ParticipationService {
           `INSERT INTO challenge_daily_missions
                   (id, participation_id, challenge_id, user_id, challenge_date, mission_id)
            VALUES ($1,$2,$3,$4,$5,$6)`,
-          [
-            randomUUID(),
-            participationId,
-            challenge.id,
-            userId,
-            date,
-            missionId,
-          ],
+          [newId(), participationId, challenge.id, userId, date, missionId],
         );
       } else if (row.status === 'cancelled') {
         await tx.query(
@@ -260,12 +253,12 @@ export class ParticipationService {
     if (rows.length === 0) return;
     await tx.query(
       `UPDATE missions SET status = 'cancelled', cancel_reason = $2, cancelled_at = now(),
-              updated_at = now() WHERE id = ANY($1::uuid[])`,
+              updated_at = now() WHERE id = ANY($1::short_id[])`,
       [rows.map((row) => row.mission_id), reason],
     );
     await tx.query(
       `UPDATE challenge_daily_missions SET status = 'cancelled', updated_at = now()
-        WHERE id = ANY($1::uuid[])`,
+        WHERE id = ANY($1::short_id[])`,
       [rows.map((row) => row.daily_id)],
     );
   }
@@ -390,7 +383,7 @@ export class ParticipationService {
         await tx.query(
           `INSERT INTO challenge_rule_events (id, challenge_id, admin_id, event_type, reason)
            VALUES ($1,$2,$3,'cancelled',$4)`,
-          [randomUUID(), challengeId, adminId, reason],
+          [newId(), challengeId, adminId, reason],
         );
         await this.audit.record(tx, {
           adminId,

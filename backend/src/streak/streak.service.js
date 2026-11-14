@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable, Logger } from '@nestjs/common';
 import { AchievementsService } from '../achievements/achievements.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -257,7 +257,7 @@ export class StreakService {
             userId,
             sourceType: 'streak',
             sourceId: award.id,
-            resultId: randomUUID(),
+            resultId: newId(),
           });
           await this.reinstateExperience(tx, userId, award.id);
           granted = true;
@@ -271,7 +271,7 @@ export class StreakService {
           userId,
           sourceType: 'streak',
           sourceId: award.id,
-          resultId: randomUUID(),
+          resultId: newId(),
         });
         await this.revokeExperience(tx, userId, award.id);
         revoked = true;
@@ -307,7 +307,7 @@ export class StreakService {
       userId,
       originalPoints: original,
     });
-    const id = randomUUID();
+    const id = newId();
     await tx.query(
       `INSERT INTO streak_milestone_awards
               (id, user_id, target_success_days, policy_version_id,
@@ -350,7 +350,7 @@ export class StreakService {
     if (awardId) {
       await this.experience.revokeExperience(tx, {
         awardId,
-        resultId: randomUUID(),
+        resultId: newId(),
       });
     }
   }
@@ -365,7 +365,7 @@ export class StreakService {
     if (awardId) {
       await this.experience.reinstateExperience(tx, {
         awardId,
-        resultId: randomUUID(),
+        resultId: newId(),
       });
     }
   }

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import {
   BadRequestException,
   Dependencies,
@@ -86,7 +86,7 @@ export class UserSupportService {
         );
       }
       if (target) await this.assertReportable(tx, userId, target);
-      const id = randomUUID();
+      const id = newId();
       await tx.query(
         `INSERT INTO support_tickets
            (id, ticket_type, category, reporter_user_id, subject, body,
@@ -106,7 +106,7 @@ export class UserSupportService {
       await tx.query(
         `INSERT INTO support_ticket_events (id, ticket_id, event_type, visibility)
          VALUES ($1, $2, 'received', 'user')`,
-        [randomUUID(), id],
+        [newId(), id],
       );
       return this.getTicket(userId, id, tx);
     });
@@ -146,7 +146,7 @@ export class UserSupportService {
           AND ($2::text IS NULL OR ticket_type = $2)
           AND ($3::text IS NULL OR status = $3)
           AND ($4::timestamptz IS NULL
-               OR (received_at, id) < ($4::timestamptz, $5::uuid))
+               OR (received_at, id) < ($4::timestamptz, $5::short_id))
         ORDER BY received_at DESC, id DESC
         LIMIT $6`,
       [

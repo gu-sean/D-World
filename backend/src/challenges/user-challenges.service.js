@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../admin-auth/audit.service.js';
 import { AdminIdempotencyService } from '../common/idempotency/admin-idempotency.service.js';
@@ -97,7 +97,7 @@ export class UserChallengesService {
         );
       }
 
-      const id = randomUUID();
+      const id = newId();
       await tx.query(
         `INSERT INTO challenges
                 (id, origin, created_by_user_id, title, description, category_id, difficulty_id,
@@ -238,7 +238,7 @@ export class UserChallengesService {
       await tx.query(
         `INSERT INTO challenge_publication_reviews (id, challenge_id, requested_by_user_id, decision)
          VALUES ($1,$2,$3,'submitted')`,
-        [randomUUID(), id, userId],
+        [newId(), id, userId],
       );
       return this.view(tx, id);
     });
@@ -255,7 +255,7 @@ export class UserChallengesService {
     const reviews = await this.database.query(
       `SELECT DISTINCT ON (challenge_id) challenge_id, decision, reason, created_at
          FROM challenge_publication_reviews
-        WHERE challenge_id = ANY($1::uuid[]) AND decision <> 'submitted'
+        WHERE challenge_id = ANY($1::short_id[]) AND decision <> 'submitted'
         ORDER BY challenge_id, created_at DESC`,
       [rows.map((row) => row.id)],
     );
@@ -312,7 +312,7 @@ export class UserChallengesService {
           await tx.query(
             `INSERT INTO challenge_rule_events (id, challenge_id, admin_id, event_type, reason)
              VALUES ($1,$2,$3,'published',$4)`,
-            [randomUUID(), id, adminId, reason ?? '검수 승인'],
+            [newId(), id, adminId, reason ?? '검수 승인'],
           );
         } else {
           await tx.query(
@@ -325,7 +325,7 @@ export class UserChallengesService {
                   (id, challenge_id, reviewed_by_admin_id, decision, reason)
            VALUES ($1,$2,$3,$4,$5)`,
           [
-            randomUUID(),
+            newId(),
             id,
             adminId,
             decision === 'approve' ? 'approved' : 'rejected',

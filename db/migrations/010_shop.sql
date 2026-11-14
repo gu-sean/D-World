@@ -3,7 +3,7 @@
 BEGIN;
 
 CREATE TABLE shop_items (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     code varchar(40) NOT NULL UNIQUE CHECK (code ~ '^[a-z][a-z0-9_]*$'),
     name varchar(80) NOT NULL CHECK (length(btrim(name)) > 0),
     description text,
@@ -18,12 +18,12 @@ CREATE TABLE shop_items (
 CREATE INDEX shop_items_visible_idx ON shop_items (is_active, display_order, id);
 
 CREATE TABLE shop_item_price_versions (
-    id uuid PRIMARY KEY,
-    item_id uuid NOT NULL REFERENCES shop_items(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY,
+    item_id short_id NOT NULL REFERENCES shop_items(id) ON DELETE RESTRICT,
     version_no integer NOT NULL CHECK (version_no > 0),
     price_points integer NOT NULL CHECK (price_points > 0),
     effective_at timestamptz NOT NULL,
-    created_by_admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (item_id, version_no),
     UNIQUE (id, item_id)
@@ -44,17 +44,17 @@ BEFORE UPDATE OR DELETE ON shop_item_price_versions
 FOR EACH ROW EXECUTE FUNCTION protect_shop_price_version();
 
 CREATE TABLE shop_orders (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    item_id uuid NOT NULL REFERENCES shop_items(id) ON DELETE RESTRICT,
-    price_version_id uuid NOT NULL,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item_id short_id NOT NULL REFERENCES shop_items(id) ON DELETE RESTRICT,
+    price_version_id short_id NOT NULL,
     quantity integer NOT NULL CHECK (quantity BETWEEN 1 AND 99),
     unit_points integer NOT NULL CHECK (unit_points > 0),
     total_points bigint GENERATED ALWAYS AS (unit_points::bigint * quantity) STORED,
     status varchar(12) NOT NULL DEFAULT 'completed'
         CHECK (status IN ('completed', 'cancelled')),
-    spend_transaction_id uuid NOT NULL,
-    refund_transaction_id uuid,
+    spend_transaction_id short_id NOT NULL,
+    refund_transaction_id short_id,
     cancel_reason text,
     idempotency_key text NOT NULL CHECK (length(btrim(idempotency_key)) > 0),
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -87,7 +87,7 @@ DECLARE
     price_effective_at timestamptz;
     tx_kind varchar(32);
     tx_source_type varchar(32);
-    tx_source_id uuid;
+    tx_source_id short_id;
     tx_delta bigint;
     tx_cap_delta bigint;
 BEGIN
@@ -132,8 +132,8 @@ LANGUAGE plpgsql AS $$
 DECLARE
     tx_kind varchar(32);
     tx_source_type varchar(32);
-    tx_source_id uuid;
-    tx_original uuid;
+    tx_source_id short_id;
+    tx_original short_id;
     tx_delta bigint;
     tx_cap_delta bigint;
 BEGIN
@@ -179,20 +179,20 @@ BEFORE UPDATE ON shop_orders
 FOR EACH ROW EXECUTE FUNCTION guard_shop_order_update();
 
 CREATE TABLE user_inventory (
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    item_id uuid NOT NULL REFERENCES shop_items(id) ON DELETE RESTRICT,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item_id short_id NOT NULL REFERENCES shop_items(id) ON DELETE RESTRICT,
     quantity integer NOT NULL DEFAULT 0 CHECK (quantity >= 0),
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, item_id)
 );
 
 CREATE TABLE user_inventory_events (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    item_id uuid NOT NULL REFERENCES shop_items(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item_id short_id NOT NULL REFERENCES shop_items(id) ON DELETE RESTRICT,
     kind varchar(12) NOT NULL CHECK (kind IN ('purchase', 'refund', 'use')),
     quantity_delta integer NOT NULL CHECK (quantity_delta <> 0),
-    order_id uuid,
+    order_id short_id,
     idempotency_key text NOT NULL UNIQUE CHECK (length(btrim(idempotency_key)) > 0),
     occurred_at timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (order_id, user_id, item_id)

@@ -1,4 +1,5 @@
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../database/database.service.js';
@@ -45,7 +46,7 @@ export class PhoneVerificationService {
    */
   async send(phone, purpose) {
     const code = randomCode();
-    const challengeId = randomUUID();
+    const challengeId = newId();
     let expiresAt;
 
     const resendAvailableAt = new Date(Date.now() + RESEND_COOLDOWN_SEC * 1000);
@@ -139,7 +140,7 @@ export class PhoneVerificationService {
    * 실제 출시 전 시연용 단순화: 번호 소유 확인을 하지 않는다
    */
   async issueConfirmed(phone, purpose) {
-    const challengeId = randomUUID();
+    const challengeId = newId();
     const { rows } = await this.database.withTransaction(async (tx) => {
       await tx.query(
         `UPDATE phone_verification_challenges
@@ -157,7 +158,7 @@ export class PhoneVerificationService {
           challengeId,
           phone,
           purpose,
-          this.hashCode(phone, purpose, randomUUID()),
+          this.hashCode(phone, purpose, newId()),
           CONFIRMED_TTL_MINUTES,
         ],
       );

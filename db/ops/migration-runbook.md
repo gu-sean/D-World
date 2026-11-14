@@ -1,6 +1,6 @@
 # 운영 DB 마이그레이션 적용 절차
 
-- 대상: `db/migrations/001~014`(구 014~017을 기능 파일에 통합한 최종본, 구 001~017과 **스키마 동일**)
+- 대상: `db/migrations/001~017`(구 014~017을 기능 파일에 통합한 최종본, 구 001~017과 **스키마 동일**)
 - 적용기: `backend/scripts/migrate.mjs`(`schema_migrations`에 파일명·SHA-256 기록, 적용된 파일이 바뀌면 오류)
 - 마이그레이션에는 되돌리기(down)가 없다 → 되돌릴 때는 **적용 전 백업으로 복원**한다
 - 각 파일은 자체 `BEGIN/COMMIT`이라 실패한 파일은 통째로 롤백되고 이후 파일은 적용되지 않는다
@@ -24,7 +24,7 @@
 ```sh
 export DATABASE_URL='postgres://dworld_migrator:<비번>@<호스트>:5432/d_world?sslmode=require'
 cd backend
-node scripts/migrate.mjs              # 001~014, "14개 적용 완료" 확인
+node scripts/migrate.mjs              # 001~017, "17개 적용 완료" 확인
 ```
 1. `roles.sql`을 한 번 더 실행(이미 만든 테이블 권한 부여)
 2. 확인: 업무 테이블 93개, 마이그레이션 13행

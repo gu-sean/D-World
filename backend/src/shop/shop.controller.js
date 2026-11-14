@@ -22,7 +22,7 @@ import {
   idOf,
   integer,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { ShopService } from './shop.service.js';
@@ -49,8 +49,8 @@ export class ShopController {
   purchase(request, body) {
     return this.shop.purchase(request.auth.userId, {
       ...validateBody(body, {
-        itemId: uuid(),
-        priceVersionId: uuid({ optional: true }),
+        itemId: shortId(),
+        priceVersionId: shortId({ optional: true }),
         quantity: integer({ min: 1, max: 99 }),
       }),
       idempotencyKey: readIdempotencyKey(request),

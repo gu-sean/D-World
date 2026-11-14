@@ -101,7 +101,7 @@ export function toPlanSteps(rows, goalEnd) {
   return ordered.map(([, step], index) => ({ stepNo: index + 1, ...step }));
 }
 
-export const ADJUSTMENT_KEY = /^plan-adjust:([0-9a-f-]{36}):([0-9a-f-]{36})$/;
+export const ADJUSTMENT_KEY = /^plan-adjust:([0-9A-Za-z]{8}):([0-9A-Za-z]{8})$/;
 
 /** ingestKey = plan-adjust:{runId}:{goalId} */
 export function adjustmentKey(runId, goalId) {

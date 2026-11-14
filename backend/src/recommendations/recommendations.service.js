@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { conflict } from '../common/errors/http-errors.js';
@@ -264,7 +264,7 @@ export class RecommendationsService {
         // 읽은 뒤 동시에 다른 요청이 끼어들 수 있어 잠근 상태에서 다시 확인
         await this.assertNotRateLimited(tx, userId);
 
-        const runId = randomUUID();
+        const runId = newId();
         await tx.query(
           `INSERT INTO ai_analysis_runs (id, user_id, run_type)
            VALUES ($1, $2, 'situational_recommendation')`,
@@ -281,7 +281,7 @@ export class RecommendationsService {
            RETURNING id, rank_no, mission_definition_id, suggestion_text, reason,
                      context, status, expires_at`,
             [
-              randomUUID(),
+              newId(),
               runId,
               userId,
               index + 1,

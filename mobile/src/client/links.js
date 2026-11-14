@@ -30,7 +30,7 @@ const ROUTES = [
 ];
 
 /**
- * @param {string|null|undefined} linkScreen 예: `'missions/7b2a6f0e-…'`
+ * @param {string|null|undefined} linkScreen 예: `'missions/Ab3dE9xZ'`
  * @returns {{name: string, params: Record<string, string>}}
  */
 export function parseLinkScreen(linkScreen) {

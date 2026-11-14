@@ -18,7 +18,7 @@ export default function HoldReviewPage() {
   const decide = useDecideVerification();
 
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       <Typography.Title level={3}>AI 판정 보류 검토</Typography.Title>
       <Link to={BACK}>← 처리 대기</Link>
       <QueryBoundary query={query}>

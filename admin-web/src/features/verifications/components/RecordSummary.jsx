@@ -45,7 +45,7 @@ const appealColumns = [
 export default function RecordSummary({ record }) {
   const { mission } = record;
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <Descriptions title="수행 회차" bordered size="small" column={2}>
         <Descriptions.Item label="회차 ID">{record.recordId}</Descriptions.Item>
         <Descriptions.Item label="상태">

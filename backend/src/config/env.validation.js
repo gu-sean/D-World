@@ -82,6 +82,8 @@ const SCHEMA = z.object({
   DATABASE_URL: required(z.string({ error: '값이 필요함' })),
   DATABASE_POOL_MAX: withDefault(integer(1, 100), 10),
   DATABASE_SSL: withDefault(boolean, false),
+  /** DATABASE_SSL=true일 때 서버 인증서를 검증할 CA 인증서(PEM) 파일 경로 (예: Supabase certs/supabase-prod-ca-2021.crt), 비우면 시스템 기본 CA */
+  DATABASE_SSL_CA: optional(z.string()),
   /** 쿼리 1건 최대 실행 시간 */
   DATABASE_STATEMENT_TIMEOUT_MS: withDefault(integer(1000), 30_000),
   /** 트랜잭션을 열고 방치할 수 있는 최대 시간, 초과 시 서버가 연결 종료 */

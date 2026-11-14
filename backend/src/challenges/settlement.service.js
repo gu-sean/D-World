@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AdminMutationService } from '../admin-auth/admin-mutation.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -274,7 +274,7 @@ export class SettlementService {
           `SELECT COALESCE(max(run_no), 0) + 1 AS n FROM challenge_settlement_runs WHERE challenge_id = $1`,
           [challengeId],
         );
-        const runId = randomUUID();
+        const runId = newId();
         await tx.query(
           `INSERT INTO challenge_settlement_runs (id, challenge_id, run_no) VALUES ($1,$2,$3)`,
           [runId, challengeId, rows[0].n],
@@ -287,7 +287,7 @@ export class SettlementService {
                     (run_id, challenge_id, participation_id, successful_days,
                      last_qualifying_submitted_at, rank_no, outcome, exclusion_reason,
                      promised_points, paid_points, user_xp, pet_xp, payment_status)
-             SELECT $1, $2, * FROM unnest($3::uuid[], $4::int[], $5::timestamptz[], $6::int[],
+             SELECT $1, $2, * FROM unnest($3::short_id[], $4::int[], $5::timestamptz[], $6::int[],
                     $7::text[], $8::text[], $9::int[], $10::int[], $11::int[], $12::int[], $13::text[])`,
             [
               runId,
@@ -413,7 +413,7 @@ export class SettlementService {
         if (ranked.length > 0) {
           await tx.query(
             `INSERT INTO challenge_final_rankings (id, run_id, participation_id, rank_no, score, display_name)
-             SELECT gen_random_uuid(), $1, * FROM unnest($2::uuid[], $3::int[], $4::int[], $5::text[])`,
+             SELECT new_short_id(), $1, * FROM unnest($2::short_id[], $3::int[], $4::int[], $5::text[])`,
             [
               runId,
               ranked.map((e) => e.participationId),
@@ -433,7 +433,7 @@ export class SettlementService {
                 SET status = $2::text,
                     completed_at = CASE WHEN $2::text = 'completed' THEN COALESCE(completed_at, now()) END,
                     updated_at = now()
-              WHERE id = ANY($1::uuid[])`,
+              WHERE id = ANY($1::short_id[])`,
             [ids, outcome],
           );
         }

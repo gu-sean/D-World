@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { conflict, notFound } from '../common/errors/http-errors.js';
@@ -41,7 +41,7 @@ export class AdminAssetsService {
 
   /** M84: 업로드 티켓 발급 */
   async createTicket(tx, { adminId, assetKind, ownerId, mimeType, sizeBytes }) {
-    const assetId = randomUUID();
+    const assetId = newId();
     const extension = EXTENSIONS[mimeType];
     const prefix = this.config.get('R2_KEY_PREFIX');
     let versionNo = null;
@@ -240,7 +240,7 @@ export class AdminAssetsService {
   async ownerOfNewItem(tx, assetKind, assetIds) {
     const { rows } = await tx.query(
       `SELECT DISTINCT owner_id FROM admin_asset_uploads
-        WHERE asset_kind = $1 AND id = ANY($2::uuid[])`,
+        WHERE asset_kind = $1 AND id = ANY($2::short_id[])`,
       [assetKind, assetIds],
     );
     if (rows.length === 0) {

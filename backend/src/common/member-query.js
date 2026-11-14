@@ -1,7 +1,8 @@
 // 관리자 목록의 "회원" 검색 규칙 (회원 목록 M10과 같은 규칙을 모든 목록에 쓴다)
-//   UUID 모양이면 회원 ID와 정확히 같은 것, 아니면 닉네임 부분 일치
-export const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+//   회원 ID 모양(8자 영숫자)이면 회원 ID와 정확히 같은 것, 아니면 닉네임 부분 일치
+import { ID_PATTERN } from './ids.js';
+
+export { ID_PATTERN };
 
 export const escapeLike = (text) => text.replace(/[\\%_]/g, '\\$&');
 
@@ -13,8 +14,11 @@ export const escapeLike = (text) => text.replace(/[\\%_]/g, '\\$&');
 export function memberQueryParams(raw) {
   const text = typeof raw === 'string' ? raw.trim() : '';
   if (!text) return { like: null, id: null };
-  if (UUID_PATTERN.test(text)) return { like: null, id: text };
-  return { like: `%${escapeLike(text)}%`, id: null };
+  // 8자 영숫자는 닉네임일 수도 있어서 ID 일치와 닉네임 부분 일치를 둘 다 본다
+  return {
+    like: `%${escapeLike(text)}%`,
+    id: ID_PATTERN.test(text) ? text : null,
+  };
 }
 
 /**
@@ -24,9 +28,7 @@ export function memberQueryParams(raw) {
  * @param {string} idParam 회원 ID 매개변수 (예: '$7')
  */
 export const memberWhere = (column, likeParam, idParam) =>
-  `(${idParam}::uuid IS NULL OR ${column} = ${idParam})
-   AND (${likeParam}::text IS NULL OR ${column} IN (
-     SELECT mq.user_id FROM profiles mq WHERE mq.nickname ILIKE ${likeParam}))`;
+  memberWhereAny([column], likeParam, idParam);
 
 /**
  * 여러 회원 컬럼 중 하나라도 맞으면 통과 (예: 문의·신고의 접수자 또는 신고 대상)
@@ -35,7 +37,7 @@ export const memberWhere = (column, likeParam, idParam) =>
  * @param {string} idParam
  */
 export const memberWhereAny = (columns, likeParam, idParam) =>
-  `((${idParam}::uuid IS NULL AND ${likeParam}::text IS NULL)
+  `((${idParam}::short_id IS NULL AND ${likeParam}::text IS NULL)
     OR ${columns.map((c) => `${c} = ${idParam}`).join(' OR ')}
     OR ${columns
       .map(

@@ -22,7 +22,7 @@ import {
   password,
   phone,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { AuthService } from './auth.service.js';
@@ -36,7 +36,9 @@ const code = () => string({ min: 6, max: 6, pattern: /^\d{6}$/ });
 const provider = () => oneOf(SOCIAL_PROVIDERS);
 const socialToken = () => string({ min: 1, max: 4096 });
 const consents = () =>
-  array(object({ documentVersionId: uuid(), granted: boolean() }), { max: 10 });
+  array(object({ documentVersionId: shortId(), granted: boolean() }), {
+    max: 10,
+  });
 
 @Controller()
 @Dependencies(AuthService, AccessTokenService, MobileAuthService)

@@ -27,11 +27,7 @@ npm run start:dev
 | `db:reset` | DB를 비우고 처음부터 적용 (개발·테스트 전용, `--db 이름`으로 DB 지정·생성) |
 | `db:seed` | 개발 시드, `DEV_ADMIN_PASSWORD`·`DEV_USER_PASSWORD` 필요 (docker compose의 postgres 사용) |
 | `db:verify` | 마이그레이션·smoke·시드 검증 (docker) |
-| `demo` | 시연 DB 덤프(`db/dumps`) 복원 + `.env` 준비 + 빌드 + 서버 실행을 한 번에. Docker가 있으면 컨테이너, 없으면 설치된 PostgreSQL(psql)을 자동으로 씀. 시험 계정·환경별 방법은 `db/dumps/README.md` |
-| `demo:reset` | `demo`와 같되 이미 복원돼 있어도 덤프로 DB를 덮어씀 |
-| `demo:dump` | 지금 DB를 시연 덤프 파일로 다시 저장 |
 | `demo:fill` | 비어 있는 시연 데이터(검수·제재·정산·진화 등)를 앱 경로로 채움 (선행: `npm run build`) |
-| `demo:refresh` | 덤프 갱신 한 번에: 임시 DB 복원 → 마이그레이션 → 빌드 → `demo:fill` → 덤프 저장 |
 | `push:check` / `weather:check` | FCM 키 / 날씨 공급자 점검 (아래 각 절) |
 | `openapi:export` | `docs/openapi/backend.json` 생성 (먼저 `npm run build`, DB 연결 불필요) |
 | `lint` / `format` | prettier 검사 / 적용 (ESLint 없음) |
@@ -52,7 +48,8 @@ npm run start:dev
 | `ADMIN_WEB_ORIGIN` | 관리자 웹 Origin, 쉼표로 여럿 (비우면 CORS 비활성) | |
 | `TRUST_PROXY` | 프록시 뒤에서 `X-Forwarded-For` 신뢰 | false |
 | `DATABASE_POOL_MAX` | 풀 최대 연결 수 | 10 |
-| `DATABASE_SSL` | TLS 사용 | false |
+| `DATABASE_SSL` | TLS 사용 (서버 인증서 항상 검증) | false |
+| `DATABASE_SSL_CA` | TLS 검증용 CA 인증서(PEM) 파일 경로, 비우면 시스템 기본 CA (Supabase: `certs/supabase-prod-ca-2021.crt`) | |
 | `DATABASE_STATEMENT_TIMEOUT_MS` | 쿼리 1건 최대 실행 시간 | 30000 |
 | `DATABASE_IDLE_TX_TIMEOUT_MS` | 트랜잭션 방치 허용 시간 | 60000 |
 | `JWT_ACCESS_SECRET` | 앱 access token 서명 키, 32자 이상 (필수). 휴대폰 인증 단계 토큰·소셜 가입 토큰 서명에도 사용 | |
@@ -104,10 +101,33 @@ npm run start:dev
 - 문서(12 §8)에 없는 변수: `SOCIAL_DRIVER`, `WEATHER_DRIVER`, `OPENWEATHER_API_KEY`, `KMA_AUTH_KEY`, `FCM_SERVICE_ACCOUNT_*` → 이름 확정 필요
 - 운영 권장: `PHONE_CODE_PEPPER` 별도 지정, 프록시 뒤면 `TRUST_PROXY=true` (아니면 IP 제한이 전원 공유)
 
+## 원격 DB (Supabase)
+
+- 목적: 여러 PC가 같은 시연 DB를 공유 (프로젝트 `D-world`, 지역 Seoul `ap-northeast-2`, ID `jmeovrrynxayxtvnsdhc`)
+- 내용: 기준 데이터·정책·공식 콘텐츠 + 시험 계정 `01099999999` 1개 + 관리자 `dev_admin` (활동 데이터 없음)
+- 연결: **세션 풀러**만 사용 (직접 연결은 IPv6 전용, 트랜잭션 풀러는 정기 작업의 세션 잠금과 충돌)
+- 설정: `backend/.env.supabase` 파일 (`.gitignore`의 `.env.*`로 커밋 제외, 비밀번호는 팀에서 따로 받음)
+  ```
+  DATABASE_URL=postgresql://postgres.jmeovrrynxayxtvnsdhc:<비밀번호>@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
+  DATABASE_SSL=true
+  DATABASE_SSL_CA=certs/supabase-prod-ca-2021.crt
+  ```
+  - 비밀번호에 `@ : / # %` 등이 있으면 URL 인코딩 (`!`는 그대로 가능)
+- 실행: **`npm run demo:supabase`** (연결 파일 확인 → `.env` 없으면 생성 → DB 연결 점검 → 빌드 → 서버 실행, `--check`는 연결만 점검)
+  - 수동 실행: `node --env-file=.env --env-file=.env.supabase dist/main.js` (먼저 `npm run build`)
+  - 연결 실패 시 원인(비밀번호·인증서·일시 중지 등)과 조치를 화면에 안내
+  - PC마다 `.env`의 JWT 키가 다르면 다른 PC 서버가 발급한 로그인 토큰은 서로 인정되지 않음 → 서버를 바꾸면 앱에서 다시 로그인
+- 마이그레이션: `node --env-file=.env.supabase scripts/migrate.mjs`
+- 주의
+  - **e2e 테스트·`db:reset`은 이 DB에 돌리지 않음** (데이터가 지워지거나 테스트 데이터가 남음)
+  - 모든 표에 행 보안(RLS)이 켜져 있고 Data API는 꺼 둠 → 백엔드가 `postgres` 계정으로만 접근
+  - 무료 플랜은 일정 기간 미사용 시 일시 중지 → 대시보드에서 `Resume project`
+  - 시험 계정 날짜는 자동으로 오늘에 맞춰지지 않음 (공유 DB는 복원 단계가 없음)
+
 ## 마이그레이션
 
 - `npm run db:migrate [디렉터리]`: 기본 `MIGRATIONS_DIR` 또는 `../db/migrations`
-- 적용 순서: `order.txt`가 있으면 그 순서, 없으면 파일명 순 (현재 `001~014`)
+- 적용 순서: `order.txt`가 있으면 그 순서, 없으면 파일명 순 (현재 `001~017`)
 - 적용 기록: `schema_migrations`(파일명, 체크섬), 적용분은 건너뜀
 - 적용된 파일 수정 시 체크섬 불일치로 중단, 변경은 새 번호 파일로 추가
 - 파일은 자체 BEGIN/COMMIT 전제, psql 메타 명령(`\if`)은 미지원
@@ -147,7 +167,7 @@ src/
   integrations/ai/     AI 서버 호출기(AiClient: 헤더·타임아웃·오류 분류), 전역 모듈
   database/            Pool, withTransaction, Queryable
   common/              errors(오류 형식·코드 표), idempotency, auth(토큰·세션·guard), pagination(AdminPage·limit),
-                       catalog-code(분야·난이도 code↔UUID), http(X-Request-Id, 모바일 경로 별칭, 문자 발송 제한 판별), crypto(해시·서명 토큰),
+                       catalog-code(분야·난이도 code↔ID), http(X-Request-Id, 모바일 경로 별칭, 문자 발송 제한 판별), crypto(해시·서명 토큰),
                        time(KST, dayjs), masking, validation
   auth/                휴대폰·소셜 로그인, 인증번호, 세션 + mobile-auth.*(모바일 A01~A10)
   accounts/            프로필(`GET /me` 확장), 약관 동의, 이용 제한 검사
@@ -193,7 +213,7 @@ test/                  unit/(모듈별 단위), e2e/(실제 PostgreSQL, 파일�
   - 코드 표 `common/errors/error-codes.js`(팀 문서 05 §7), 서비스 내부 코드는 `LEGACY_CODE_MAP`으로 변환
   - 입력 오류는 `COMMON_VALIDATION_FAILED` + `details.fields`, 관리자 `reason` 오류는 `ADMIN_REASON_REQUIRED`
   - 표에 없는 도메인 코드는 대문자로 그대로 노출 (예: `STEP_HAS_HISTORY`)
-- 분야·난이도: API는 `categoryCode`·`difficultyCode`, 전역 인터셉터가 UUID와 변환 (요청의 `categoryId`도 허용)
+- 분야·난이도: API는 `categoryCode`·`difficultyCode`, 전역 인터셉터가 ID와 변환 (요청의 `categoryId`도 허용)
 - 관리자 목록: `{ items, page, size, totalCount }`, `?page&size&sort`
 - 관리자 변경 요청: `Idempotency-Key`와 `reason`(1~500자) 필수, 감사 로그에 성공·실패 기록
 - 앱 멱등: `@Idempotent()` 요청은 키 필수, `@Idempotent({ optional: true })`(미션 생성·수정·취소, 목표 수정·삭제, 펫 선택)는 헤더가 있을 때만 처리
@@ -245,7 +265,7 @@ test/                  unit/(모듈별 단위), e2e/(실제 PostgreSQL, 파일�
   - 문의·신고: `reporterNickname`·`assignedAdminLoginId`·`sameTargetOpenCount`·`targetId`·`targetSummary`, 이벤트 `adminLoginId`, 처리 `accountActionId`
   - 공지 `pushStats`(pending·sent·failed·skipped)
   - 월 한도·스트릭 마일스톤 목록은 `{ items }` (보상표·인증 기준은 배열 그대로)
-  - 관리자 응답의 분야·난이도는 `categoryCode`와 `categoryId`(UUID)를 함께 (앱 API는 code만)
+  - 관리자 응답의 분야·난이도는 `categoryCode`와 `categoryId`(ID)를 함께 (앱 API는 code만)
 - 미확인: 변경(POST·PATCH) 응답 모양, 데이터가 있어야 보이는 중첩 필드(인증 결과 상세·챌린지 순위 등)
 
 ## AI 서버 연동 (I01)
@@ -315,7 +335,7 @@ test/                  unit/(모듈별 단위), e2e/(실제 PostgreSQL, 파일�
 
 1. https://apihub.kma.go.kr 에서 가입하고 인증키를 발급받는다.
 2. **동네예보 중 "초단기실황조회"와 "초단기예보조회" 두 API를 모두 활용 신청**한다 (하나라도 빠지면 날씨를 못 읽는다).
-3. `backend/.env`에 `WEATHER_DRIVER=kma`, `KMA_AUTH_KEY=<발급받은 키>`를 넣는다. (`npm run demo`로 만든 `.env`는 `mock`이라 이 두 줄만 바꾸면 된다)
+3. `backend/.env`에 `WEATHER_DRIVER=kma`, `KMA_AUTH_KEY=<발급받은 키>`를 넣는다. (`npm run demo:supabase`가 만든 `.env`는 `mock`이라 이 두 줄만 바꾸면 된다)
 4. **`npm run weather:check`로 점검**한 뒤 서버를 다시 띄운다.
 
 ### 점검 `npm run weather:check`
@@ -360,6 +380,10 @@ npm run weather:check -- --driver kma                   # .env와 다른 드라�
 | 4 | 서버 | **`npm run push:check`**로 키가 맞는지 점검 (아래) |
 | 5 | 서버 `.env` | 점검이 통과하면 `PUSH_DRIVER=fcm`으로 바꾸고 서버를 다시 띄운다 |
 | 6 | 앱 파트 | `@react-native-firebase/app`·`messaging` 설치, `android/app/google-services.json` 추가(커밋하지 않음), `App.jsx`에서 로그인 직후 `registerPushDevice()`·로그아웃 직전 `unregisterPushDevice()` 호출, 알림 탭 처리. 자세한 순서는 `mobile/src/setup/pushRegistration.js` 머리말 |
+
+- 이 프로젝트의 서버 키: Firebase 프로젝트 `D-World`(`d-world-3095f`), 키 파일은 `backend/service-account.json`(git 제외) + `.env`의 `FCM_SERVICE_ACCOUNT_PATH=service-account.json`, `PUSH_DRIVER=fcm`
+- `FCM_SERVICE_ACCOUNT_JSON`을 비워 두면(.env.example 기본값) 파일 경로를 읽음
+- 서버 경로 점검 결과: 기기 등록(A15) → 공지 게시 → 알림 생성 → `push-send` 작업이 FCM 호출 → 가짜 토큰은 FCM이 거절(`not a valid FCM registration token`)하고 서버가 기기를 비활성화·재시도 예약 (실제 기기 도착은 앱 연결 후 확인)
 
 ### 키 점검 `npm run push:check`
 

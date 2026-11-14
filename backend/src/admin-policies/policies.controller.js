@@ -8,7 +8,7 @@ import {
   oneOf,
   string,
   timestamp,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { CatalogService } from './catalog.service.js';
@@ -168,8 +168,8 @@ export class PoliciesController {
   @Bind(Query())
   listRewardRates(query) {
     const filters = validateBody(query, {
-      categoryId: uuid({ optional: true }),
-      difficultyId: uuid({ optional: true }),
+      categoryId: shortId({ optional: true }),
+      difficultyId: shortId({ optional: true }),
     });
     return this.rewards
       .listRewardRates({
@@ -183,8 +183,8 @@ export class PoliciesController {
   @Bind(Req(), Body())
   createRewardRate(request, body) {
     const input = validateBody(body, {
-      categoryId: uuid(),
-      difficultyId: uuid(),
+      categoryId: shortId(),
+      difficultyId: shortId(),
       points: pointsRule(),
       // 관리자 화면에서 사용자 XP를 뺐다: 없으면 포인트와 같은 값 (시드 보상표와 같은 규칙, 레벨이 계속 오르게)
       userXp: integer({ min: 0, max: MAX_POINTS, optional: true }),
@@ -206,7 +206,7 @@ export class PoliciesController {
   @Bind(Query())
   listCriteria(query) {
     const filters = validateBody(query, {
-      categoryId: uuid({ optional: true }),
+      categoryId: shortId({ optional: true }),
       method: oneOf(['camera', 'sensor'], { optional: true }),
     });
     return this.rewards
@@ -222,7 +222,7 @@ export class PoliciesController {
   @Bind(Req(), Body())
   createCriteria(request, body) {
     const input = validateBody(body, {
-      categoryId: uuid(),
+      categoryId: shortId(),
       verificationMethod: oneOf(['camera', 'sensor']),
       rules: jsonObject(),
       effectiveAt: effectiveAtRule(),

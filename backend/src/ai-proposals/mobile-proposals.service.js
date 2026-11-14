@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { conflict } from '../common/errors/http-errors.js';
@@ -129,13 +129,7 @@ export class MobileProposalsService {
          VALUES ($1, $2, $3, $4, $5::jsonb)
          RETURNING id, goal_id, generation_no, status, proposal_json,
                    generated_at, accepted_at`,
-        [
-          randomUUID(),
-          userId,
-          goalId,
-          Number(last[0].n) + 1,
-          JSON.stringify(plan),
-        ],
+        [newId(), userId, goalId, Number(last[0].n) + 1, JSON.stringify(plan)],
       );
       return this.toView(rows[0]);
     });
@@ -208,7 +202,7 @@ export class MobileProposalsService {
     return rows[0];
   }
 
-  /** 앱의 PlanStep[] → 수락 API가 받는 계획 { steps }, code는 UUID로 바꾼다 */
+  /** 앱의 PlanStep[] → 수락 API가 받는 계획 { steps }, code는 ID로 바꾼다 */
   async toPlan(steps) {
     const { categories, difficulties } = await this.codeMaps(this.database);
     return {

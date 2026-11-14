@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { stableStringify } from '../common/idempotency/admin-idempotency.service.js';
@@ -93,7 +93,7 @@ export class ProposalsService {
          FROM ai_plan_proposals
         WHERE goal_id = $1 AND user_id = $2
           AND ($3::text IS NULL OR status = $3)
-          AND ($4::timestamptz IS NULL OR (generated_at, id) < ($4::timestamptz, $5::uuid))
+          AND ($4::timestamptz IS NULL OR (generated_at, id) < ($4::timestamptz, $5::short_id))
         ORDER BY generated_at DESC, id DESC
         LIMIT $6`,
       [
@@ -276,7 +276,7 @@ export class ProposalsService {
             step.title,
             step.description || null,
             step.dueDate,
-            randomUUID(),
+            newId(),
           ],
         );
         createdSteps.push(rows[0]);
@@ -351,7 +351,7 @@ export class ProposalsService {
     const stepIds = [...new Set(missions.map((m) => m.stepId).filter(Boolean))];
     const { rows: stepRows } = await tx.query(
       `SELECT id, goal_id, step_no, title, description, due_date, status, completed_at
-         FROM goal_steps WHERE id = ANY($1::uuid[]) ORDER BY step_no`,
+         FROM goal_steps WHERE id = ANY($1::short_id[]) ORDER BY step_no`,
       [stepIds],
     );
     return {

@@ -63,26 +63,26 @@ CREATE TRIGGER missions_lock_xp_before_update BEFORE UPDATE ON missions
 FOR EACH ROW EXECUTE FUNCTION lock_mission_xp();
 
 CREATE TABLE user_level_policy_versions (
-    id uuid PRIMARY KEY, version_no integer NOT NULL UNIQUE CHECK (version_no > 0),
+    id short_id PRIMARY KEY, version_no integer NOT NULL UNIQUE CHECK (version_no > 0),
     effective_at timestamptz NOT NULL,
-    created_by_admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE user_level_thresholds (
-    policy_version_id uuid NOT NULL REFERENCES user_level_policy_versions(id) ON DELETE RESTRICT,
+    policy_version_id short_id NOT NULL REFERENCES user_level_policy_versions(id) ON DELETE RESTRICT,
     level_no integer NOT NULL CHECK (level_no > 0),
     min_total_xp bigint NOT NULL CHECK (min_total_xp >= 0),
     PRIMARY KEY(policy_version_id,level_no), UNIQUE(policy_version_id,min_total_xp),
     CHECK (level_no <> 1 OR min_total_xp=0)
 );
 CREATE TABLE pet_level_policy_versions (
-    id uuid PRIMARY KEY, version_no integer NOT NULL UNIQUE CHECK (version_no > 0),
+    id short_id PRIMARY KEY, version_no integer NOT NULL UNIQUE CHECK (version_no > 0),
     effective_at timestamptz NOT NULL,
-    created_by_admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE pet_level_thresholds (
-    policy_version_id uuid NOT NULL REFERENCES pet_level_policy_versions(id) ON DELETE RESTRICT,
+    policy_version_id short_id NOT NULL REFERENCES pet_level_policy_versions(id) ON DELETE RESTRICT,
     level_no integer NOT NULL CHECK (level_no > 0),
     min_total_xp bigint NOT NULL CHECK (min_total_xp >= 0),
     PRIMARY KEY(policy_version_id,level_no), UNIQUE(policy_version_id,min_total_xp),
@@ -116,8 +116,8 @@ CREATE TRIGGER pet_threshold_no_change BEFORE UPDATE OR DELETE ON pet_level_thre
 FOR EACH ROW EXECUTE FUNCTION protect_xp_policy();
 
 CREATE TABLE user_experience (
-    user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    level_policy_version_id uuid NOT NULL REFERENCES user_level_policy_versions(id) ON DELETE RESTRICT,
+    user_id short_id PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    level_policy_version_id short_id NOT NULL REFERENCES user_level_policy_versions(id) ON DELETE RESTRICT,
     total_xp bigint NOT NULL DEFAULT 0 CHECK (total_xp >= 0),
     level_no integer NOT NULL DEFAULT 1 CHECK (level_no > 0),
     updated_at timestamptz NOT NULL DEFAULT now()
@@ -139,37 +139,37 @@ CREATE TRIGGER user_experience_guard BEFORE INSERT OR UPDATE ON user_experience
 FOR EACH ROW EXECUTE FUNCTION guard_user_experience();
 
 CREATE TABLE pet_species (
-    id uuid PRIMARY KEY, code varchar(80) NOT NULL UNIQUE CHECK (code ~ '^[a-z][a-z0-9_]*$'),
+    id short_id PRIMARY KEY, code varchar(80) NOT NULL UNIQUE CHECK (code ~ '^[a-z][a-z0-9_]*$'),
     name varchar(80) NOT NULL CHECK (length(btrim(name))>0),
     description text, status varchar(12) NOT NULL DEFAULT 'draft'
         CHECK (status IN ('draft','public','hidden')),
-    created_by_admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE pet_stage_images (
-    id uuid PRIMARY KEY, species_id uuid NOT NULL REFERENCES pet_species(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY, species_id short_id NOT NULL REFERENCES pet_species(id) ON DELETE RESTRICT,
     r2_object_key text NOT NULL UNIQUE CHECK (length(btrim(r2_object_key))>0),
     mime_type varchar(40) NOT NULL CHECK (mime_type IN ('image/png','image/jpeg','image/webp')),
     size_bytes bigint NOT NULL CHECK (size_bytes>0), uploaded_at timestamptz NOT NULL,
-    created_by_admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(id,species_id)
 );
 CREATE TRIGGER pet_stage_images_no_change BEFORE UPDATE OR DELETE ON pet_stage_images
 FOR EACH ROW EXECUTE FUNCTION protect_xp_policy();
 CREATE TABLE pet_species_versions (
-    id uuid PRIMARY KEY, species_id uuid NOT NULL REFERENCES pet_species(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY, species_id short_id NOT NULL REFERENCES pet_species(id) ON DELETE RESTRICT,
     version_no integer NOT NULL CHECK (version_no>0),
     name varchar(80) NOT NULL CHECK (length(btrim(name))>0),
     description text, personality text, world_text text,
-    category_id uuid NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
+    category_id short_id NOT NULL REFERENCES goal_categories(id) ON DELETE RESTRICT,
     unlock_condition_type varchar(40) NOT NULL CHECK (unlock_condition_type IN
         ('none','approved_mission_count','category_approved_mission_count',
          'streak_milestone','achievement_earned')),
-    unlock_target_count integer, unlock_category_id uuid REFERENCES goal_categories(id) ON DELETE RESTRICT,
-    unlock_achievement_id uuid REFERENCES achievement_definitions(id) ON DELETE RESTRICT,
+    unlock_target_count integer, unlock_category_id short_id REFERENCES goal_categories(id) ON DELETE RESTRICT,
+    unlock_achievement_id short_id REFERENCES achievement_definitions(id) ON DELETE RESTRICT,
     hatch_mission_count integer NOT NULL CHECK (hatch_mission_count>=0),
     effective_at timestamptz NOT NULL,
-    created_by_admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    created_by_admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(species_id,version_no), UNIQUE(id,species_id),
     CHECK (
       (unlock_condition_type='none' AND unlock_target_count IS NULL AND unlock_category_id IS NULL AND unlock_achievement_id IS NULL)
@@ -182,12 +182,12 @@ CREATE TABLE pet_species_versions (
 CREATE TRIGGER pet_species_versions_no_change BEFORE UPDATE OR DELETE ON pet_species_versions
 FOR EACH ROW EXECUTE FUNCTION protect_xp_policy();
 CREATE TABLE pet_stage_versions (
-    species_version_id uuid NOT NULL, species_id uuid NOT NULL,
+    species_version_id short_id NOT NULL, species_id short_id NOT NULL,
     stage_no smallint NOT NULL CHECK (stage_no BETWEEN 1 AND 3),
     stage_code varchar(8) NOT NULL CHECK (stage_code IN ('egg','baby','adult')),
     min_total_xp bigint NOT NULL CHECK (min_total_xp>=0),
     bonus_basis_points integer NOT NULL CHECK (bonus_basis_points BETWEEN 0 AND 2000),
-    image_id uuid NOT NULL, PRIMARY KEY(species_version_id,stage_no),
+    image_id short_id NOT NULL, PRIMARY KEY(species_version_id,stage_no),
     FOREIGN KEY(species_version_id,species_id) REFERENCES pet_species_versions(id,species_id) ON DELETE RESTRICT,
     FOREIGN KEY(image_id,species_id) REFERENCES pet_stage_images(id,species_id) ON DELETE RESTRICT,
     CHECK ((stage_no=1 AND stage_code='egg' AND min_total_xp=0) OR
@@ -210,7 +210,7 @@ FOR EACH ROW EXECUTE FUNCTION check_pet_stage_sequence();
 CREATE TRIGGER pet_stage_versions_no_change BEFORE UPDATE OR DELETE ON pet_stage_versions
 FOR EACH ROW EXECUTE FUNCTION protect_xp_policy();
 CREATE TABLE pet_stage_dialogues (
-    species_version_id uuid NOT NULL, stage_no smallint NOT NULL,
+    species_version_id short_id NOT NULL, stage_no smallint NOT NULL,
     dialogue_no integer NOT NULL CHECK (dialogue_no>0),
     text_content text NOT NULL CHECK (length(btrim(text_content))>0),
     time_of_day varchar(12) CHECK (time_of_day IN ('morning','afternoon','evening','night')),
@@ -222,9 +222,9 @@ CREATE TRIGGER pet_stage_dialogues_no_change BEFORE UPDATE OR DELETE ON pet_stag
 FOR EACH ROW EXECUTE FUNCTION protect_xp_policy();
 
 CREATE TABLE user_pets (
-    id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    species_id uuid NOT NULL, species_version_id uuid NOT NULL,
-    level_policy_version_id uuid NOT NULL REFERENCES pet_level_policy_versions(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY, user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    species_id short_id NOT NULL, species_version_id short_id NOT NULL,
+    level_policy_version_id short_id NOT NULL REFERENCES pet_level_policy_versions(id) ON DELETE RESTRICT,
     nickname varchar(10) NOT NULL CHECK (nickname ~ '^[가-힣A-Za-z]{2,10}$'),
     total_xp bigint NOT NULL DEFAULT 0 CHECK (total_xp>=0),
     level_no integer NOT NULL DEFAULT 1 CHECK (level_no>0),
@@ -236,7 +236,7 @@ CREATE TABLE user_pets (
 CREATE UNIQUE INDEX user_pets_nickname_ci_uq ON user_pets(user_id,lower(nickname));
 CREATE FUNCTION guard_user_pet() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE calculated integer; spec_effective timestamptz; level_effective timestamptz;
-        unlock_type text; unlock_target integer; unlock_category uuid; unlock_achievement uuid;
+        unlock_type text; unlock_target integer; unlock_category short_id; unlock_achievement short_id;
         actual_count integer; baby_xp bigint; adult_xp bigint; hatch_required integer;
         expected_stage smallint;
 BEGIN
@@ -310,12 +310,12 @@ BEGIN
 END $$;
 CREATE TRIGGER user_pets_no_direct_delete BEFORE DELETE ON user_pets
 FOR EACH ROW EXECUTE FUNCTION protect_user_pet_delete();
-ALTER TABLE profiles ADD COLUMN representative_pet_id uuid;
+ALTER TABLE profiles ADD COLUMN representative_pet_id short_id;
 ALTER TABLE profiles ADD CONSTRAINT profiles_representative_pet_owner_fk
     FOREIGN KEY(representative_pet_id,user_id) REFERENCES user_pets(id,user_id)
     ON DELETE SET NULL (representative_pet_id);
 CREATE TABLE pet_evolution_events (
-    id uuid PRIMARY KEY, user_pet_id uuid NOT NULL REFERENCES user_pets(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY, user_pet_id short_id NOT NULL REFERENCES user_pets(id) ON DELETE CASCADE,
     from_stage_no smallint NOT NULL CHECK(from_stage_no BETWEEN 1 AND 3),
     to_stage_no smallint NOT NULL CHECK(to_stage_no BETWEEN 1 AND 3),
     total_xp_after bigint NOT NULL CHECK(total_xp_after>=0),
@@ -324,7 +324,7 @@ CREATE TABLE pet_evolution_events (
     CHECK(abs(to_stage_no-from_stage_no)=1)
 );
 
-ALTER TABLE mission_records ADD COLUMN reward_pet_id uuid,
+ALTER TABLE mission_records ADD COLUMN reward_pet_id short_id,
     ADD COLUMN reward_pet_stage_no smallint CHECK(reward_pet_stage_no BETWEEN 1 AND 3),
     ADD COLUMN reward_pet_bonus_basis_points integer NOT NULL DEFAULT 0
         CHECK(reward_pet_bonus_basis_points BETWEEN 0 AND 2000),
@@ -334,8 +334,8 @@ ALTER TABLE mission_records ADD COLUMN reward_pet_id uuid,
         ((reward_pet_id IS NULL AND reward_pet_stage_no IS NULL AND reward_pet_bonus_basis_points=0)
          OR (reward_pet_id IS NOT NULL AND reward_pet_stage_no IS NOT NULL));
 CREATE FUNCTION snapshot_mission_pet() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE selected_pet uuid; selected_stage smallint; selected_bonus integer;
-        pet_category uuid; mission_category uuid;
+DECLARE selected_pet short_id; selected_stage smallint; selected_bonus integer;
+        pet_category short_id; mission_category short_id;
 BEGIN
     IF TG_OP='UPDATE' THEN
         IF ROW(OLD.reward_pet_id,OLD.reward_pet_stage_no,OLD.reward_pet_bonus_basis_points)
@@ -367,13 +367,13 @@ CREATE TRIGGER mission_records_pet_snapshot BEFORE INSERT OR UPDATE ON mission_r
 FOR EACH ROW EXECUTE FUNCTION snapshot_mission_pet();
 
 CREATE TABLE experience_awards (
-    id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY, user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     source_type varchar(16) NOT NULL CHECK(source_type IN ('mission','achievement','streak')),
-    source_id uuid NOT NULL, recipient_pet_id uuid,
+    source_id short_id NOT NULL, recipient_pet_id short_id,
     base_user_xp integer NOT NULL CHECK(base_user_xp>=0),
     base_pet_xp integer NOT NULL CHECK(base_pet_xp>=0),
     bonus_pet_xp integer NOT NULL DEFAULT 0 CHECK(bonus_pet_xp>=0),
-    pet_species_version_id uuid REFERENCES pet_species_versions(id) ON DELETE RESTRICT,
+    pet_species_version_id short_id REFERENCES pet_species_versions(id) ON DELETE RESTRICT,
     pet_stage_no smallint CHECK(pet_stage_no BETWEEN 1 AND 3),
     bonus_basis_points integer NOT NULL DEFAULT 0 CHECK(bonus_basis_points BETWEEN 0 AND 2000),
     status varchar(12) NOT NULL CHECK(status IN ('active','revoked')),
@@ -387,9 +387,9 @@ CREATE TABLE experience_awards (
 );
 CREATE FUNCTION guard_experience_award() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE expected_user_xp integer; expected_pet_xp integer;
-        source_status text; source_user uuid; snapshot_pet uuid;
+        source_status text; source_user short_id; snapshot_pet short_id;
         snapshot_stage smallint; snapshot_bonus integer;
-        snapshot_species_version uuid;
+        snapshot_species_version short_id;
 BEGIN
     IF TG_OP='UPDATE' THEN
         IF ROW(OLD.user_id,OLD.source_type,OLD.source_id,OLD.base_user_xp,OLD.base_pet_xp,
@@ -445,22 +445,22 @@ END $$;
 CREATE TRIGGER experience_awards_guard BEFORE INSERT OR UPDATE ON experience_awards
 FOR EACH ROW EXECUTE FUNCTION guard_experience_award();
 CREATE TABLE pending_pet_experience (
-    experience_award_id uuid PRIMARY KEY, user_id uuid NOT NULL,
+    experience_award_id short_id PRIMARY KEY, user_id short_id NOT NULL,
     base_pet_xp integer NOT NULL CHECK(base_pet_xp>=0),
     status varchar(12) NOT NULL CHECK(status IN ('pending','assigned','cancelled')),
-    assigned_pet_id uuid, created_at timestamptz NOT NULL DEFAULT now(), assigned_at timestamptz,
+    assigned_pet_id short_id, created_at timestamptz NOT NULL DEFAULT now(), assigned_at timestamptz,
     FOREIGN KEY(experience_award_id,user_id) REFERENCES experience_awards(id,user_id) ON DELETE CASCADE,
     FOREIGN KEY(assigned_pet_id,user_id) REFERENCES user_pets(id,user_id) ON DELETE RESTRICT,
     CHECK((status='assigned')=(assigned_pet_id IS NOT NULL AND assigned_at IS NOT NULL))
 );
 CREATE TABLE experience_transactions (
-    id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY, user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     recipient_kind varchar(4) NOT NULL CHECK(recipient_kind IN ('user','pet')),
-    user_pet_id uuid, experience_award_id uuid,
+    user_pet_id short_id, experience_award_id short_id,
     xp_delta bigint NOT NULL CHECK(xp_delta<>0), balance_after bigint NOT NULL CHECK(balance_after>=0),
     kind varchar(20) NOT NULL CHECK(kind IN ('award','reversal','reinstatement','admin_adjustment')),
-    original_transaction_id uuid, idempotency_key text NOT NULL UNIQUE CHECK(length(btrim(idempotency_key))>0),
-    created_by_admin_id uuid REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    original_transaction_id short_id, idempotency_key text NOT NULL UNIQUE CHECK(length(btrim(idempotency_key))>0),
+    created_by_admin_id short_id REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     reason text, occurred_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE(id,user_id),
     FOREIGN KEY(user_pet_id,user_id) REFERENCES user_pets(id,user_id) ON DELETE CASCADE,
@@ -488,15 +488,15 @@ CREATE INDEX pet_evolution_events_user_pet_idx
     ON pet_evolution_events (user_pet_id);
 
 CREATE TABLE admin_asset_uploads (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     asset_kind varchar(12) NOT NULL CHECK (asset_kind IN ('badge', 'pet_stage')),
-    owner_id uuid NOT NULL,
+    owner_id short_id NOT NULL,
     version_no integer CHECK (version_no > 0),
     object_key text NOT NULL UNIQUE CHECK (length(btrim(object_key)) > 0),
     mime_type varchar(40) NOT NULL
         CHECK (mime_type IN ('image/png', 'image/jpeg', 'image/webp')),
     size_bytes bigint NOT NULL CHECK (size_bytes > 0),
-    created_by_admin_id uuid NOT NULL
+    created_by_admin_id short_id NOT NULL
         REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL DEFAULT now(),
     uploaded_at timestamptz,

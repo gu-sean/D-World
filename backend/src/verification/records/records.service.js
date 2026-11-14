@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../../common/ids.js';
 import { Dependencies, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AppException } from '../../common/errors/app-exception.js';
 import { addDays, kstDayStart } from '../../common/time/kst.js';
@@ -192,7 +192,7 @@ export class RecordsService {
     const { rows } = await db.query(
       `SELECT id, record_id, media_kind, upload_status, expected_size_bytes,
               actual_size_bytes FROM media_files
-        WHERE record_id = ANY($1::uuid[]) AND upload_status <> 'deleted'
+        WHERE record_id = ANY($1::short_id[]) AND upload_status <> 'deleted'
         ORDER BY created_at, id`,
       [recordIds],
     );
@@ -240,7 +240,7 @@ export class RecordsService {
     const missionIds = [...new Set(items.map(({ row }) => row.mission_id))];
     const { rows: counts } = await db.query(
       `SELECT mission_id, count(*)::int AS n FROM mission_records
-        WHERE mission_id = ANY($1::uuid[]) AND submission_no IS NOT NULL
+        WHERE mission_id = ANY($1::short_id[]) AND submission_no IS NOT NULL
         GROUP BY mission_id`,
       [missionIds],
     );
@@ -451,7 +451,7 @@ export class RecordsService {
         );
       }
 
-      const recordId = randomUUID();
+      const recordId = newId();
       await tx.query(
         `INSERT INTO mission_records (id, mission_id, user_id, attempt_no, status)
          VALUES ($1, $2, $3, $4, 'recording')`,

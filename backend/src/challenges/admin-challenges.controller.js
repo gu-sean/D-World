@@ -19,7 +19,7 @@ import {
   idOf,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { definitionRules } from './challenges.validation.js';
@@ -72,7 +72,7 @@ export class AdminChallengesController {
   @Bind(Query())
   list(query) {
     const filters = validateBody(query, {
-      categoryId: uuid({ optional: true }),
+      categoryId: shortId({ optional: true }),
     });
     return this.challenges.listAdmin({
       publicationStatus: pickEnum(query, 'publicationStatus', [
@@ -208,9 +208,9 @@ export class AdminChallengesController {
   @Bind(Req(), Param('id'), Body())
   async moderate(request, id, body) {
     const input = validateBody(body, {
-      participationId: uuid(),
+      participationId: shortId(),
       action: oneOf(['disqualify', 'exclude_day', 'restore_day']),
-      dailyMissionId: uuid({ optional: true }),
+      dailyMissionId: shortId({ optional: true }),
       reason: reasonRule(),
     });
     const adminId = request.auth.adminId;

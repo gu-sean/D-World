@@ -14,7 +14,7 @@ const isVideo = (file) => file.mimeType?.startsWith('video/');
  */
 export default function EvidenceViewer({ files = [], duplicateOfMediaId = null }) {
   return (
-    <Space direction="vertical" size="small" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="small" style={{ width: '100%' }}>
       {duplicateOfMediaId && (
         <Alert
           type="warning"

@@ -19,7 +19,7 @@ import {
   idOf,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { PHASES } from './challenges.constants.js';
@@ -63,7 +63,7 @@ export class ChallengesController {
   list(request, query) {
     const filters = validateBody(query, {
       phase: oneOf(PHASES, { optional: true }),
-      categoryId: uuid({ optional: true }),
+      categoryId: shortId({ optional: true }),
       // 08 A100: 앱은 분야를 code로 보낸다 (exercise·study·lifestyle)
       categoryCode: string({ min: 1, max: 32, optional: true }),
       // 08 A100: 모집 중이고 시작까지 2일 이하인 것만

@@ -74,7 +74,7 @@ export class MobileChallengesService {
   async myChallengesFor(rows) {
     if (rows.length === 0) return [];
     const [challenges, counts, today] = await Promise.all([
-      this.database.query(`${SELECT} WHERE c.id = ANY($1::uuid[])`, [
+      this.database.query(`${SELECT} WHERE c.id = ANY($1::short_id[])`, [
         rows.map((row) => row.challenge_id),
       ]),
       this.database.query(
@@ -82,7 +82,7 @@ export class MobileChallengesService {
                 count(*) FILTER (WHERE status = 'success')::int AS success,
                 max(status) FILTER (WHERE challenge_date = ${TODAY_SQL}) AS today_status
            FROM challenge_daily_missions
-          WHERE participation_id = ANY($1::uuid[])
+          WHERE participation_id = ANY($1::short_id[])
           GROUP BY participation_id`,
         [rows.map((row) => row.id)],
       ),

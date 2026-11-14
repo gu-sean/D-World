@@ -44,7 +44,7 @@ export default function VerificationCriteriaPage() {
   };
 
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       <Typography.Title level={3}>판정 기준</Typography.Title>
       <Space wrap>
         <FilterBar fields={filterFields} value={params} onChange={setParams} />

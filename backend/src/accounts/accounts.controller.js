@@ -15,12 +15,15 @@ import {
   boolean,
   nickname,
   object,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { AccountsService } from './accounts.service.js';
 
-const consentItem = object({ documentVersionId: uuid(), granted: boolean() });
+const consentItem = object({
+  documentVersionId: shortId(),
+  granted: boolean(),
+});
 
 @Controller()
 @Dependencies(AccountsService)

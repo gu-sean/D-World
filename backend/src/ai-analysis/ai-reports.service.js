@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import {
   BadRequestException,
   Dependencies,
@@ -73,12 +73,12 @@ export class AiReportsService {
     );
     if (rows.length === 0) return 0;
     // 한 번에 삽입, 동시에 다른 인스턴스가 만든 행(고유 인덱스 충돌)은 건너뜀
-    const ids = rows.map(() => randomUUID());
+    const ids = rows.map(() => newId());
     const { rowCount } = await this.database.query(
       `INSERT INTO ai_analysis_runs
               (id, user_id, run_type, period_start, period_end, ingest_key)
        SELECT t.id, t.user_id, $3, $4::date, $5::date, 'report:' || t.id
-         FROM unnest($1::uuid[], $2::uuid[]) AS t(id, user_id)
+         FROM unnest($1::short_id[], $2::short_id[]) AS t(id, user_id)
        ON CONFLICT DO NOTHING`,
       [ids, rows.map((row) => row.user_id), runType, period.start, period.end],
     );

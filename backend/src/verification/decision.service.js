@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AchievementsService } from '../achievements/achievements.service.js';
 import { AppException } from '../common/errors/app-exception.js';
@@ -284,7 +284,7 @@ export class DecisionService {
       'UPDATE verification_results SET is_current = false WHERE record_id = $1 AND is_current',
       [recordId],
     );
-    const resultId = randomUUID();
+    const resultId = newId();
     const resultNo = (previous[0]?.result_no ?? 0) + 1;
     await tx.query(
       `INSERT INTO verification_results
@@ -387,14 +387,14 @@ export class DecisionService {
     await tx.query(
       `INSERT INTO user_notifications
          (id, user_id, kind, event_key, title, body, push_status)
-       SELECT $1, $2, 'system', $3, $4, $5,
+       SELECT $1, $2::short_id, 'system', $3, $4, $5,
               CASE WHEN COALESCE(p.notification_enabled, false)
                    THEN 'pending' ELSE 'none' END
          FROM users u LEFT JOIN profiles p ON p.user_id = u.id
         WHERE u.id = $2
        ON CONFLICT (user_id, event_key) DO NOTHING`,
       [
-        randomUUID(),
+        newId(),
         mission.user_id,
         `verification_result:${resultId}`,
         approved ? '인증이 승인됐어요' : '인증이 반려됐어요',

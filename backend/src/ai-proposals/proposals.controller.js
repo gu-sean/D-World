@@ -9,7 +9,7 @@ import {
   oneOf,
   string,
   timestamp,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { MAX_STEPS_PER_GOAL } from '../goals/goals.constants.js';
@@ -48,8 +48,8 @@ const text = (max) => string({ min: 0, max, optional: true });
 const missionSpec = object({
   title: title(),
   description: text(2000),
-  categoryId: uuid({ optional: true }),
-  difficultyId: uuid({ optional: true }),
+  categoryId: shortId({ optional: true }),
+  difficultyId: shortId({ optional: true }),
   exerciseCode: oneOf(
     ['push_up', 'burpee', 'squat', 'lunge', 'plank', 'running'],
     { optional: true },

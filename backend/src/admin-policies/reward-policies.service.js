@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable } from '@nestjs/common';
 import { AdminMutationService } from '../admin-auth/admin-mutation.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -25,7 +25,7 @@ export class RewardPoliciesService {
     const { rows } = await this.database.query(
       `SELECT id, category_id, difficulty_id, version_no, points, user_xp, pet_xp, effective_at
          FROM mission_reward_rate_versions
-        WHERE ($1::uuid IS NULL OR category_id = $1) AND ($2::uuid IS NULL OR difficulty_id = $2)
+        WHERE ($1::short_id IS NULL OR category_id = $1) AND ($2::short_id IS NULL OR difficulty_id = $2)
         ORDER BY effective_at DESC, version_no DESC LIMIT $3`,
       [categoryId ?? null, difficultyId ?? null, limit],
     );
@@ -68,7 +68,7 @@ export class RewardPoliciesService {
           'WHERE category_id = $1 AND difficulty_id = $2',
           [input.categoryId, input.difficultyId],
         );
-        const id = randomUUID();
+        const id = newId();
         await tx.query(
           `INSERT INTO mission_reward_rate_versions
                   (id, category_id, difficulty_id, version_no, points, user_xp, pet_xp,
@@ -108,7 +108,7 @@ export class RewardPoliciesService {
     const { rows } = await this.database.query(
       `SELECT id, category_id, verification_method, version_no, rules_json, effective_at
          FROM verification_criteria_versions
-        WHERE ($1::uuid IS NULL OR category_id = $1)
+        WHERE ($1::short_id IS NULL OR category_id = $1)
           AND ($2::text IS NULL OR verification_method = $2)
         ORDER BY effective_at DESC, version_no DESC LIMIT $3`,
       [categoryId ?? null, verificationMethod ?? null, limit],
@@ -148,7 +148,7 @@ export class RewardPoliciesService {
           'WHERE category_id = $1 AND verification_method = $2',
           [input.categoryId, input.verificationMethod],
         );
-        const id = randomUUID();
+        const id = newId();
         await tx.query(
           `INSERT INTO verification_criteria_versions
                   (id, category_id, verification_method, version_no, rules_json,

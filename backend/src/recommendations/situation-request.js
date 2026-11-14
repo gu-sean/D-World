@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 
 /** AI에 보낼 후보 최대 수 (AI 계약 candidates 1~20) */
 export const MAX_CANDIDATES = 20;
@@ -25,7 +25,7 @@ export function buildSituationRequest({
   maxResults,
 }) {
   return {
-    ingestKey: `situational:${randomUUID()}`,
+    ingestKey: `situational:${newId()}`,
     context: {
       weather: WEATHERS.has(context.weather) ? context.weather : 'unknown',
       temperatureC: context.temperatureC ?? null,

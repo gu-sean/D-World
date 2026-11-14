@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { ID_PATTERN } from './ids.js';
 
 /**
  * 요청 본문 검증, 스펙에 없는 필드는 버림
@@ -40,18 +41,9 @@ export function boolean({ optional = false } = {}) {
   );
 }
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** UUID 문자열, 대문자로 와도 소문자로 통일(DB가 돌려주는 값과 문자열 비교가 맞도록) */
-export function uuid({ optional = false } = {}) {
-  const rule = string({ min: 36, max: 36, pattern: UUID_PATTERN, optional });
-  return (raw) => {
-    const result = rule(raw);
-    return typeof result.value === 'string'
-      ? ok(result.value.toLowerCase())
-      : result;
-  };
+/** 식별자(8자 영숫자). 대소문자를 구분하므로 값은 그대로 유지 */
+export function shortId({ optional = false } = {}) {
+  return string({ min: 8, max: 8, pattern: ID_PATTERN, optional });
 }
 
 export function integer({
@@ -206,5 +198,5 @@ export const nickname = (options) =>
     ...options,
   });
 
-/** 경로 파라미터의 UUID 검증(형식이 틀리면 400) */
-export const idOf = (id) => validateBody({ id }, { id: uuid() }).id;
+/** 경로 파라미터의 식별자 검증(형식이 틀리면 400) */
+export const idOf = (id) => validateBody({ id }, { id: shortId() }).id;

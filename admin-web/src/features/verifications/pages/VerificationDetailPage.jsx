@@ -12,7 +12,7 @@ export default function VerificationDetailPage() {
   const query = useVerification(recordId);
 
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       <Typography.Title level={3}>인증 기록 상세</Typography.Title>
       <Link to="/verifications">← 인증 기록</Link>
       <QueryBoundary query={query}>

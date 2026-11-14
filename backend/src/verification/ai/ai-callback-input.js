@@ -4,7 +4,7 @@ import {
   number,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../../common/validation.js';
 
@@ -19,7 +19,7 @@ const DECISIONS = ['approved', 'rejected', 'review_required'];
 export function parseCallback(body) {
   const input = validateBody(body, {
     ingestKey: string({ min: 8, max: 200, pattern: /^[\x21-\x7e]+$/ }),
-    recordId: uuid(),
+    recordId: shortId(),
     status: oneOf(['completed', 'failed'], { optional: true }),
     decision: oneOf(DECISIONS, { optional: true }),
     engineVersion: string({ min: 1, max: 80, pattern: /\S/ }),
@@ -27,7 +27,7 @@ export function parseCallback(body) {
     metrics: jsonObject({ optional: true }),
     reason: string({ min: 0, max: 2000, optional: true }),
     failureReason: string({ min: 0, max: 500, optional: true }),
-    criteriaVersionId: uuid({ optional: true }),
+    criteriaVersionId: shortId({ optional: true }),
     rawResult: jsonObject({ maxBytes: 262_144, optional: true }),
   });
   if (input.status !== 'failed' && !input.decision) {

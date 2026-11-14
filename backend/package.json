@@ -19,6 +19,7 @@
     "db:verify": "docker compose -f ../docker-compose.yml exec -T -e PGUSER=dworld -e PGPASSWORD=dworld postgres sh /db/scripts/verify.sh",
     "db:reset": "node --env-file-if-exists=.env scripts/migrate.mjs reset",
     "db:seed": "node --env-file-if-exists=.env scripts/seed.mjs",
+    "demo:supabase": "node scripts/supabase.mjs",
     "push:check": "node --env-file-if-exists=.env scripts/push-check.mjs",
     "weather:check": "node --env-file-if-exists=.env scripts/weather-check.mjs",
     "openapi:export": "node --env-file-if-exists=.env scripts/export-openapi.mjs"
@@ -62,6 +63,8 @@
     "node": ">=22.9"
   },
   "overrides": {
-    "multer": "2.5.0"
+    "multer": "2.5.0",
+    "minimatch": "^11.0.8",
+    "glob": "^14.0.6"
   }
 }

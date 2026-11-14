@@ -66,7 +66,7 @@ export default function VerificationQueuePage() {
   ];
 
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       <Typography.Title level={3}>인증 기록</Typography.Title>
       <Alert
         type="info"

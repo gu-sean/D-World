@@ -1,6 +1,6 @@
 // 총괄 관리자 계정 생성, 가입 API는 없고 배포·운영 절차로만 만든다
 // 사용: ADMIN_PASSWORD='...' node --env-file-if-exists=.env scripts/create-admin.mjs <login_id> <email>
-import { randomUUID } from 'node:crypto';
+import { newId } from '../src/common/ids.js';
 import argon2 from 'argon2';
 import pg from 'pg';
 
@@ -43,7 +43,7 @@ try {
     `INSERT INTO admin_accounts (id, login_id, email, password_hash)
      VALUES ($1, $2, $3, $4)`,
     [
-      randomUUID(),
+      newId(),
       loginId,
       email,
       await argon2.hash(password, { type: argon2.argon2id }),

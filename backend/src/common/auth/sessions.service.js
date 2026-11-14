@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../../database/database.service.js';
@@ -48,7 +48,7 @@ export class SessionsService {
   /** 세션 생성, refresh token 원문은 이 응답에서만 노출되고 해시만 저장 */
   async create(tx, kind, ownerId) {
     const { sessions, ownerColumn } = TABLES[kind];
-    const sessionId = randomUUID();
+    const sessionId = newId();
     const refreshToken = randomToken();
     const { rows } = await tx.query(
       `INSERT INTO ${sessions} (id, ${ownerColumn}, refresh_token_hash, expires_at)

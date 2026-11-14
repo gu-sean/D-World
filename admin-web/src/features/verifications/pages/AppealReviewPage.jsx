@@ -17,7 +17,7 @@ export default function AppealReviewPage() {
   const resolve = useResolveAppeal();
 
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       <Typography.Title level={3}>이의 신청 검토</Typography.Title>
       <Link to="/verifications/appeals">← 이의 신청 목록</Link>
       <QueryBoundary query={query}>

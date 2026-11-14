@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppException } from '../common/errors/app-exception.js';
@@ -178,7 +178,7 @@ export class MediaService {
         );
       }
 
-      const id = randomUUID();
+      const id = newId();
       const key = recordMediaKey({
         prefix: this.config.get('R2_KEY_PREFIX'),
         userId,
@@ -563,7 +563,7 @@ export class MediaService {
     if (rows.length === 0) return { deleted: 0 };
     await this.database.query(
       `UPDATE media_files SET upload_status = 'deleting', updated_at = now()
-        WHERE id = ANY($1::uuid[]) AND upload_status = 'uploaded'`,
+        WHERE id = ANY($1::short_id[]) AND upload_status = 'uploaded'`,
       [rows.map((row) => row.id)],
     );
     const removed = [];
@@ -573,7 +573,7 @@ export class MediaService {
     if (removed.length === 0) return { deleted: 0 };
     const { rowCount } = await this.database.query(
       `UPDATE media_files SET upload_status = 'deleted', deleted_at = now(), updated_at = now()
-        WHERE id = ANY($1::uuid[]) AND upload_status <> 'deleted'`,
+        WHERE id = ANY($1::short_id[]) AND upload_status <> 'deleted'`,
       [removed],
     );
     return { deleted: rowCount };

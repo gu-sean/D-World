@@ -18,7 +18,7 @@ export default function DecisionForm({ labels, confirmTitle, submitText, onDecid
   const [open, setOpen] = useState(false);
 
   return (
-    <Space direction="vertical">
+    <Space orientation="vertical">
       <Radio.Group value={decision} onChange={(event) => setDecision(event.target.value)}>
         <Radio value="approved">{labels.approved}</Radio>
         <Radio value="rejected">{labels.rejected}</Radio>

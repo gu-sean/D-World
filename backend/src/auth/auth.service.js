@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { nicknameTaken } from '../accounts/accounts.service.js';
 import { ConsentService } from '../accounts/consent.service.js';
@@ -127,7 +127,7 @@ export class AuthService {
   }
 
   async createUser(tx, { nickname }) {
-    const userId = randomUUID();
+    const userId = newId();
     await tx.query('INSERT INTO users (id) VALUES ($1)', [userId]);
     await tx.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
       userId,
@@ -335,7 +335,7 @@ export class AuthService {
           await tx.query(
             `INSERT INTO user_identities (id, user_id, provider, provider_subject, email)
              VALUES ($1, $2, $3, $4, $5)`,
-            [randomUUID(), id, provider, identity.subject, identity.email],
+            [newId(), id, provider, identity.subject, identity.email],
           );
           await this.consents.record(tx, id, consents, current);
           return {
@@ -453,7 +453,7 @@ export class AuthService {
       await this.database.query(
         `INSERT INTO user_identities (id, user_id, provider, provider_subject, email)
          VALUES ($1, $2, $3, $4, $5)`,
-        [randomUUID(), userId, provider, identity.subject, identity.email],
+        [newId(), userId, provider, identity.subject, identity.email],
       );
     } catch (error) {
       rethrowConstraint(error, {

@@ -54,7 +54,7 @@ export class ReportsService {
             WHERE user_id = $1 AND deleted_at IS NULL AND status <> 'cancelled'
               AND ($2::date IS NULL OR scheduled_date >= $2::date)
               AND scheduled_date <= $3::date
-              AND ($4::uuid IS NULL OR category_id = $4)`,
+              AND ($4::short_id IS NULL OR category_id = $4)`,
           params,
         ),
         this.database.query(
@@ -64,7 +64,7 @@ export class ReportsService {
             WHERE m.user_id = $1 AND m.deleted_at IS NULL AND m.status <> 'cancelled'
               AND ($2::date IS NULL OR m.scheduled_date >= $2::date)
               AND m.scheduled_date <= $3::date
-              AND ($4::uuid IS NULL OR m.category_id = $4)
+              AND ($4::short_id IS NULL OR m.category_id = $4)
             GROUP BY c.id ORDER BY c.display_order, c.id`,
           params,
         ),
@@ -74,7 +74,7 @@ export class ReportsService {
              FROM missions m JOIN goals g ON g.id = m.goal_id AND g.user_id = m.user_id
             WHERE m.user_id = $1 AND m.deleted_at IS NULL AND m.status <> 'cancelled'
               AND g.deleted_at IS NULL AND g.status = 'active'
-              AND ($2::uuid IS NULL OR g.category_id = $2)`,
+              AND ($2::short_id IS NULL OR g.category_id = $2)`,
           [userId, categoryId ?? null],
         ),
         this.database.query(
@@ -174,7 +174,7 @@ export class ReportsService {
         WHERE r.user_id = $1 AND a.superseded_at IS NULL
           AND ($2::text IS NULL OR r.run_type = $2)
           AND ($3::timestamptz IS NULL
-               OR (r.generated_at, r.run_id) < ($3::timestamptz, $4::uuid))
+               OR (r.generated_at, r.run_id) < ($3::timestamptz, $4::short_id))
         ORDER BY r.generated_at DESC, r.run_id DESC
         LIMIT $5`,
       [userId, runType ?? null, after?.t ?? null, after?.id ?? null, limit + 1],

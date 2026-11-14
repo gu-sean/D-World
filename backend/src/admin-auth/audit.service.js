@@ -1,8 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable } from '@nestjs/common';
 import { adminPage } from '../common/pagination/admin-page.js';
 import {
-  UUID_PATTERN,
+  ID_PATTERN,
   escapeLike,
   memberQueryParams,
   memberWhere,
@@ -35,7 +35,7 @@ export class AuditService {
   }) {
     const target = memberQueryParams(member);
     const adminText = typeof admin === 'string' ? admin.trim() : '';
-    const adminIsId = UUID_PATTERN.test(adminText);
+    const adminIsId = ID_PATTERN.test(adminText);
     const params = [
       adminId ?? (adminIsId ? adminText : null),
       action ? `${escapeLike(action)}%` : null,
@@ -46,7 +46,7 @@ export class AuditService {
       target.like,
       adminText && !adminIsId ? `%${escapeLike(adminText)}%` : null,
     ];
-    const where = `($1::uuid IS NULL OR l.admin_id = $1)
+    const where = `($1::short_id IS NULL OR l.admin_id = $1)
           AND ($2::text IS NULL OR l.action LIKE $2)
           AND ${memberWhere('l.target_user_id', '$7', '$3')}
           AND ($4::text IS NULL OR l.result = $4)
@@ -107,7 +107,7 @@ export class AuditService {
               (id, admin_id, target_user_id, action, result, reason, before_value, after_value)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
-        randomUUID(),
+        newId(),
         adminId,
         targetUserId,
         action,

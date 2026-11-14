@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, Injectable } from '@nestjs/common';
 import { AdminMutationService } from '../admin-auth/admin-mutation.service.js';
 import { rethrowConstraint } from '../common/errors/constraint.js';
@@ -69,7 +69,7 @@ export class GrowthPoliciesService {
           'WHERE target_success_days = $1',
           [input.targetDays],
         );
-        const id = randomUUID();
+        const id = newId();
         await tx.query(
           `INSERT INTO streak_milestone_policy_versions
                   (id, target_success_days, version_no, points, user_xp, pet_xp,
@@ -135,7 +135,7 @@ export class GrowthPoliciesService {
             { currentMonth: month[0].current },
           );
         }
-        const id = randomUUID();
+        const id = newId();
         try {
           await tx.query(
             `INSERT INTO point_monthly_cap_policies
@@ -193,7 +193,7 @@ export class GrowthPoliciesService {
         await lockScope(tx, kind);
         const effectiveAt = await resolveEffectiveAt(tx, input.effectiveAt);
         const versionNo = await nextVersionNo(tx, policies, '', []);
-        const id = randomUUID();
+        const id = newId();
         await tx.query(
           `INSERT INTO ${policies} (id, version_no, effective_at, created_by_admin_id)
            VALUES ($1,$2,$3,$4)`,

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 
 /**
  * 경험치 원장 내부 도구, 호출자가 연 트랜잭션(tx)에서만 사용
@@ -154,7 +154,7 @@ export async function insertExperienceTransaction(
     reason = null,
   },
 ) {
-  const id = randomUUID();
+  const id = newId();
   await tx.query(
     `INSERT INTO experience_transactions
             (id, user_id, recipient_kind, user_pet_id, experience_award_id,

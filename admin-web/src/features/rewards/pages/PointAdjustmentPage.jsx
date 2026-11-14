@@ -4,8 +4,8 @@ import { Link, useSearchParams } from 'react-router';
 import { useConfirmedChange } from '../components/useConfirmedChange.jsx';
 import { MAX_POINTS } from '../components/labels.js';
 import { useAdjustPoints, useMember } from '../queries.js';
+import { ID_PATTERN } from '../../../api/ids.js';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACTION_TEXT = { manual_grant: '지급', manual_recovery: '회수' };
 
 /** 입력한 회원 ID가 누구인지 바로 아래에 보여 준다 (잘못된 회원에게 조정하지 않게). */
@@ -32,7 +32,7 @@ export default function PointAdjustmentPage() {
 
   // 회원 상세의 "포인트 조정"에서 오면 회원 ID가 채워져 있다 (?userId=)
   const typedId = (Form.useWatch('userId', form) ?? '').trim();
-  const member = useMember(UUID.test(typedId) ? typedId : null);
+  const member = useMember(ID_PATTERN.test(typedId) ? typedId : null);
 
   // The server decides the result (balance, whether a recovery is possible); nothing is
   // calculated here (docs/parts/admin-web.md §7 rule 3).
@@ -71,14 +71,14 @@ export default function PointAdjustmentPage() {
             { required: true, whitespace: true, message: '회원 ID를 입력해 주세요.' },
             {
               validator: (_, v) =>
-                !v?.trim() || UUID.test(v.trim())
+                !v?.trim() || ID_PATTERN.test(v.trim())
                   ? Promise.resolve()
                   : Promise.reject(new Error('회원 ID 형식을 확인해 주세요.')),
             },
           ]}
         >
-          {/* UUID 36자가 잘리지 않게 고정폭 글꼴로 칸을 채운다 */}
-          <Input style={{ fontFamily: 'monospace' }} maxLength={36} />
+          {/* 회원 ID 8자를 알아보기 쉽게 고정폭 글꼴로 */}
+          <Input style={{ fontFamily: 'monospace' }} maxLength={8} />
         </Form.Item>
         <div style={{ marginTop: -8, marginBottom: 16 }}>
           <MemberCheck query={member} />

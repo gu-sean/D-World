@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import {
   BadRequestException,
   Bind,
@@ -27,7 +27,7 @@ import {
   object,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -174,7 +174,7 @@ export class AdminSupportController {
   assign(request, ticketId, body) {
     const id = idOf(ticketId);
     const input = validateBody(body, {
-      adminId: nullableUuid(),
+      adminId: nullableId(),
       reason: string(REASON_RULE_OPTIONS),
     });
     const adminId = request.auth.adminId;
@@ -389,7 +389,7 @@ export class AdminSupportController {
   }
 
   async addEvent(tx, ticketId, adminId, eventType, visibility, body) {
-    const id = randomUUID();
+    const id = newId();
     await tx.query(
       `INSERT INTO support_ticket_events
          (id, ticket_id, admin_id, event_type, visibility, body, created_at)
@@ -406,7 +406,7 @@ export class AdminSupportController {
       `INSERT INTO user_notifications (id, user_id, kind, event_key, title, body)
        VALUES ($1, $2, 'system', $3, $4, $5)`,
       [
-        randomUUID(),
+        newId(),
         ticket.reporter_user_id,
         `ticket_reply:${eventId}`,
         ticket.ticket_type === 'report'
@@ -556,8 +556,8 @@ function assertOutcomeShape({
   if (errors.length > 0) throw new BadRequestException(errors);
 }
 
-/** null을 허용하는 uuid 규칙: null이면 요청한 관리자 본인 */
-function nullableUuid() {
-  const rule = uuid();
+/** null을 허용하는 식별자 규칙: null이면 요청한 관리자 본인 */
+function nullableId() {
+  const rule = shortId();
   return (raw) => (raw === null ? { value: null } : rule(raw));
 }

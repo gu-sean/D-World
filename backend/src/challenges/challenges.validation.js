@@ -6,7 +6,7 @@ import {
   object,
   oneOf,
   string,
-  uuid,
+  shortId,
 } from '../common/validation.js';
 import {
   DEFAULT_LIMIT,
@@ -33,7 +33,7 @@ const rewardRule = (optional = false) =>
       // 사용자 XP는 관리자 화면에서 뺐다 (없으면 등록 0, 수정은 지금 값 유지)
       userXp: integer({ min: 0, max: 1_000_000, optional: true }),
       petXp: integer({ min: 0, max: 1_000_000 }),
-      badgeAchievementVersionId: uuid({ optional: true }),
+      badgeAchievementVersionId: shortId({ optional: true }),
     },
     { optional },
   );
@@ -41,8 +41,8 @@ const rewardRule = (optional = false) =>
 export const definitionRules = (optional) => ({
   title: text(200, optional),
   description: text(5000, optional),
-  categoryId: uuid({ optional }),
-  difficultyId: uuid({ optional }),
+  categoryId: shortId({ optional }),
+  difficultyId: shortId({ optional }),
   verificationMethod: oneOf(VERIFICATION_METHODS, { optional }),
   exerciseCode: oneOf(EXERCISE_CODES, { optional: true }),
   targetValue: number({ min: 0.01, max: 99_999_999, optional: true }),

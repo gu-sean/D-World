@@ -22,7 +22,7 @@ import {
   oneOf,
   string,
   timestamp,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { notFound } from '../common/errors/http-errors.js';
@@ -93,7 +93,7 @@ export class AdminPointsController {
   @Bind(Query(), Res({ passthrough: true }))
   async list(query, response) {
     const filters = validateBody(query, {
-      userId: uuid({ optional: true }),
+      userId: shortId({ optional: true }),
       from: timestamp({ optional: true }),
       to: timestamp({ optional: true }),
     });
@@ -150,7 +150,7 @@ export class AdminPointsController {
   @Bind(Req(), Body())
   adjust(request, body) {
     const input = validateBody(body, {
-      userId: uuid(),
+      userId: shortId(),
       kind: oneOf(['manual_grant', 'manual_recovery']),
       amount: integer({ min: 1, max: MAX_ADJUST_POINTS }),
       reason: string({

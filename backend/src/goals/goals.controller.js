@@ -20,7 +20,7 @@ import {
   integer,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { GOAL_STATUSES } from './goals.constants.js';
@@ -46,7 +46,7 @@ const description = () => string({ min: 0, max: 2000, optional: true });
 const idParams = (params) =>
   validateBody(
     params,
-    Object.fromEntries(Object.keys(params).map((k) => [k, uuid()])),
+    Object.fromEntries(Object.keys(params).map((k) => [k, shortId()])),
   );
 
 @Controller('goals')
@@ -68,9 +68,9 @@ export class GoalsController {
       validateBody(body, {
         title: title(),
         description: description(),
-        categoryId: uuid(),
+        categoryId: shortId(),
         // 최종 목표에는 보상이 없어 난이도를 받지 않아도 된다 (생략하면 보통, 미션 난이도는 미션마다 판정)
-        difficultyId: uuid({ optional: true }),
+        difficultyId: shortId({ optional: true }),
         startDate: dateString(),
         endDate: dateString(),
         targetFrequency: integer({ min: 1, max: 7, optional: true }),
@@ -84,7 +84,7 @@ export class GoalsController {
   list(request, query) {
     const { categoryId, status: statusText } = validateBody(query, {
       status: string({ min: 1, max: 60, optional: true }),
-      categoryId: uuid({ optional: true }),
+      categoryId: shortId({ optional: true }),
     });
     // 여러 값 필터 `?status=a,b` (05 §6)
     const statuses = statusText
@@ -180,7 +180,7 @@ export class GoalsController {
       validateBody(body, {
         title: title({ optional: true }),
         description: description(),
-        difficultyId: uuid({ optional: true }),
+        difficultyId: shortId({ optional: true }),
         endDate: dateString({ optional: true }),
         targetFrequency: integer({ min: 1, max: 7, optional: true }),
         dailyAvailableMinutes: integer({ min: 5, max: 240, optional: true }),

@@ -28,13 +28,13 @@ import {
   oneOf,
   string,
   timestamp,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { DatabaseService } from '../database/database.service.js';
 import { REASON_RULE_OPTIONS } from '../admin-members/admin-members.service.js';
 import { NoticeDeliveryService } from '../notices/notice-delivery.service.js';
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 
 const CATEGORIES = ['service', 'event', 'policy', 'marketing'];
 const STATUSES = ['draft', 'scheduled', 'published', 'cancelled'];
@@ -88,14 +88,14 @@ const contentRules = (optional) => ({
   linkScreen: string({
     min: 1,
     max: 80,
-    pattern: /^[a-z][a-z0-9_/.-]*$/,
+    pattern: /^[a-z][A-Za-z0-9_/.-]*$/,
     optional: true,
   }),
   audienceType: oneOf(['all', 'users'], { optional }),
-  userIds: array(uuid(), { min: 1, max: MAX_RECIPIENTS, optional: true }),
+  userIds: array(shortId(), { min: 1, max: MAX_RECIPIENTS, optional: true }),
   showInList: boolean({ optional }),
   sendPush: boolean({ optional }),
-  policyDocumentVersionId: uuid({ optional: true }),
+  policyDocumentVersionId: shortId({ optional: true }),
 });
 
 /** 합쳐진 공지 내용의 교차 규칙을 DB CHECK 이전에 검사 */
@@ -185,7 +185,7 @@ export class AdminNoticesController {
       reason: input.reason.trim(),
       run: async (tx) => {
         await this.assertReferences(tx, input);
-        const id = randomUUID();
+        const id = newId();
         await tx.query(
           `INSERT INTO notices
              (id, category, title, body, link_screen, audience_type, show_in_list,
@@ -495,7 +495,7 @@ export class AdminNoticesController {
     if (notice.audienceType === 'users') {
       const unique = [...new Set(notice.userIds)];
       const { rows } = await tx.query(
-        'SELECT count(*)::int AS n FROM users WHERE id = ANY($1::uuid[])',
+        'SELECT count(*)::int AS n FROM users WHERE id = ANY($1::short_id[])',
         [unique],
       );
       if (rows[0].n !== unique.length) {
@@ -507,7 +507,7 @@ export class AdminNoticesController {
   async setRecipients(tx, noticeId, userIds) {
     await tx.query(
       `INSERT INTO notice_recipients (notice_id, user_id)
-       SELECT $1, u FROM unnest($2::uuid[]) AS u
+       SELECT $1, u FROM unnest($2::short_id[]) AS u
        ON CONFLICT DO NOTHING`,
       [noticeId, [...new Set(userIds)]],
     );

@@ -244,7 +244,7 @@ function ChallengeForm({ challenge, categories, difficulties }) {
           </Form.Item>
         </Space>
         <Form.Item label="배지 업적 버전 ID (선택)" name={['reward', 'badgeAchievementVersionId']}>
-          <Input placeholder="UUID" />
+          <Input placeholder="ID" />
         </Form.Item>
         <Space>
           <Button onClick={() => navigate('/challenges')}>취소</Button>

@@ -15,7 +15,7 @@ import {
   idOf,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { ReportsService } from './reports.service.js';
@@ -35,7 +35,7 @@ export class ReportsController {
     const filters = validateBody(query, {
       period: oneOf(['week', 'month', 'all'], { optional: true }),
       date: dateString({ optional: true }),
-      categoryId: uuid({ optional: true }),
+      categoryId: shortId({ optional: true }),
     });
     return this.reports.summary(request.auth.userId, filters);
   }

@@ -4,7 +4,7 @@ import {
   number,
   oneOf,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { EXERCISE_CODES } from '../challenges/challenges.constants.js';
@@ -48,8 +48,8 @@ const definitionRules = (optional) => ({
     optional,
   }),
   description: string({ min: 0, max: 2000, optional: true }),
-  categoryId: uuid({ optional }),
-  difficultyId: uuid({ optional }),
+  categoryId: shortId({ optional }),
+  difficultyId: shortId({ optional }),
   exerciseCode: oneOf(EXERCISE_CODES, { optional: true }),
   verificationMethod: oneOf(VERIFICATION_METHODS, { optional }),
   targetValue: number({ min: 0.01, max: 99_999_999.99, optional: true }),
@@ -125,7 +125,7 @@ export class AdminMissionDefinitionsController {
   @Bind(Query())
   list(query) {
     const filters = validateBody(query, {
-      categoryId: uuid({ optional: true }),
+      categoryId: shortId({ optional: true }),
     });
     return this.reviews.listAdmin({
       origin: pickEnum(query, 'origin', ['admin', 'user']),

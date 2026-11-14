@@ -2,8 +2,21 @@
 
 BEGIN;
 
+-- 식별자: 8자 영숫자(대소문자 구분). 앱이 만들고(backend/src/common/ids.js), DB 기본값 용도로 new_short_id()도 제공
+-- COLLATE "C": 문자 비교를 바이트 기준으로 해 인덱스가 빠르고 결과가 환경에 따라 달라지지 않음
+CREATE DOMAIN short_id AS varchar(8) COLLATE "C"
+    CONSTRAINT short_id_format CHECK (VALUE ~ '^[0-9A-Za-z]{8}$');
+
+CREATE FUNCTION new_short_id() RETURNS short_id
+LANGUAGE sql VOLATILE AS $$
+    SELECT string_agg(
+               substr('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+                      1 + floor(random() * 62)::int, 1), '')::short_id
+      FROM generate_series(1, 8)
+$$;
+
 CREATE TABLE users (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     status varchar(24) NOT NULL DEFAULT 'active'
         CHECK (status IN ('active', 'withdrawal_processing')),
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -11,7 +24,7 @@ CREATE TABLE users (
 );
 
 CREATE TABLE profiles (
-    user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    user_id short_id PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     nickname varchar(12) NOT NULL
         CHECK (nickname ~ '^[가-힣A-Za-z0-9]{2,12}$'),
     notification_enabled boolean NOT NULL DEFAULT false,
@@ -21,7 +34,7 @@ CREATE TABLE profiles (
 CREATE UNIQUE INDEX profiles_nickname_ci_uq ON profiles (lower(nickname));
 
 CREATE TABLE phone_credentials (
-    user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    user_id short_id PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     phone_e164 varchar(16) NOT NULL UNIQUE
         CHECK (phone_e164 ~ '^\+[1-9][0-9]{1,14}$'),
     password_hash text NOT NULL CHECK (length(password_hash) > 0),
@@ -33,8 +46,8 @@ CREATE TABLE phone_credentials (
 );
 
 CREATE TABLE user_identities (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     provider varchar(20) NOT NULL
         CHECK (provider IN ('apple', 'google', 'naver')),
     provider_subject text NOT NULL CHECK (length(provider_subject) > 0),
@@ -45,7 +58,7 @@ CREATE TABLE user_identities (
 );
 
 CREATE TABLE phone_verification_challenges (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     phone_e164 varchar(16) NOT NULL
         CHECK (phone_e164 ~ '^\+[1-9][0-9]{1,14}$'),
     purpose varchar(24) NOT NULL
@@ -66,8 +79,8 @@ CREATE INDEX phone_challenges_recent_idx
     ON phone_verification_challenges (phone_e164, purpose, created_at DESC);
 
 CREATE TABLE auth_sessions (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     refresh_token_hash text NOT NULL UNIQUE
         CHECK (length(refresh_token_hash) > 0),
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -81,7 +94,7 @@ CREATE INDEX auth_sessions_user_expiry_idx
     ON auth_sessions (user_id, expires_at);
 
 CREATE TABLE policy_document_versions (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     document_type varchar(24) NOT NULL
         CHECK (document_type IN ('terms', 'privacy', 'marketing')),
     version varchar(40) NOT NULL CHECK (length(version) > 0),
@@ -97,9 +110,9 @@ CREATE INDEX policy_documents_effective_idx
     WHERE published_at IS NOT NULL;
 
 CREATE TABLE consent_records (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    document_version_id uuid NOT NULL
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_version_id short_id NOT NULL
         REFERENCES policy_document_versions(id) ON DELETE RESTRICT,
     granted boolean NOT NULL,
     recorded_at timestamptz NOT NULL DEFAULT now()
@@ -109,7 +122,7 @@ CREATE INDEX consent_records_latest_idx
     ON consent_records (user_id, document_version_id, recorded_at DESC);
 
 CREATE TABLE admin_accounts (
-    id uuid PRIMARY KEY,
+    id short_id PRIMARY KEY,
     login_id varchar(50) NOT NULL
         CHECK (login_id ~ '^[A-Za-z0-9_]{3,50}$'),
     email varchar(255) NOT NULL
@@ -130,8 +143,8 @@ CREATE UNIQUE INDEX admin_accounts_email_uq
     ON admin_accounts (email);
 
 CREATE TABLE admin_sessions (
-    id uuid PRIMARY KEY,
-    admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE CASCADE,
+    id short_id PRIMARY KEY,
+    admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE CASCADE,
     refresh_token_hash text NOT NULL UNIQUE
         CHECK (length(refresh_token_hash) > 0),
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -145,9 +158,9 @@ CREATE INDEX admin_sessions_admin_expiry_idx
     ON admin_sessions (admin_id, expires_at);
 
 CREATE TABLE account_actions (
-    id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    id short_id PRIMARY KEY,
+    user_id short_id NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     action_type varchar(20) NOT NULL
         CHECK (action_type IN ('warning', 'restriction')),
     reason text NOT NULL CHECK (length(btrim(reason)) > 0),
@@ -167,12 +180,12 @@ CREATE INDEX account_actions_user_period_idx
     ON account_actions (user_id, starts_at DESC);
 
 CREATE TABLE account_withdrawal_requests (
-    id uuid PRIMARY KEY,
-    user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    id short_id PRIMARY KEY,
+    user_id short_id REFERENCES users(id) ON DELETE SET NULL,
     status varchar(24) NOT NULL DEFAULT 'requested'
         CHECK (status IN ('requested', 'cancelled', 'on_hold', 'processing', 'completed')),
     requested_at timestamptz NOT NULL DEFAULT now(),
-    reviewed_by uuid REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    reviewed_by short_id REFERENCES admin_accounts(id) ON DELETE RESTRICT,
     reviewed_at timestamptz,
     reason text,
     completed_at timestamptz,
@@ -190,9 +203,9 @@ CREATE INDEX account_withdrawal_queue_idx
     ON account_withdrawal_requests (status, requested_at);
 
 CREATE TABLE admin_audit_logs (
-    id uuid PRIMARY KEY,
-    admin_id uuid NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
-    target_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    id short_id PRIMARY KEY,
+    admin_id short_id NOT NULL REFERENCES admin_accounts(id) ON DELETE RESTRICT,
+    target_user_id short_id REFERENCES users(id) ON DELETE SET NULL,
     action varchar(80) NOT NULL,
     result varchar(20) NOT NULL CHECK (result IN ('success', 'failure')),
     reason text,

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { ActiveAccountGuard } from '../accounts/active-account.guard.js';
 import { AppException } from '../common/errors/app-exception.js';
@@ -186,7 +186,7 @@ export class MissionsService {
       `SELECT scheduled_date, count(*) AS n FROM missions
         WHERE user_id = $1 AND scheduled_date = ANY($2::date[])
           AND deleted_at IS NULL AND status <> 'cancelled' AND source_type <> 'challenge'
-          AND ($3::uuid IS NULL OR id <> $3)
+          AND ($3::short_id IS NULL OR id <> $3)
         GROUP BY scheduled_date`,
       [userId, dates, excludeMissionId],
     );
@@ -402,7 +402,7 @@ export class MissionsService {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
        RETURNING ${COLUMNS}`,
       [
-        randomUUID(),
+        newId(),
         userId,
         m.goalId ?? null,
         m.stepId ?? null,
@@ -496,9 +496,9 @@ export class MissionsService {
     if (date) add('scheduled_date = ?::date', date);
     if (from) add('scheduled_date >= ?::date', from);
     if (to) add('scheduled_date <= ?::date', to);
-    if (goalId) add('goal_id = ?::uuid', goalId);
-    if (stepId) add('goal_step_id = ?::uuid', stepId);
-    if (categoryId) add('category_id = ?::uuid', categoryId);
+    if (goalId) add('goal_id = ?::short_id', goalId);
+    if (stepId) add('goal_step_id = ?::short_id', stepId);
+    if (categoryId) add('category_id = ?::short_id', categoryId);
     if (statuses?.length) add('status = ANY(?::text[])', statuses);
     else if (status) add('status = ?::text', status);
     else where.push("status <> 'cancelled'");
@@ -515,7 +515,7 @@ export class MissionsService {
       params.push(after.d, after.t, after.id);
       const n = params.length;
       where.push(
-        `(scheduled_date, created_at, id) > ($${n - 2}::date, $${n - 1}::timestamptz, $${n}::uuid)`,
+        `(scheduled_date, created_at, id) > ($${n - 2}::date, $${n - 1}::timestamptz, $${n}::short_id)`,
       );
     }
 
@@ -768,7 +768,7 @@ export class MissionsService {
     if (list.length === 0) return views;
     const { rows } = await this.database.query(
       `SELECT mission_id, challenge_id
-         FROM challenge_daily_missions WHERE mission_id = ANY($1::uuid[])`,
+         FROM challenge_daily_missions WHERE mission_id = ANY($1::short_id[])`,
       [list.map((view) => view.id)],
     );
     const byMission = new Map(rows.map((r) => [r.mission_id, r.challenge_id]));

@@ -23,7 +23,7 @@ import {
   idOf,
   jsonObject,
   string,
-  uuid,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { PlanAdjustmentsService } from './plan-adjustments.service.js';
@@ -44,7 +44,7 @@ export class PlanAdjustmentsController {
   @Bind(Req(), Query())
   list(request, query) {
     const filters = validateBody(query, {
-      goalId: uuid({ optional: true }),
+      goalId: shortId({ optional: true }),
       status: string({ min: 1, max: 60, optional: true }),
       cursor: string({ min: 1, max: 500, optional: true }),
     });

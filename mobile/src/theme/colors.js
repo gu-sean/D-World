@@ -29,8 +29,6 @@ export const colors = {
   /** 목표 분야별 색. `categoryStyle.js`가 이 값을 찾아 쓴다. */
   category: {
     exercise: '#FF7A45',
-    study: '#4F7CFF',
-    lifestyle: '#22C55E',
   },
 };
 

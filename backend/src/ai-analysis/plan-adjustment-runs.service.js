@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../common/ids.js';
 import {
   BadRequestException,
   Dependencies,
@@ -118,7 +118,7 @@ export class PlanAdjustmentRunsService {
     let created = 0;
     for (const candidates of [...byUser.values()].slice(0, limit)) {
       const pick = pickWorstGoal(candidates);
-      const id = randomUUID();
+      const id = newId();
       try {
         await this.database.query(
           `INSERT INTO ai_analysis_runs
@@ -365,7 +365,7 @@ export class PlanAdjustmentRunsService {
                  now() + make_interval(days => $8))
          RETURNING id`,
         [
-          randomUUID(),
+          newId(),
           run.id,
           run.user_id,
           key.goalId,

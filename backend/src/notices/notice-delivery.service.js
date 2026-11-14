@@ -34,7 +34,7 @@ export class NoticeDeliveryService {
                 FROM n
                 JOIN users u ON u.status = 'active'
                 LEFT JOIN profiles p ON p.user_id = u.id
-               WHERE ($3::uuid IS NULL OR u.id > $3)
+               WHERE ($3::short_id IS NULL OR u.id > $3)
                  AND (n.audience_type = 'all' OR EXISTS (
                         SELECT 1 FROM notice_recipients r
                          WHERE r.notice_id = n.id AND r.user_id = u.id))
@@ -52,7 +52,7 @@ export class NoticeDeliveryService {
             ins AS (
               INSERT INTO user_notifications
                 (id, user_id, kind, notice_id, title, body, link_screen, push_status)
-              SELECT gen_random_uuid(), b.user_id, 'notice', n.id, n.title, n.body,
+              SELECT new_short_id(), b.user_id, 'notice', n.id, n.title, n.body,
                      n.link_screen,
                      CASE WHEN NOT n.send_push THEN 'none'
                           WHEN COALESCE(b.notification_enabled, false) THEN 'pending'

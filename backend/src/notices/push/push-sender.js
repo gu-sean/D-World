@@ -46,6 +46,16 @@ class FcmPushSender {
   }
 }
 
+/**
+ * 서비스 계정 JSON: 문자열(FCM_SERVICE_ACCOUNT_JSON)이 있으면 그것, 없으면 파일(FCM_SERVICE_ACCOUNT_PATH)
+ * .env.example에서 복사한 빈 값("")은 없는 것으로 본다
+ */
+export function serviceAccountJson(config) {
+  const inline = config.get('FCM_SERVICE_ACCOUNT_JSON');
+  if (inline && inline.trim()) return inline;
+  return readFileSync(config.get('FCM_SERVICE_ACCOUNT_PATH'), 'utf8');
+}
+
 /** firebase-admin은 fcm일 때만 불러와 초기화(다른 드라이버에서는 로드하지 않음) */
 async function createFcmSender(config) {
   const [{ initializeApp, cert, getApps, getApp }, { getMessaging }] =
@@ -53,9 +63,7 @@ async function createFcmSender(config) {
       import('firebase-admin/app'),
       import('firebase-admin/messaging'),
     ]);
-  const json =
-    config.get('FCM_SERVICE_ACCOUNT_JSON') ??
-    readFileSync(config.get('FCM_SERVICE_ACCOUNT_PATH'), 'utf8');
+  const json = serviceAccountJson(config);
   const app = getApps().length
     ? getApp()
     : initializeApp({ credential: cert(JSON.parse(json)) });
