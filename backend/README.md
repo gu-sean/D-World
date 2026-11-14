@@ -127,7 +127,7 @@ npm run start:dev
 ## 마이그레이션
 
 - `npm run db:migrate [디렉터리]`: 기본 `MIGRATIONS_DIR` 또는 `../db/migrations`
-- 적용 순서: `order.txt`가 있으면 그 순서, 없으면 파일명 순 (현재 `001~016`)
+- 적용 순서: `order.txt`가 있으면 그 순서, 없으면 파일명 순 (현재 `001~017`)
 - 적용 기록: `schema_migrations`(파일명, 체크섬), 적용분은 건너뜀
 - 적용된 파일 수정 시 체크섬 불일치로 중단, 변경은 새 번호 파일로 추가
 - 파일은 자체 BEGIN/COMMIT 전제, psql 메타 명령(`\if`)은 미지원

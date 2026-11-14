@@ -1,4 +1,4 @@
-`.env.supabase`을 backend폴더에 둔 뒤 `cd backend && npm install && npm run demo:supabase`
+`cd backend && npm install && npm run demo:supabase`
 
 시험 계정
 - id: 01099999999
