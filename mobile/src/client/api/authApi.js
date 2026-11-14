@@ -7,26 +7,12 @@
 import { request } from '../http/httpClient.js';
 
 /**
- * A01 휴대폰 인증번호 보내기.
+ * A01 휴대폰 번호 확인 (인증번호 단계 없음).
  * @param {{phoneNumber: string, purpose: 'signup'|'reset_password'}} input `phoneNumber`는 숫자만 (11 §8.1)
- * @returns {Promise<object>} `PhoneVerificationStarted`
+ * @returns {Promise<{accountStatus: string, provider: string|null, verificationToken?: string, expiresAt?: string, maskedPhoneNumber: string}>}
  */
 export function requestPhoneVerification(input) {
   return request({ method: 'POST', path: '/auth/phone-verifications', body: input, auth: false });
-}
-
-/**
- * A02 인증번호 확인.
- * @param {{verificationId: string, code: string}} input
- * @returns {Promise<object>} `PhoneVerificationConfirmed`
- */
-export function confirmPhoneVerification({ verificationId, code }) {
-  return request({
-    method: 'POST',
-    path: `/auth/phone-verifications/${encodeURIComponent(verificationId)}/confirm`,
-    body: { code },
-    auth: false,
-  });
 }
 
 /**
@@ -108,7 +94,6 @@ export function logout(refreshToken) {
 
 export default {
   requestPhoneVerification,
-  confirmPhoneVerification,
   checkNicknameAvailability,
   getCurrentPolicies,
   signup,

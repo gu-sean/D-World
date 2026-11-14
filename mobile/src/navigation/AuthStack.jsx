@@ -16,7 +16,6 @@ import SignupMethodScreen from '../screens/auth/SignupMethodScreen';
 import SocialSignupConfirmScreen from '../screens/auth/SocialSignupConfirmScreen';
 import TermsAgreementScreen from '../screens/auth/TermsAgreementScreen';
 import PhoneNumberScreen from '../screens/auth/PhoneNumberScreen';
-import OtpVerifyScreen from '../screens/auth/OtpVerifyScreen';
 import PasswordSetupScreen from '../screens/auth/PasswordSetupScreen';
 import NicknameSetupScreen from '../screens/auth/NicknameSetupScreen';
 import ExistingAccountScreen from '../screens/auth/ExistingAccountScreen';
@@ -35,7 +34,6 @@ export default function AuthStack() {
       <Stack.Screen name={Routes.SOCIAL_SIGNUP_CONFIRM} component={SocialSignupConfirmScreen} />
       <Stack.Screen name={Routes.TERMS_AGREEMENT} component={TermsAgreementScreen} />
       <Stack.Screen name={Routes.PHONE_NUMBER} component={PhoneNumberScreen} />
-      <Stack.Screen name={Routes.OTP_VERIFY} component={OtpVerifyScreen} />
       <Stack.Screen name={Routes.PASSWORD_SETUP} component={PasswordSetupScreen} />
       <Stack.Screen name={Routes.NICKNAME_SETUP} component={NicknameSetupScreen} />
       <Stack.Screen name={Routes.EXISTING_ACCOUNT} component={ExistingAccountScreen} />

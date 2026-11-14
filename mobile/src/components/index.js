@@ -14,7 +14,6 @@ export { default as Icon } from './Icon';
 export { default as ListRow } from './ListRow';
 export { default as MissionCard } from './MissionCard';
 export { default as OptionRow } from './OptionRow';
-export { default as OtpInput } from './OtpInput';
 export { default as PetAvatar } from './PetAvatar';
 export { default as PlanStepList } from './PlanStepList';
 export { default as ProgressBar } from './ProgressBar';

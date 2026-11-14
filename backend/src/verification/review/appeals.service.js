@@ -6,6 +6,7 @@ import { AppException } from '../../common/errors/app-exception.js';
 import { rethrowConstraint } from '../../common/errors/constraint.js';
 import { AdminIdempotencyService } from '../../common/idempotency/admin-idempotency.service.js';
 import { DatabaseService } from '../../database/database.service.js';
+import { memberQueryParams, memberWhere } from '../../common/member-query.js';
 import { DecisionService } from '../decision.service.js';
 import { APPEAL_WINDOW } from '../records/records.constants.js';
 import { conflict } from '../../common/errors/http-errors.js';
@@ -194,7 +195,11 @@ export class AppealsService {
   }
 
   /** M34 관리자 이의 제기 목록(AdminPage), 기본 open, 원 판정(AI 의견)과 미션 조건을 함께 보여 줌 */
-  async list({ status, paging }) {
+  async list({ status, member, paging }) {
+    // member: 닉네임 또는 회원 ID (common/member-query.js)
+    const search = memberQueryParams(member);
+    const where = `a.status = $1 AND ${memberWhere('r.user_id', '$2', '$3')}`;
+    const params = [status, search.like, search.id];
     const [{ rows }, count] = await Promise.all([
       this.database.query(
         `SELECT a.id, a.record_id, a.status, a.reason, a.filed_at,
@@ -207,14 +212,16 @@ export class AppealsService {
            JOIN missions m ON m.id = r.mission_id
            JOIN verification_results vr ON vr.id = a.original_result_id
            LEFT JOIN profiles p ON p.user_id = r.user_id
-          WHERE a.status = $1
+          WHERE ${where}
           ORDER BY ${paging.orderBy}
-          LIMIT $2 OFFSET $3`,
-        [status, paging.size, paging.offset],
+          LIMIT $4 OFFSET $5`,
+        [...params, paging.size, paging.offset],
       ),
       this.database.query(
-        'SELECT count(*) AS n FROM verification_appeals a WHERE a.status = $1',
-        [status],
+        `SELECT count(*) AS n FROM verification_appeals a
+           JOIN mission_records r ON r.id = a.record_id
+          WHERE ${where}`,
+        params,
       ),
     ]);
     return adminPage(

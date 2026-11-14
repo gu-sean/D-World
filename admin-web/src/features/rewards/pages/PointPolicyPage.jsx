@@ -101,7 +101,7 @@ function RewardRateTab() {
   const onFinish = ({ effectiveAt, ...values }) =>
     ask({
       title: '새 보상표 버전을 저장할까요?',
-      summary: `${nameOf(categories.data, values.categoryId)} · ${nameOf(difficulties.data, values.difficultyId)} · ${values.points}P / 사용자 ${values.userXp}XP / 펫 ${values.petXp}XP`,
+      summary: `${nameOf(categories.data, values.categoryId)} · ${nameOf(difficulties.data, values.difficultyId)} · ${values.points}P / 펫 ${values.petXp}XP`,
       run: ({ reason, idempotencyKey }) =>
         create.mutateAsync({
           payload: { ...values, effectiveAt: toIso(effectiveAt), reason },
@@ -169,7 +169,6 @@ function RewardRateTab() {
                 },
                 { title: '버전', dataIndex: 'versionNo', render: (v) => `v${v}` },
                 { title: '포인트', dataIndex: 'points', align: 'right' },
-                { title: '사용자 XP', dataIndex: 'userXp', align: 'right' },
                 { title: '펫 XP', dataIndex: 'petXp', align: 'right' },
                 {
                   title: '시행 시각',
@@ -200,7 +199,6 @@ function RewardRateTab() {
           <Select options={toOptions(difficulties.data)} />
         </Form.Item>
         {numberItem('points', '포인트')}
-        {numberItem('userXp', '사용자 XP')}
         {numberItem('petXp', '펫 XP')}
         <EffectiveAtItem />
         <Button type="primary" htmlType="submit" loading={create.isPending}>

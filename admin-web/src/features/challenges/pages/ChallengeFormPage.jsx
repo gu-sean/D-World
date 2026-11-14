@@ -104,7 +104,7 @@ function ChallengeForm({ challenge, categories, difficulties }) {
         layout="vertical"
         style={{ maxWidth: 720 }}
         onFinish={onFinish}
-        initialValues={initial ?? { reward: { points: 0, userXp: 0, petXp: 0 } }}
+        initialValues={initial ?? { reward: { points: 0, petXp: 0 } }}
       >
         <Form.Item
           label="제목"
@@ -231,13 +231,6 @@ function ChallengeForm({ challenge, categories, difficulties }) {
           <Form.Item
             label="포인트"
             name={['reward', 'points']}
-            rules={[{ required: true, message: '필수' }]}
-          >
-            <InputNumber min={0} max={1000000} precision={0} />
-          </Form.Item>
-          <Form.Item
-            label="사용자 경험치"
-            name={['reward', 'userXp']}
             rules={[{ required: true, message: '필수' }]}
           >
             <InputNumber min={0} max={1000000} precision={0} />

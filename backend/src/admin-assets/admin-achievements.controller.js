@@ -44,7 +44,8 @@ const versionRules = () => ({
   // categoryCode는 전역 인터셉터가 categoryId(UUID)로 바꿔 줌
   categoryId: uuid({ optional: true }),
   rewardPoints: integer({ min: 0, max: MAX_REWARD }),
-  rewardUserXp: integer({ min: 0, max: MAX_REWARD }),
+  // 관리자 화면에서 사용자 XP를 뺐다: 없으면 0 (assertCondition에서 채움)
+  rewardUserXp: integer({ min: 0, max: MAX_REWARD, optional: true }),
   rewardPetXp: integer({ min: 0, max: MAX_REWARD }),
   badgeAssetId: uuid(),
   status: oneOf(['draft', 'public']),
@@ -54,6 +55,7 @@ const versionRules = () => ({
 
 /** DB CHECK와 같은 규칙을 먼저 검사해 필드별 오류로 돌려줌 */
 function assertCondition(input) {
+  if (input.rewardUserXp === undefined) input.rewardUserXp = 0;
   const errors = [];
   const { conditionType, targetCount, categoryId } = input;
   if (conditionType === 'first_goal_completed' && targetCount !== 1) {

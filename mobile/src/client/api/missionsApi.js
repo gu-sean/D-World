@@ -81,7 +81,31 @@ export function getNextMissions(source) {
   return request({ method: 'GET', path: '/recommendations/next-missions', query: { source } });
 }
 
+/** 미션 난이도·보상 미리 보기 (저장 안 함). 직접 만드는 미션은 이 규칙으로 난이도가 정해진다 */
+export function previewDifficulty(body) {
+  return request({ method: 'POST', path: '/missions/difficulty-preview', body });
+}
+
+/** 목표의 빈 주 (세부 미션이 주 N회보다 적은 주) */
+export function getGoalGaps(goalId) {
+  return request({ method: 'GET', path: `/goals/${encodeURIComponent(goalId)}/gaps` });
+}
+
+/** 빈 주 채우기. weekStarts를 생략하면 모든 빈 주 */
+export function fillGoalGaps({ goalId, weekStarts, idempotencyKey }) {
+  return request({
+    method: 'POST',
+    path: `/goals/${encodeURIComponent(goalId)}/gaps/fill`,
+    body: weekStarts ? { weekStarts } : {},
+    idempotent: true,
+    idempotencyKey,
+  });
+}
+
 export default {
+  previewDifficulty,
+  getGoalGaps,
+  fillGoalGaps,
   listMissions,
   createMission,
   getMission,

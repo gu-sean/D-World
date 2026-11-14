@@ -97,7 +97,7 @@ export class AdminAppealsController {
     const paging = parseAdminPage(query, {
       'filedAt,asc': 'a.filed_at ASC, a.id ASC',
     });
-    return this.appeals.list({ status, paging });
+    return this.appeals.list({ status, member: query.member, paging });
   }
 
   /** M35 */

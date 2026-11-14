@@ -5,6 +5,7 @@ import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';
+import { memberColumn } from '../../../components/memberColumns.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { EXERCISE_OPTIONS, labelOf } from '../constants.js';
@@ -38,7 +39,7 @@ export default function UserMissionReviewPage() {
 
   const columns = [
     { title: '제목', dataIndex: 'title' },
-    { title: '작성자', dataIndex: 'authorNickname', render: (value) => value ?? '-' },
+    memberColumn({ title: '작성자', idKey: 'authorId', nicknameKey: 'authorNickname' }),
     {
       title: '운동',
       dataIndex: 'exerciseCode',

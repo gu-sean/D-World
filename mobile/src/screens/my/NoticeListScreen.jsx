@@ -15,6 +15,8 @@ const CATEGORIES = [
   { value: 'service', label: '서비스' },
   { value: 'event', label: '이벤트' },
   { value: 'policy', label: '정책' },
+  // 관리자 웹에서 마케팅 공지도 게시할 수 있어서 탭을 맞춘다
+  { value: 'marketing', label: '마케팅' },
 ];
 
 export default function NoticeListScreen({ navigation }) {

@@ -47,7 +47,6 @@ yarn-error.log*
 pnpm-debug.log*
 
 # ── admin-web (Vite) ──────────────────────────────────────────
-# public/mockServiceWorker.js 는 `npx msw init` 결과물이지만 저장소에 포함한다
 admin-web/.vite/
 admin-web/dist/
 

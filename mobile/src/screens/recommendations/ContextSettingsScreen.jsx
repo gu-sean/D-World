@@ -124,5 +124,11 @@ const styles = StyleSheet.create({
   signalRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   signalText: { ...typography.body, color: colors.text, flex: 1 },
   privacy: { ...typography.caption, color: colors.textSub, marginTop: spacing.xs },
-  group: { backgroundColor: colors.surface, borderRadius: spacing.md, overflow: 'hidden' },
+  group: {
+    backgroundColor: colors.surface,
+    borderRadius: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
 });

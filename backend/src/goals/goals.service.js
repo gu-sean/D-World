@@ -181,7 +181,14 @@ export class GoalsService {
     return result;
   }
 
-  async createGoal(userId, data) {
+  async createGoal(userId, input) {
+    const data = { ...input };
+    if (!data.difficultyId) {
+      const { rows } = await this.database.query(
+        "SELECT id FROM difficulty_levels WHERE code = 'normal'",
+      );
+      data.difficultyId = rows[0]?.id;
+    }
     this.assertPeriod(data.startDate, data.endDate);
     await this.assertReferences(
       this.database,

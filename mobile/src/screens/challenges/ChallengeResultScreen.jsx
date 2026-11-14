@@ -99,7 +99,13 @@ export default function ChallengeResultScreen({ navigation, route }) {
                 />
                 <Button
                   title="다른 챌린지 보기"
-                  onPress={() => navigation.navigate(Routes.CHALLENGE_EXPLORE)}
+                  onPress={() =>
+                    // 이 화면은 루트 스택이라 챌린지 탭 첫 화면으로 보낸다
+                    navigation.navigate(Routes.MAIN, {
+                      screen: Routes.CHALLENGES_TAB,
+                      params: { screen: Routes.CHALLENGE_HOME },
+                    })
+                  }
                   full
                 />
               </View>

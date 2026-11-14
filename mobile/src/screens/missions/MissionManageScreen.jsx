@@ -1,4 +1,4 @@
-// MISSION-12 미션 관리 (미션 탭 첫 화면)
+// MISSION-12 미션 관리 (홈의 "관리"에서 연다)
 //
 // 고른 날짜의 미션을 모아 보여 주고, 거기서 추가·수정으로 이어진다.
 // 날짜는 위쪽 화살표로 하루씩 옮긴다.
@@ -14,8 +14,8 @@ import { colors, spacing, typography } from '../../theme';
 
 const DAY_MS = 86400000;
 
-export default function MissionManageScreen({ navigation }) {
-  const [date, setDate] = useState(() => format.todayKst());
+export default function MissionManageScreen({ navigation, route }) {
+  const [date, setDate] = useState(() => route.params?.date ?? format.todayKst());
   const missions = useMissions({ date });
 
   const move = (days) => {
@@ -24,7 +24,7 @@ export default function MissionManageScreen({ navigation }) {
   };
 
   return (
-    <Screen title="미션 관리" padded={false}>
+    <Screen title="미션 관리" onBack={() => navigation.goBack()} padded={false}>
       <View style={styles.dateBar}>
         <TouchableOpacity onPress={() => move(-1)} accessibilityRole="button" hitSlop={8}>
           <Icon name="chevronLeft" size={22} color={colors.textSub} />

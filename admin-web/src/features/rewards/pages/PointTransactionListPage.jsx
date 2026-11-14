@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';
+import { MEMBER_FIELD, memberColumn } from '../../../components/memberColumns.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { optionsOf } from '../components/labels.js';
@@ -12,7 +13,7 @@ import { usePointTransactions } from '../queries.js';
 const DEFAULT_SORT = 'occurredAt,desc'; // docs/09 M70
 
 const fields = [
-  { name: 'userId', type: 'text', label: '회원 ID' },
+  MEMBER_FIELD,
   { name: 'kind', type: 'select', label: '종류', options: optionsOf('pointTransactionKind') },
   { name: 'sourceType', type: 'select', label: '출처', options: optionsOf('pointSourceType') },
   { name: 'period', type: 'dateRange', label: '기간' }, // writes `from` and `to`
@@ -30,7 +31,7 @@ const columns = [
     width: 160,
     render: (value) => <DateText value={value} />,
   },
-  { title: '회원', dataIndex: 'userId', ellipsis: true, width: 120 },
+  memberColumn({ idKey: 'userId', nicknameKey: 'nickname' }),
   {
     title: '종류',
     dataIndex: 'kind',

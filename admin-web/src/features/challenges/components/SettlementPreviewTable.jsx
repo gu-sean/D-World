@@ -21,7 +21,6 @@ export function SettlementPreviewTable({ entries }) {
     { title: '점수', dataIndex: 'score' },
     { title: '예정 포인트', dataIndex: 'promisedPoints' },
     { title: '지급 포인트', dataIndex: 'paidPoints' },
-    { title: '사용자 경험치', dataIndex: 'userXp' },
     { title: '펫 경험치', dataIndex: 'petXp' },
     {
       title: '지급 상태',

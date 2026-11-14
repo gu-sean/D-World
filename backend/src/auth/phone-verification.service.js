@@ -134,6 +134,38 @@ export class PhoneVerificationService {
   }
 
   /**
+   * 모바일 A01: 인증번호 없이 바로 확인된 challenge를 만든다 (문자 발송·재발송 제한 없음)
+   * 다음 단계(가입·재설정)를 마칠 시간(CONFIRMED_TTL_MINUTES)만큼 유효, 다음 단계에서 consume 한다
+   * 실제 출시 전 시연용 단순화: 번호 소유 확인을 하지 않는다
+   */
+  async issueConfirmed(phone, purpose) {
+    const challengeId = randomUUID();
+    const { rows } = await this.database.withTransaction(async (tx) => {
+      await tx.query(
+        `UPDATE phone_verification_challenges
+            SET invalidated_at = now()
+          WHERE phone_e164 = $1 AND purpose = $2
+            AND consumed_at IS NULL AND invalidated_at IS NULL`,
+        [phone, purpose],
+      );
+      return tx.query(
+        `INSERT INTO phone_verification_challenges
+                (id, phone_e164, purpose, code_hash, expires_at)
+         VALUES ($1, $2, $3, $4, now() + make_interval(mins => $5))
+         RETURNING expires_at`,
+        [
+          challengeId,
+          phone,
+          purpose,
+          this.hashCode(phone, purpose, randomUUID()),
+          CONFIRMED_TTL_MINUTES,
+        ],
+      );
+    });
+    return { challengeId, expiresAt: rows[0].expires_at };
+  }
+
+  /**
    * 인증번호 확인(A02): 코드가 맞으면 가입·재설정 단계를 마칠 시간(CONFIRMED_TTL_MINUTES)만큼 유효기간을 늘림
    * 다음 단계에서 같은 challenge를 consume 한다
    */

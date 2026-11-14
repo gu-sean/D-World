@@ -1,7 +1,6 @@
 // 개발 시드 적용: ../db/seeds/dev/*.sql 을 순서대로 psql로 실행 (docker compose의 postgres 컨테이너 사용)
 // 비밀번호 해시는 환경 변수 DEV_ADMIN_PASSWORD, DEV_USER_PASSWORD로 받아 argon2id로 만들어 넘긴다 (저장소에 비밀번호 없음)
 // 사용: DEV_ADMIN_PASSWORD=... DEV_USER_PASSWORD=... npm run db:seed
-// 이미지 자산(db/seeds/dev/assets)의 MinIO 업로드는 이 스크립트가 하지 않음
 import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import argon2 from 'argon2';

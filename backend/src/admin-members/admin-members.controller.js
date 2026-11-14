@@ -20,6 +20,12 @@ import { conflict, notFound } from '../common/errors/http-errors.js';
 import { readIdempotencyKey } from '../common/idempotency/admin-idempotency.service.js';
 import { maskEmail, maskPhone } from '../common/masking.js';
 import {
+  UUID_PATTERN,
+  escapeLike,
+  memberQueryParams,
+  memberWhere,
+} from '../common/member-query.js';
+import {
   adminPage,
   parseAdminPage,
   pickEnum,
@@ -96,10 +102,6 @@ const DATA_SCOPE_COLUMNS = `
 const WITHDRAWAL_SELECT = `SELECT w.*, p.nickname, ${DATA_SCOPE_COLUMNS}
    FROM account_withdrawal_requests w
    LEFT JOIN profiles p ON p.user_id = w.user_id`;
-
-const escapeLike = (text) => text.replace(/[\\%_]/g, '\\$&');
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** 관리자 회원 API: 목록·상세·활동(M10~M12), 이용 조치(M13·M14), 탈퇴 요청(M15·M16) */
 @Controller('admin/v1')
@@ -426,17 +428,22 @@ export class AdminMembersController {
       'requestedAt,asc': 'w.requested_at ASC, w.id ASC',
       'requestedAt,desc': 'w.requested_at DESC, w.id DESC',
     });
+    // member: 닉네임 또는 회원 ID (common/member-query.js)
+    const member = memberQueryParams(query.member);
+    const params = [status ?? null, member.like, member.id];
+    const where = `($1::text IS NULL OR w.status = $1)
+          AND ${memberWhere('w.user_id', '$2', '$3')}`;
     const [{ rows }, count] = await Promise.all([
       this.database.query(
         `${WITHDRAWAL_SELECT}
-          WHERE ($1::text IS NULL OR w.status = $1)
-          ORDER BY ${paging.orderBy} LIMIT $2 OFFSET $3`,
-        [status ?? null, paging.size, paging.offset],
+          WHERE ${where}
+          ORDER BY ${paging.orderBy} LIMIT $4 OFFSET $5`,
+        [...params, paging.size, paging.offset],
       ),
       this.database.query(
         `SELECT count(*) AS n FROM account_withdrawal_requests w
-          WHERE ($1::text IS NULL OR w.status = $1)`,
-        [status ?? null],
+          WHERE ${where}`,
+        params,
       ),
     ]);
     return adminPage(rows.map(withdrawalView), paging, count.rows[0].n);

@@ -1,4 +1,5 @@
 // ADM-18 챌린지 운영 목록
+// 챌린지는 관리자만 만들고 관리한다 (회원 개설·검수 없음). 회원은 앱에서 참여 여부만 고른다.
 import { useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
 import { Button, Dropdown, message, Space, Typography } from 'antd';
@@ -9,8 +10,8 @@ import { FilterBar } from '../../../components/FilterBar.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { labels } from '../../../constants/labels.js';
-import { label, ORIGIN, PHASE, toOptions } from '../labels.js';
-import { useChallengeAction, useChallenges, useReviewChallenge } from '../queries.js';
+import { label, PHASE, toOptions } from '../labels.js';
+import { useChallengeAction, useChallenges } from '../queries.js';
 
 const kindOptions = (kind) =>
   Object.entries(labels[kind]).map(([value, item]) => ({ value, label: item.text }));
@@ -23,7 +24,6 @@ const FIELDS = [
     options: kindOptions('challengePublicationStatus'),
   },
   { name: 'phase', type: 'select', label: '진행 단계', options: toOptions(PHASE) },
-  { name: 'origin', type: 'select', label: '출처', options: toOptions(ORIGIN) },
   {
     name: 'settlementStatus',
     type: 'select',
@@ -37,42 +37,26 @@ export default function ChallengeListPage() {
   const [params, setParams] = useListParams({ sort: 'startDate,desc' }); // API default (docs/09)
   const query = useChallenges(params);
   const action = useChallengeAction();
-  const review = useReviewChallenge();
-  const [target, setTarget] = useState(null); // {row, type: 'action'|'review', value, title, danger}
+  const [target, setTarget] = useState(null); // {row, type: 'action', value, title, danger}
 
   const ask = (row, type, value, title, danger = false) =>
     setTarget({ row, type, value, title, danger });
 
   const menuFor = (row) => {
     const items = [];
-    if (row.origin === 'admin' && row.publicationStatus !== 'cancelled') {
+    if (row.publicationStatus !== 'cancelled') {
       items.push({
         key: 'edit',
         label: '수정',
         onClick: () => navigate(`/challenges/${row.id}/edit`),
       });
     }
-    if (row.origin === 'admin' && row.publicationStatus === 'draft') {
+    if (row.publicationStatus === 'draft') {
       items.push({
         key: 'publish',
         label: '공개',
         onClick: () => ask(row, 'action', 'publish', '챌린지 공개'),
       });
-    }
-    if (row.origin === 'user' && row.publicationStatus === 'review_pending') {
-      items.push(
-        {
-          key: 'approve',
-          label: '검수 승인',
-          onClick: () => ask(row, 'review', 'approved', '검수 승인'),
-        },
-        {
-          key: 'reject',
-          label: '검수 반려',
-          danger: true,
-          onClick: () => ask(row, 'review', 'rejected', '검수 반려', true),
-        },
-      );
     }
     if (row.publicationStatus === 'public') {
       items.push({
@@ -97,15 +81,7 @@ export default function ChallengeListPage() {
     {
       title: '챌린지',
       dataIndex: 'title',
-      render: (title, row) => (
-        <Space orientation="vertical" size={0}>
-          <Typography.Text strong>{title}</Typography.Text>
-          <Typography.Text type="secondary">
-            {label(ORIGIN, row.origin)}
-            {row.creatorNickname ? ` · ${row.creatorNickname}` : ''}
-          </Typography.Text>
-        </Space>
-      ),
+      render: (title) => <Typography.Text strong>{title}</Typography.Text>,
     },
     { title: '기간', key: 'period', render: (_, row) => `${row.startDate} ~ ${row.endDate}` },
     { title: '진행', dataIndex: 'phase', render: (value) => label(PHASE, value) },
@@ -167,21 +143,12 @@ export default function ChallengeListPage() {
         summary={target ? `${target.row.title} · ${target.title}` : ''}
         danger={target?.danger}
         onSubmit={async ({ reason, idempotencyKey }) => {
-          if (target.type === 'review') {
-            await review.mutateAsync({
-              id: target.row.id,
-              decision: target.value,
-              reason,
-              idempotencyKey,
-            });
-          } else {
-            await action.mutateAsync({
-              id: target.row.id,
-              action: target.value,
-              reason,
-              idempotencyKey,
-            });
-          }
+          await action.mutateAsync({
+            id: target.row.id,
+            action: target.value,
+            reason,
+            idempotencyKey,
+          });
           message.success('처리했어요');
           setTarget(null);
         }}

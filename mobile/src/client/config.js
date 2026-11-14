@@ -27,6 +27,11 @@ export const config = {
   SOCIAL_LOGIN_MODE: text(Config.SOCIAL_LOGIN_MODE, 'mock'),
   /** 러닝 파일 `device.appVersion`·A45 `clientMetrics.appVersion`에 넣는 값. */
   APP_VERSION: text(Config.APP_VERSION, '0.1.0'),
+  /**
+   * 비밀번호 재설정 버튼을 보일지. 인증번호 단계를 없앤 지금은 번호만으로 남의 비밀번호를
+   * 바꿀 수 있어서 기본으로 숨긴다. 백엔드도 재설정 요청을 거절한다 (mobile-auth.service A01).
+   */
+  PASSWORD_RESET_ENABLED: flag(Config.PASSWORD_RESET_ENABLED, false),
 };
 
 /** 개발 빌드인지. 디버그 로그는 이 값이 true일 때만 남긴다 (parts/mobile-client §1.4). */

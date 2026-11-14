@@ -14,8 +14,9 @@ export const MENU = [
     key: 'verifications',
     label: '인증 검수',
     children: [
-      { label: '검수 대기', path: '/verifications' },
-      { label: '이의 신청', path: '/verifications/appeals' },
+      // 관리자 판정은 처리 대기 한 곳(이의 신청 + AI 판정 보류), 인증 기록은 읽기 전용 이력
+      { label: '처리 대기', path: '/verifications/appeals' },
+      { label: '인증 기록', path: '/verifications' },
       { label: '판정 기준', path: '/verifications/criteria' },
     ],
   },
@@ -34,7 +35,6 @@ export const MENU = [
       { label: '미션 정의', path: '/missions/definitions' },
       { label: '분야·난이도', path: '/missions/categories' },
       { label: '사용자 미션 검수', path: '/missions/reviews' },
-      { label: '추천 미션', path: '/missions/featured' },
     ],
   },
   { key: 'challenges', label: '챌린지', path: '/challenges' },
@@ -50,22 +50,14 @@ export const MENU = [
       { label: '연속 일수 정책', path: '/rewards/streak-policies' },
     ],
   },
-  {
-    key: 'billing',
-    label: '결제·구독',
-    children: [
-      { label: '구독', path: '/billing/subscriptions' },
-      { label: '결제', path: '/billing/payments' },
-      { label: '환불', path: '/billing/refunds' },
-      { label: '이용권', path: '/billing/entitlements' },
-    ],
-  },
+  // 결제·구독은 아직 껍데기(M110 501)라 한 화면으로 모았다. 구독·결제·환불·이용권 주소는 그대로 열린다.
+  { key: 'billing', label: '결제·구독', path: '/billing/subscriptions' },
   {
     key: 'content',
     label: '운영 콘텐츠',
     children: [
-      { label: '공지', path: '/content/notices' },
-      { label: '푸시 알림', path: '/content/push' },
+      // 공지와 푸시 알림은 같은 공지 데이터라 한 메뉴로 합쳤다 (목록의 푸시 필터로 구분)
+      { label: '공지·푸시', path: '/content/notices' },
       { label: '약관·정책', path: '/content/policies' },
       { label: '추천 문구', path: '/content/messages' },
     ],

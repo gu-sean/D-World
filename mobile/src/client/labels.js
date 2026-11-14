@@ -12,6 +12,7 @@
  */
 
 /** 04 §5 목표·미션 */
+export const difficulty = { easy: '쉬움', normal: '보통', hard: '어려움' };
 export const goalStatus = { active: '진행 중', paused: '일시정지', completed: '완료' };
 export const goalStepStatus = { active: '진행 중', completed: '완료' };
 export const missionStatus = {
@@ -239,6 +240,7 @@ export const targetUnit = {
 };
 
 export const labels = {
+  difficulty,
   goalStatus,
   goalStepStatus,
   missionStatus,

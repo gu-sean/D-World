@@ -12,6 +12,7 @@ import { ChallengesModule } from './challenges/challenges.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AuthCoreModule } from './common/auth/auth-core.module.js';
 import { CatalogCodeInterceptor } from './common/catalog-code/catalog-code.interceptor.js';
+import { DefaultReasonInterceptor } from './common/http/default-reason.interceptor.js';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter.js';
 import { validateEnv } from './config/env.validation.js';
 import { DatabaseModule } from './database/database.module.js';
@@ -94,6 +95,8 @@ import { AdminDashboardModule } from './admin-dashboard/admin-dashboard.module.j
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // 사유가 비면 기본 문구를 채운다 (관리자 웹은 사유 선택 입력)
+    { provide: APP_INTERCEPTOR, useClass: DefaultReasonInterceptor },
     { provide: APP_INTERCEPTOR, useClass: CatalogCodeInterceptor },
   ],
 })

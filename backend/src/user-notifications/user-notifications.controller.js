@@ -112,6 +112,13 @@ export class UserNotificationsController {
     return this.notifications.listNotices(request.auth.userId, {
       limit: parseLimit(query, 20, 50),
       cursor: cursorOf(query),
+      // 앱 공지 목록의 분류 탭 (없으면 전체)
+      category: pickEnum(query, 'category', [
+        'service',
+        'event',
+        'policy',
+        'marketing',
+      ]),
     });
   }
 

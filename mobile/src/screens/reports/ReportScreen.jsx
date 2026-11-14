@@ -93,6 +93,9 @@ export default function ReportScreen({ navigation }) {
             <View>
               <SectionTitle title="분야별 진행" />
               <Card style={styles.categories}>
+                {summary.categories.length === 0 && (
+                  <Text style={styles.categoryEmpty}>이 기간에 기록된 미션이 없어요.</Text>
+                )}
                 {summary.categories.map((item) => (
                   <View key={item.categoryCode} style={styles.categoryRow}>
                     <View style={styles.categoryHead}>
@@ -165,6 +168,7 @@ const styles = StyleSheet.create({
   summarySub: { ...typography.caption, color: colors.textSub },
   categories: { gap: spacing.md },
   categoryRow: { gap: spacing.xs },
+  categoryEmpty: { ...typography.caption, color: colors.textSub },
   categoryHead: { flexDirection: 'row', justifyContent: 'space-between' },
   categoryName: { ...typography.body, color: colors.text },
   categoryValue: { ...typography.caption, color: colors.textSub },

@@ -18,7 +18,6 @@ export const Routes = Object.freeze({
   SOCIAL_SIGNUP_CONFIRM: 'SocialSignupConfirm', // { provider, email, socialSignupToken }
   TERMS_AGREEMENT: 'TermsAgreement',            // { purpose: 'phone'|'social', socialSignupToken? }
   PHONE_NUMBER: 'PhoneNumber',                  // { purpose: 'signup'|'reset_password', consents? }
-  OTP_VERIFY: 'OtpVerify',                      // { purpose, verificationId, phoneNumber, expiresAt, resendAvailableAt, consents? }
   PASSWORD_SETUP: 'PasswordSetup',              // { mode: 'signup'|'reset', verificationToken, consents? }
   NICKNAME_SETUP: 'NicknameSetup',              // { verificationToken, password, consents } 또는 { socialSignupToken, consents }
   SIGNUP_COMPLETE: 'SignupComplete',
@@ -32,7 +31,7 @@ export const Routes = Object.freeze({
   MAIN: 'Main',                                 // 탭 묶음 자체 (탭 밖에서 홈으로 돌아올 때)
   HOME_TAB: 'HomeTab',
   GOALS_TAB: 'GoalsTab',
-  MISSIONS_TAB: 'MissionsTab',
+  CHALLENGES_TAB: 'ChallengesTab',
   REPORTS_TAB: 'ReportsTab',
   MY_TAB: 'MyTab',
 
@@ -100,12 +99,11 @@ export const Routes = Object.freeze({
   SHOP: 'Shop',
 
   // 챌린지
-  CHALLENGE_EXPLORE: 'ChallengeExplore',
+  CHALLENGE_HOME: 'ChallengeHome',              // 챌린지 탭 첫 화면 (관리자 챌린지)
   CHALLENGE_DETAIL: 'ChallengeDetail',          // { challengeId }
   MY_CHALLENGES: 'MyChallenges',
   CHALLENGE_RANKING: 'ChallengeRanking',        // { challengeId }
   CHALLENGE_RESULT: 'ChallengeResult',          // { challengeId }
-  CHALLENGE_CREATE: 'ChallengeCreate',
 
   // 마이
   MY: 'My',

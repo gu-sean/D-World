@@ -79,10 +79,13 @@ export default function MissionDetailScreen({ navigation, route }) {
                 )}
 
                 <View style={styles.facts}>
-                  <Fact
-                    label="목표"
-                    value={format.formatTarget(detail.targetValue, detail.targetUnit)}
-                  />
+                  {/* 목표 값이 없는 미션(직접 만든 미션 등)은 빈 칸 대신 항목을 숨긴다 */}
+                  {detail.targetValue !== null && detail.targetValue !== undefined && (
+                    <Fact
+                      label="목표"
+                      value={format.formatTarget(detail.targetValue, detail.targetUnit)}
+                    />
+                  )}
                   {!!detail.estimatedDurationSeconds && (
                     <Fact
                       label="예상 시간"
@@ -149,7 +152,13 @@ export default function MissionDetailScreen({ navigation, route }) {
                     <Button
                       title="수정"
                       variant="secondary"
-                      onPress={() => navigation.navigate(Routes.MISSION_FORM, { missionId })}
+                      onPress={() =>
+                        // 미션 수정 화면은 홈 탭 묶음 안에 있다 (이 화면은 루트 스택)
+                        navigation.navigate(Routes.MAIN, {
+                          screen: Routes.HOME_TAB,
+                          params: { screen: Routes.MISSION_FORM, params: { missionId } },
+                        })
+                      }
                       full
                     />
                   </View>

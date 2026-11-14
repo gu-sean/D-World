@@ -69,18 +69,4 @@ export const updateCatalogItem = (kind, id, body, idempotencyKey) =>
     .patch(`${CATALOG_PATHS[kind]}/${id}`, body, { idempotencyKey })
     .then((response) => response.data);
 
-// ── Reward rates (M74~M75), append-only versions ──
-
-/** M74 GET /mission-reward-rates -> `[{id, categoryId, difficultyId, versionNo, points, userXp, petXp, effectiveAt}]` */
-export const fetchRewardRates = (params = {}) =>
-  http
-    .get('/mission-reward-rates', {
-      params: Object.fromEntries(
-        Object.entries(params).filter(([, value]) => value !== undefined && value !== ''),
-      ),
-    })
-    .then((response) => response.data);
-
-/** M75 POST /mission-reward-rates: `{categoryId, difficultyId, points, userXp, petXp, effectiveAt?, reason}` */
-export const createRewardRate = (body, idempotencyKey) =>
-  http.post('/mission-reward-rates', body, { idempotencyKey }).then((response) => response.data);
+// 미션 보상표(M74~M75)는 rewards 기능(포인트 정책 > 미션 보상표) 한 곳에서 다룬다

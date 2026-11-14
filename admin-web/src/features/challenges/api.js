@@ -29,10 +29,6 @@ export const updateChallenge = (id, patch, idempotencyKey) =>
 export const changeChallengeStatus = (id, body, idempotencyKey) =>
   http.patch(`/challenges/${id}`, body, withKey(idempotencyKey)).then(data);
 
-/** M55 POST /challenges/:id/reviews `{decision: approved|rejected|hidden, reason}` */
-export const reviewChallenge = (id, body, idempotencyKey) =>
-  http.post(`/challenges/${id}/reviews`, body, withKey(idempotencyKey)).then(data);
-
 /** M60 GET /challenges/:id/rankings -> `{ranking: {challengeId, calculatedAt}, entries}` */
 export const fetchRankings = (id) => http.get(`/challenges/${id}/rankings`).then(data);
 

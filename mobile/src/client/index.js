@@ -18,7 +18,6 @@ export { ClientProvider } from '../setup/ClientProvider.js';
 export {
   useSession,
   useRequestPhoneVerification,
-  useConfirmPhoneVerification,
   useNicknameAvailability,
   useCurrentPolicies,
   useSignup,
@@ -67,6 +66,9 @@ export {
   useCancelMission,
   useMissionDefinitions,
   useNextMissions,
+  useDifficultyPreview,
+  useGoalGaps,
+  useFillGoalGaps,
 } from './queries/missions.js';
 
 // ── 수행 인증 (A40~A46) ──────────────────────────────────────────────
@@ -127,7 +129,6 @@ export {
   useChallenge,
   useJoinChallenge,
   useLeaveChallenge,
-  useCreateChallenge,
   useMyChallenges,
   useChallengeRanking,
   useChallengeResult,

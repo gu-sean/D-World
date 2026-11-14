@@ -10,7 +10,6 @@
 ```
 db/
   migrations/   001~014 (기능별 파일, 번호 = 적용 순서)
-  tests/        기능별 smoke SQL 13개 + 전역 FK 인덱스 검사 1개 (전부 ROLLBACK, 데이터 잔류 없음)
   seeds/dev/    개발용 시드 (001 기준 데이터, 002 콘텐츠·개발 사용자·공개 챌린지, assets)
   (시연용 가상 데이터는 SQL이 아니라 `backend/scripts/seed-demo.mjs`, 아래 "시연 데이터" 참고)
   scripts/      verify.sh (Docker 없이), verify-docker.sh (Docker)
@@ -41,7 +40,6 @@ db/
 
 **탈퇴**
 - `users` 삭제 시 하위 데이터 `ON DELETE CASCADE`, 신고·확정 챌린지 순위는 개인 식별만 지우고 보존
-- 모든 `users` 참조 FK에 인덱스 필수 (`tests/099_fk_indexes_smoke.sql`이 검사)
 - 연쇄 삭제·SET NULL 경로의 FK(기준 데이터·`admin_accounts` 참조 제외)에도 인덱스 필수 (같은 테스트가 검사, 새 FK를 인덱스 없이 추가하면 실패)
 - R2 파일은 `upload_status='deleted'` 확인 전 삭제 차단
 
@@ -67,9 +65,7 @@ db/
 - 통합 이력: 보정 파일 014~017(2026-11-09)을 기능 파일 006·007·008·013에 합쳤다. 스키마는 통합 전과 동일(열·제약·인덱스·트리거·함수 2,237건 일치 확인)
 - 통합 전 파일이 적용된 DB는 `ops/rebaseline.sh`로 이력만 맞추거나 재생성한다([ops/migration-runbook.md](ops/migration-runbook.md))
 
-
 ## 마이그레이션 정책
-- 파일명 `NNN_snake_case.sql`, 테스트 `tests/NNN_snake_case_smoke.sql`
 - 적용된 파일 수정 금지, 변경은 새 번호로 추가 (ORM 동기화 금지), 공유 후 보정은 `014`부터
 - 보정이 쌓이면 첫 공유 배포 전에 한 번 기능 파일로 정리 (위 통합 이력 방식), 정리 후 기존 DB는 재생성하거나 `ops/rebaseline.sh`로 이력 전환
 - 통합 전후 스키마 동일성은 열·제약·인덱스·트리거·함수 정의를 비교해 확인한다(통합 PR에 결과를 적는다)
@@ -109,8 +105,6 @@ for f in db/seeds/dev/*.sql;  do psql -v ON_ERROR_STOP=1 -d d_world -v admin_pas
 ```
 
 ## 시연 데이터
-- **바로 쓰기: 시연 덤프** — `db/dumps/d_world_demo.sql`을 `cd backend && npm run demo` 한 줄로 복원·실행한다.
-  시험 계정(휴대폰 `01099999999`)과 방법은 [`db/dumps/README.md`](dumps/README.md)
 - 목적: 시연·수동 테스트용으로 사용자 1명이 앱 기능을 한 번씩 쓴 상태를 만든다 (아래는 이 데이터를 처음부터 만드는 시드 스크립트)
 - 방식: 원장·캐시·트리거 정합성을 SQL로 직접 맞추지 않고 **앱 API·서비스를 그대로 통과**시켜 생성 (`backend/scripts/seed-demo.mjs`)
 - 선행: 마이그레이션 + 개발 시드 001·002 적용, `npm run build`

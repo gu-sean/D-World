@@ -13,10 +13,8 @@ import {
 } from './phone-verification.service.js';
 import { SocialVerifierService } from './social/social-verifier.service.js';
 
-const VERIFICATION_ID_KIND = 'phone-verification-id';
 const VERIFICATION_TOKEN_KIND = 'phone-verification-token';
 const SOCIAL_SIGNUP_KIND = 'social-signup';
-const VERIFICATION_ID_TTL_SEC = 15 * 60;
 const SOCIAL_SIGNUP_TTL_SEC = 10 * 60;
 const REQUIRED_TYPES = ['terms', 'privacy'];
 // A04 응답 순서 (모바일 authApi.js: terms·privacy·marketing 순), 목록에 없는 종류는 뒤로
@@ -41,8 +39,8 @@ export function maskPhone(e164) {
 
 /**
  * 모바일 클라이언트 계정 API (팀 문서 08 A01~A10, 07 §2)
- * - verificationId / verificationToken / socialSignupToken은 서명 토큰이라 새 표가 필요 없음
- * - 인증번호 저장·제한은 기존 phone_verification_challenges 그대로 사용
+ * - verificationToken / socialSignupToken은 서명 토큰이라 새 표가 필요 없음
+ * - 휴대폰 인증번호 단계는 없음: A01이 바로 확인된 challenge(phone_verification_challenges)를 만든다
  */
 @Injectable()
 @Dependencies(
@@ -93,63 +91,44 @@ export class MobileAuthService {
     };
   }
 
-  /** A01 */
+  /**
+   * A01: 인증번호 없이 번호만 받고 바로 확인된 결과를 돌려준다 (예전 A02 응답 모양)
+   *   new               가입 가능한 번호 → verificationToken 발급
+   *   phone_registered  가입이면 기존 계정 안내 / 재설정이면 verificationToken 발급
+   *   not_registered    재설정할 계정 없음
+   *
+   * 비밀번호 재설정(reset_password)은 막아 둔다: 인증번호가 없으면 번호만 알아도 남의 비밀번호를
+   * 바꿀 수 있기 때문이다. 앱도 재설정 버튼을 숨긴다 (mobile config.PASSWORD_RESET_ENABLED).
+   * 인증번호 기반 재설정(AuthController auth/phone/codes → auth/password/reset)은 그대로다.
+   */
   async startPhoneVerification({ phone, purpose }) {
-    const exists = await this.auth.phoneExists(phone);
-    let started = null;
     if (purpose === 'reset_password') {
-      // 가입 여부가 드러나지 않게 없는 번호도 같은 모양으로 응답
-      if (exists) started = await this.phoneVerification.send(phone, purpose);
-    } else {
-      if (exists) await this.auth.sendCode(phone, purpose); // 409를 던짐
-      started = await this.phoneVerification.send(phone, purpose);
-    }
-    return {
-      verificationId: signToken(
-        this.secret,
-        VERIFICATION_ID_KIND,
-        { phone, purpose, challengeId: started?.challengeId ?? null },
-        VERIFICATION_ID_TTL_SEC,
-      ),
-      maskedPhoneNumber: maskPhone(phone),
-      expiresAt: (
-        started?.expiresAt ?? new Date(Date.now() + 3 * 60_000)
-      ).toISOString(),
-      resendAvailableAt: (
-        started?.resendAvailableAt ?? new Date(Date.now() + 30_000)
-      ).toISOString(),
-    };
-  }
-
-  /** A02 */
-  async confirmPhoneVerification(verificationId, code) {
-    const step = readToken(this.secret, VERIFICATION_ID_KIND, verificationId);
-    if (!step) throw verificationInvalid();
-    const { phone, purpose, challengeId } = step;
-    if (!challengeId) {
-      // 가입되지 않은 번호의 재설정 요청: 항상 코드 불일치로 보인다
       throw new AppException(
-        HttpStatus.UNPROCESSABLE_ENTITY,
-        'code_invalid',
-        '인증번호가 올바르지 않음',
+        HttpStatus.FORBIDDEN,
+        'password_reset_disabled',
+        '지금은 비밀번호 재설정을 쓸 수 없어요',
       );
     }
-    const confirmedUntil = await this.phoneVerification.confirm(
-      challengeId,
-      phone,
-      purpose,
-      code,
-    );
+    const exists = await this.auth.phoneExists(phone);
+    const base = { maskedPhoneNumber: maskPhone(phone), provider: null };
+    if (purpose === 'signup' && exists) {
+      return { ...base, accountStatus: 'phone_registered' };
+    }
+    if (purpose === 'reset_password' && !exists) {
+      return { ...base, accountStatus: 'not_registered' };
+    }
+    const { challengeId, expiresAt } =
+      await this.phoneVerification.issueConfirmed(phone, purpose);
     return {
+      ...base,
       accountStatus: purpose === 'signup' ? 'new' : 'phone_registered',
-      provider: null,
       verificationToken: signToken(
         this.secret,
         VERIFICATION_TOKEN_KIND,
         { phone, purpose, challengeId },
         CONFIRMED_TTL_MINUTES * 60,
       ),
-      expiresAt: confirmedUntil.toISOString(),
+      expiresAt: expiresAt.toISOString(),
     };
   }
 

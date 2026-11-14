@@ -26,6 +26,11 @@ import {
   validateBody,
 } from '../common/validation.js';
 import { notFound } from '../common/errors/http-errors.js';
+import {
+  memberQueryParams,
+  memberWhere,
+  nicknameOf,
+} from '../common/member-query.js';
 import { DatabaseService } from '../database/database.service.js';
 import { PointsService } from './points.service.js';
 
@@ -56,6 +61,7 @@ const MAX_ADJUST_POINTS = 1_000_000;
 const view = (row) => ({
   id: row.id,
   userId: row.user_id,
+  nickname: row.nickname ?? null,
   kind: row.kind,
   availableDelta: Number(row.available_delta),
   outstandingDelta: Number(row.outstanding_delta),
@@ -91,6 +97,9 @@ export class AdminPointsController {
       from: timestamp({ optional: true }),
       to: timestamp({ optional: true }),
     });
+    // member: 닉네임 또는 회원 ID (common/member-query.js, 회원 목록과 같은 규칙)
+    const member = memberQueryParams(query.member);
+    const memberId = filters.userId ?? member.id;
     const kind = pickEnum(query, 'kind', KINDS);
     const sourceType = pickEnum(query, 'sourceType', SOURCE_TYPES);
     const paging = parseAdminPage(query, {
@@ -98,23 +107,25 @@ export class AdminPointsController {
       'occurredAt,asc': 'occurred_at ASC, id ASC',
     });
     const params = [
-      filters.userId ?? null,
+      memberId ?? null,
       filters.from ?? null,
       filters.to ?? null,
       kind ?? null,
       sourceType ?? null,
+      member.like,
     ];
-    const where = `($1::uuid IS NULL OR user_id = $1)
+    const where = `${memberWhere('user_id', '$6', '$1')}
           AND ($2::timestamptz IS NULL OR occurred_at >= $2)
           AND ($3::timestamptz IS NULL OR occurred_at < $3)
           AND ($4::text IS NULL OR kind = $4)
           AND ($5::text IS NULL OR source_type = $5)`;
     const [{ rows }, count, pending] = await Promise.all([
       this.database.query(
-        `SELECT ${COLUMNS} FROM point_transactions
+        `SELECT ${COLUMNS}, ${nicknameOf('point_transactions.user_id')} AS nickname
+           FROM point_transactions
           WHERE ${where}
           ORDER BY ${paging.orderBy}
-          LIMIT $6 OFFSET $7`,
+          LIMIT $7 OFFSET $8`,
         [...params, paging.size, paging.offset],
       ),
       this.database.query(
@@ -126,8 +137,8 @@ export class AdminPointsController {
            FROM mission_records r
            JOIN missions m ON m.id = r.mission_id
           WHERE r.status = 'review_required'
-            AND ($1::uuid IS NULL OR r.user_id = $1)`,
-        [filters.userId ?? null],
+            AND ${memberWhere('r.user_id', '$2', '$1')}`,
+        [memberId ?? null, member.like],
       ),
     ]);
     response.setHeader('X-Pending-Points', String(pending.rows[0].total));

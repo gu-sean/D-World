@@ -4,6 +4,7 @@ import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';
+import { MEMBER_FIELD, memberColumn } from '../../../components/memberColumns.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { labels } from '../../../constants/labels.js';
@@ -12,6 +13,7 @@ import { useUpdateWithdrawal, useWithdrawals } from '../queries.js';
 const DEFAULT_SORT = 'requestedAt,asc'; // docs/09 M15: oldest request first
 
 const FIELDS = [
+  MEMBER_FIELD,
   {
     name: 'status',
     type: 'select',
@@ -44,7 +46,7 @@ export default function WithdrawalListPage() {
   const [target, setTarget] = useState(null); // {request, status}
 
   const columns = [
-    { title: '회원', dataIndex: 'nickname', render: (value) => value ?? '-' },
+    memberColumn({ idKey: 'userId', nicknameKey: 'nickname' }),
     {
       title: '상태',
       dataIndex: 'status',

@@ -69,7 +69,8 @@ export class GoalsController {
         title: title(),
         description: description(),
         categoryId: uuid(),
-        difficultyId: uuid(),
+        // 최종 목표에는 보상이 없어 난이도를 받지 않아도 된다 (생략하면 보통, 미션 난이도는 미션마다 판정)
+        difficultyId: uuid({ optional: true }),
         startDate: dateString(),
         endDate: dateString(),
         targetFrequency: integer({ min: 1, max: 7, optional: true }),

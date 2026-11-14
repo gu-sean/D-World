@@ -75,7 +75,7 @@ export default function HomeScreen({ navigation }) {
               <SectionTitle
                 title="오늘의 미션"
                 actionText="관리"
-                onAction={() => navigation.navigate(Routes.MISSIONS_TAB)}
+                onAction={() => navigation.navigate(Routes.MISSION_MANAGE, { date })}
               />
               {summary.missions.length === 0 ? (
                 <Card>
@@ -85,12 +85,7 @@ export default function HomeScreen({ navigation }) {
                       title="미션 추가하기"
                       variant="secondary"
                       size="sm"
-                      onPress={() =>
-                        navigation.navigate(Routes.MISSIONS_TAB, {
-                          screen: Routes.MISSION_CATALOG,
-                          params: { date },
-                        })
-                      }
+                      onPress={() => navigation.navigate(Routes.MISSION_CATALOG, { date })}
                     />
                   </View>
                 </Card>

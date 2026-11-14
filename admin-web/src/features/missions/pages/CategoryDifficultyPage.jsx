@@ -1,4 +1,4 @@
-// ADM-15 분야·난이도·보상 기준
+// ADM-15 분야·난이도 (미션 보상표는 보상 관리 > 포인트 정책 > 미션 보상표 한 곳에서 관리)
 import { useState } from 'react';
 import {
   Button,
@@ -7,23 +7,15 @@ import {
   InputNumber,
   message,
   Modal,
-  Select,
   Switch,
   Table,
   Tabs,
   Typography,
 } from 'antd';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
-import { DateText } from '../../../components/DateText.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
-import {
-  useCatalog,
-  useCreateCatalogItem,
-  useCreateRewardRate,
-  useRewardRates,
-  useUpdateCatalogItem,
-} from '../queries.js';
+import { useCatalog, useCreateCatalogItem, useUpdateCatalogItem } from '../queries.js';
 
 const KIND_LABEL = { categories: '분야', difficulties: '난이도' };
 
@@ -140,106 +132,17 @@ function CatalogTab({ kind }) {
   );
 }
 
-function RewardRateTab() {
-  const { data: categories = [] } = useCatalog('categories');
-  const { data: difficulties = [] } = useCatalog('difficulties');
-  const query = useRewardRates({});
-  const create = useCreateRewardRate();
-  const [form] = Form.useForm();
-  const [formOpen, setFormOpen] = useState(false);
-  const [values, setValues] = useState(null);
-  const nameOf = (items, id) => items.find((item) => item.id === id)?.name ?? '-';
-
-  const columns = [
-    { title: '분야', dataIndex: 'categoryId', render: (id) => nameOf(categories, id) },
-    { title: '난이도', dataIndex: 'difficultyId', render: (id) => nameOf(difficulties, id) },
-    { title: '버전', dataIndex: 'versionNo' },
-    { title: '포인트', dataIndex: 'points' },
-    { title: '사용자 경험치', dataIndex: 'userXp' },
-    { title: '펫 경험치', dataIndex: 'petXp' },
-    { title: '적용 시각', dataIndex: 'effectiveAt', render: (value) => <DateText value={value} /> },
-  ];
-  const options = (items) => items.map((item) => ({ value: item.id, label: item.name }));
-  const required = [{ required: true, message: '값을 입력해 주세요.' }];
-
-  return (
-    <QueryBoundary query={query}>
-      {(data) => (
-        <>
-          <Button
-            type="primary"
-            style={{ marginBottom: 16 }}
-            onClick={() => {
-              form.resetFields();
-              setFormOpen(true);
-            }}
-          >
-            새 버전 추가
-          </Button>
-          {data.length === 0 ? (
-            <StatePanel type="empty" />
-          ) : (
-            <Table rowKey="id" columns={columns} dataSource={data} pagination={false} />
-          )}
-          <Modal
-            title="보상 기준 추가"
-            open={formOpen}
-            onCancel={() => setFormOpen(false)}
-            onOk={() => form.submit()}
-            okText="다음"
-            cancelText="취소"
-          >
-            <Form
-              form={form}
-              layout="vertical"
-              onFinish={(next) => {
-                setFormOpen(false);
-                setValues(next);
-              }}
-            >
-              <Form.Item label="분야" name="categoryId" rules={required}>
-                <Select options={options(categories)} />
-              </Form.Item>
-              <Form.Item label="난이도" name="difficultyId" rules={required}>
-                <Select options={options(difficulties)} />
-              </Form.Item>
-              <Form.Item label="포인트" name="points" rules={required}>
-                <InputNumber min={0} precision={0} />
-              </Form.Item>
-              <Form.Item label="사용자 경험치" name="userXp" rules={required}>
-                <InputNumber min={0} precision={0} />
-              </Form.Item>
-              <Form.Item label="펫 경험치" name="petXp" rules={required}>
-                <InputNumber min={0} precision={0} />
-              </Form.Item>
-            </Form>
-          </Modal>
-          <ConfirmActionModal
-            open={Boolean(values)}
-            title="보상 기준 새 버전 추가"
-            summary="기존 버전은 그대로 남고, 적용 시각부터 새 기준이 쓰여요."
-            onSubmit={async ({ reason, idempotencyKey }) => {
-              await create.mutateAsync({ body: { ...values, reason }, idempotencyKey });
-              message.success('처리했어요');
-              setValues(null);
-            }}
-            onCancel={() => setValues(null)}
-          />
-        </>
-      )}
-    </QueryBoundary>
-  );
-}
-
 export default function CategoryDifficultyPage() {
   return (
     <div>
       <Typography.Title level={4}>분야·난이도</Typography.Title>
+      <Typography.Paragraph type="secondary">
+        미션 보상표는 보상 관리 &gt; 포인트 정책 &gt; 미션 보상표에서 관리해요.
+      </Typography.Paragraph>
       <Tabs
         items={[
           { key: 'categories', label: '분야', children: <CatalogTab kind="categories" /> },
           { key: 'difficulties', label: '난이도', children: <CatalogTab kind="difficulties" /> },
-          { key: 'rates', label: '보상 기준', children: <RewardRateTab /> },
         ]}
       />
     </div>

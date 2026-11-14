@@ -1,8 +1,10 @@
 // MISSION-10·11 미션 직접 만들기·수정
 //
 // `missionId`가 있으면 수정, 없으면 새로 만들기다.
-// 수정일 때 분야·난이도·운동 종류는 보여 주기만 하고 바꿀 수 없다 — 보상 기준이
-// 그 조합에 묶여 있어서, 바꾸려면 미션을 취소하고 새로 만들어야 한다.
+// 난이도는 고르지 않는다. 운동 종류·목표 수치·소요 시간을 보고 서버 규칙이 정하고,
+// 그 난이도의 보상(관리자 보상표)을 "예상 난이도 · 포인트"로 미리 보여 준다. 보상은 미션마다 받는다.
+// 수정일 때 분야·운동 종류는 바꿀 수 없고, 수치를 바꿔 난이도가 달라지면 저장되지 않는다
+// (보상이 만들 때 고정되므로 취소하고 새로 만들어야 한다).
 //
 // 운동을 고르면 목표 단위와 허용 범위가 그 운동의 것으로 바뀌고,
 // 범위를 벗어난 값은 보내기 전에 걸러 낸다.
@@ -13,21 +15,15 @@ import {
   format,
   labels,
   useCreateMission,
-  useDifficultyLevels,
+  useDifficultyPreview,
   useExerciseTypes,
+  useGoal,
   useGoalCategories,
   useMission,
   useUpdateMission,
   validators,
 } from '../../client';
-import {
-  Button,
-  DateField,
-  ErrorBanner,
-  OptionRow,
-  Screen,
-  TextField,
-} from '../../components';
+import { Button, DateField, ErrorBanner, OptionRow, Screen, TextField } from '../../components';
 import { colors, spacing, typography } from '../../theme';
 
 export default function MissionFormScreen({ navigation, route }) {
@@ -35,7 +31,7 @@ export default function MissionFormScreen({ navigation, route }) {
   const editing = Boolean(missionId);
 
   const categories = useGoalCategories();
-  const difficulties = useDifficultyLevels();
+  const goal = useGoal(editing ? null : goalId);
   const exercises = useExerciseTypes();
   const existing = useMission(missionId);
   const createMission = useCreateMission();
@@ -45,7 +41,6 @@ export default function MissionFormScreen({ navigation, route }) {
     title: '',
     description: '',
     categoryCode: null,
-    difficultyCode: null,
     exerciseCode: null,
     targetValue: '',
     estimatedDurationSeconds: '',
@@ -61,7 +56,6 @@ export default function MissionFormScreen({ navigation, route }) {
       title: m.title ?? '',
       description: m.description ?? '',
       categoryCode: m.categoryCode,
-      difficultyCode: m.difficultyCode,
       exerciseCode: m.exerciseCode,
       targetValue: m.targetValue != null ? String(m.targetValue) : '',
       estimatedDurationSeconds: m.estimatedDurationSeconds
@@ -71,6 +65,14 @@ export default function MissionFormScreen({ navigation, route }) {
       memo: m.memo ?? '',
     });
   }, [editing, existing.data]);
+
+  // 목표에서 미션을 더할 때는 분야를 목표의 것으로 미리 고른다
+  useEffect(() => {
+    if (editing || !goal.data?.categoryCode) return;
+    setForm((prev) =>
+      prev.categoryCode ? prev : { ...prev, categoryCode: goal.data.categoryCode },
+    );
+  }, [editing, goal.data]);
 
   const set = (key) => (value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -89,10 +91,46 @@ export default function MissionFormScreen({ navigation, route }) {
     exerciseCode: form.exerciseCode,
     targetUnit,
   });
-  const ready =
-    titleCheck.ok && memoCheck.ok && targetCheck.ok && !!form.categoryCode && !!form.difficultyCode;
-
   const isExercise = form.categoryCode === 'exercise';
+
+  // 난이도 미리 보기: 입력이 멈추고 0.4초 뒤에 서버 규칙으로 계산
+  const previewInput = useMemo(() => {
+    if (!form.categoryCode) return null;
+    const input = { categoryCode: form.categoryCode };
+    if (isExercise && form.exerciseCode) input.exerciseCode = form.exerciseCode;
+    if (form.targetValue && targetCheck.ok) {
+      input.targetValue = Number(form.targetValue);
+      input.targetUnit = targetUnit;
+    }
+    if (form.estimatedDurationSeconds) {
+      input.estimatedDurationSeconds = Number(form.estimatedDurationSeconds);
+    }
+    return input;
+  }, [
+    form.categoryCode,
+    form.exerciseCode,
+    form.targetValue,
+    form.estimatedDurationSeconds,
+    isExercise,
+    targetUnit,
+    targetCheck.ok,
+  ]);
+  const [debouncedInput, setDebouncedInput] = useState(null);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedInput(previewInput), 400);
+    return () => clearTimeout(timer);
+  }, [previewInput]);
+  const preview = useDifficultyPreview(debouncedInput);
+  const currentDifficulty = editing ? existing.data?.difficultyCode : null;
+  const difficultyWillChange =
+    editing &&
+    touched &&
+    !!preview.data &&
+    !!currentDifficulty &&
+    preview.data.difficultyCode !== currentDifficulty;
+
+  const ready =
+    titleCheck.ok && memoCheck.ok && targetCheck.ok && !!form.categoryCode && !difficultyWillChange;
 
   const submit = () => {
     if (editing) {
@@ -118,7 +156,6 @@ export default function MissionFormScreen({ navigation, route }) {
         title: form.title.trim(),
         description: form.description.trim() || null,
         categoryCode: form.categoryCode,
-        difficultyCode: form.difficultyCode,
         exerciseCode: isExercise ? form.exerciseCode : null,
         targetValue: Number(form.targetValue),
         targetUnit,
@@ -173,14 +210,6 @@ export default function MissionFormScreen({ navigation, route }) {
           disabled={editing}
         />
 
-        <OptionRow
-          label={lockedLabel('난이도')}
-          options={(difficulties.data ?? []).map((d) => ({ value: d.code, label: d.name }))}
-          value={form.difficultyCode}
-          onChange={set('difficultyCode')}
-          disabled={editing}
-        />
-
         {isExercise && (
           <OptionRow
             label={lockedLabel('운동 종류')}
@@ -198,14 +227,14 @@ export default function MissionFormScreen({ navigation, route }) {
           placeholder="20"
           keyboardType="number-pad"
           error={touched && !targetCheck.ok ? targetCheck.message : null}
-          hint={
-            exercise ? `${exercise.minTarget}~${exercise.maxTarget} 사이로 정해 주세요` : null
-          }
+          hint={exercise ? `${exercise.minTarget}~${exercise.maxTarget} 사이로 정해 주세요` : null}
         />
 
         <TextField
           label="예상 소요 시간 (선택, 분)"
-          value={form.estimatedDurationSeconds ? String(Number(form.estimatedDurationSeconds) / 60) : ''}
+          value={
+            form.estimatedDurationSeconds ? String(Number(form.estimatedDurationSeconds) / 60) : ''
+          }
           onChangeText={(text) => {
             const minutes = text.replace(/\D/g, '').slice(0, 3);
             set('estimatedDurationSeconds')(minutes ? String(Number(minutes) * 60) : '');
@@ -213,6 +242,38 @@ export default function MissionFormScreen({ navigation, route }) {
           placeholder="10"
           keyboardType="number-pad"
         />
+
+        <View style={styles.difficultyBox}>
+          <Text style={styles.difficultyLabel}>
+            {editing ? '난이도 (만들 때 정해졌어요)' : '예상 난이도'}
+          </Text>
+          {editing ? (
+            <Text style={styles.difficultyValue}>
+              {labels.difficulty[currentDifficulty] ?? currentDifficulty ?? '-'}
+              {existing.data?.reward?.points != null ? ` · ${existing.data.reward.points}P` : ''}
+            </Text>
+          ) : preview.data ? (
+            <>
+              <Text style={styles.difficultyValue}>
+                {preview.data.difficultyName}
+                {preview.data.rewardPoints != null ? ` · ${preview.data.rewardPoints}P` : ''}
+              </Text>
+              <Text style={styles.difficultyReason}>{preview.data.reason}</Text>
+            </>
+          ) : (
+            <Text style={styles.difficultyReason}>
+              {form.categoryCode
+                ? '목표 수치와 소요 시간을 보고 정해요'
+                : '분야를 고르면 난이도와 보상을 보여 드려요'}
+            </Text>
+          )}
+          {difficultyWillChange && (
+            <Text style={styles.difficultyWarn}>
+              이렇게 바꾸면 난이도가 '{preview.data.difficultyName}'(으)로 바뀌어요. 보상은 만들 때
+              정해져서, 이 미션을 취소하고 새로 만들어 주세요.
+            </Text>
+          )}
+        </View>
 
         <DateField label="날짜" value={form.scheduledDate} onChange={set('scheduledDate')} />
 
@@ -235,7 +296,7 @@ export default function MissionFormScreen({ navigation, route }) {
           />
           {editing && (
             <Text style={styles.note}>
-              분야·난이도·운동을 바꾸려면 이 미션을 취소하고 새로 만들어 주세요.
+              분야·운동을 바꾸거나 난이도가 달라지게 고치려면 이 미션을 취소하고 새로 만들어 주세요.
             </Text>
           )}
         </View>
@@ -248,4 +309,16 @@ const styles = StyleSheet.create({
   body: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
   footer: { marginTop: spacing.md, gap: spacing.sm },
   note: { ...typography.caption, color: colors.textSub, textAlign: 'center' },
+  difficultyBox: {
+    gap: spacing.xs,
+    padding: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  difficultyLabel: { ...typography.caption, color: colors.textSub },
+  difficultyValue: { ...typography.bodyStrong, color: colors.text },
+  difficultyReason: { ...typography.caption, color: colors.textSub },
+  difficultyWarn: { ...typography.caption, color: colors.danger },
 });

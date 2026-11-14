@@ -230,6 +230,15 @@ export const labels = {
     mission_definition: { text: '미션', color: 'default' },
     challenge: { text: '챌린지', color: 'default' },
   },
+  // support_tickets.category (user-support.service.js 허용 값)
+  ticketCategory: {
+    account: { text: '계정', color: 'default' },
+    mission: { text: '미션', color: 'default' },
+    verification: { text: '인증', color: 'default' },
+    points: { text: '포인트', color: 'default' },
+    challenge: { text: '챌린지', color: 'default' },
+    other: { text: '기타', color: 'default' },
+  },
   // support_ticket_resolutions.outcome
   ticketResolutionOutcome: {
     no_action: { text: '문제 없음', color: 'default' },

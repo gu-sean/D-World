@@ -23,6 +23,9 @@ export const SELECT = `
          c.publication_status, c.settlement_status, c.published_at, c.cancelled_at,
          p.points, p.user_xp, p.pet_xp, p.badge_achievement_version_id,
          (SELECT pf.nickname FROM profiles pf WHERE pf.user_id = c.created_by_user_id) AS creator_nickname,
+         (SELECT gc.code FROM goal_categories gc WHERE gc.id = c.category_id) AS category_code,
+         -- 07 isClosingSoon: 모집 중이고 시작까지 2일 이하
+         (${TODAY_SQL} < c.start_date AND c.start_date - ${TODAY_SQL} <= 2) AS is_closing_soon,
          (SELECT count(*) FROM challenge_participations cp
            WHERE cp.challenge_id = c.id AND cp.status IN ('enrolled', 'completed', 'failed')
          )::int AS participant_count,
@@ -45,6 +48,8 @@ export function toView(row) {
     title: row.title,
     description: row.description,
     categoryId: row.category_id,
+    categoryCode: row.category_code ?? null,
+    isClosingSoon: row.is_closing_soon === true,
     difficultyId: row.difficulty_id,
     verificationMethod: row.verification_method,
     exerciseCode: row.exercise_code,
@@ -119,7 +124,10 @@ export class ChallengesService {
   // ───────── 사용자 조회 ─────────
 
   /** 공개된 챌린지 목록(시작일 순). 내 참가 상태를 함께 반환 */
-  async listPublic(userId, { phase, categoryId, cursor, limit }) {
+  async listPublic(
+    userId,
+    { phase, categoryId, categoryCode, closingSoon, origin, cursor, limit },
+  ) {
     const after = cursor ? decodeCursor(cursor) : null;
     const { rows } = await this.database.query(
       `${SELECT}
@@ -128,6 +136,9 @@ export class ChallengesService {
                  WHEN ${TODAY_SQL} <= c.end_date THEN 'ongoing' ELSE 'ended' END) = $1)
           AND ($2::uuid IS NULL OR c.category_id = $2)
           AND ($3::date IS NULL OR (c.start_date, c.id) > ($3::date, $4::uuid))
+          AND ($6::text IS NULL OR c.origin = $6)
+          AND ($7::text IS NULL OR c.category_id = (SELECT id FROM goal_categories WHERE code = $7))
+          AND (NOT $8::boolean OR (${TODAY_SQL} < c.start_date AND c.start_date - ${TODAY_SQL} <= 2))
         ORDER BY c.start_date, c.id
         LIMIT $5`,
       [
@@ -136,6 +147,9 @@ export class ChallengesService {
         after?.d ?? null,
         after?.id ?? null,
         limit + 1,
+        origin ?? null,
+        categoryCode ?? null,
+        closingSoon === 'true',
       ],
     );
     const page = rows.slice(0, limit);
@@ -156,13 +170,24 @@ export class ChallengesService {
 
   async myParticipations(userId, challengeIds) {
     if (challengeIds.length === 0) return new Map();
+    // 07 myParticipation: {id, status, successfulDays} (성공 일수는 participation.service listMine과 같은 계산)
     const { rows } = await this.database.query(
-      `SELECT id, challenge_id, status FROM challenge_participations
-        WHERE user_id = $1 AND challenge_id = ANY($2::uuid[])`,
+      `SELECT cp.id, cp.challenge_id, cp.status,
+              (SELECT count(*) FROM challenge_daily_missions d
+                WHERE d.participation_id = cp.id AND d.status = 'success')::int AS successful_days
+         FROM challenge_participations cp
+        WHERE cp.user_id = $1 AND cp.challenge_id = ANY($2::uuid[])`,
       [userId, challengeIds],
     );
     return new Map(
-      rows.map((row) => [row.challenge_id, { id: row.id, status: row.status }]),
+      rows.map((row) => [
+        row.challenge_id,
+        {
+          id: row.id,
+          status: row.status,
+          successfulDays: row.successful_days,
+        },
+      ]),
     );
   }
 
@@ -342,7 +367,7 @@ export class ChallengesService {
             [
               id,
               input.reward.points,
-              input.reward.userXp,
+              input.reward.userXp ?? 0, // 관리자 화면에서 사용자 XP를 뺐다
               input.reward.petXp,
               input.reward.badgeAchievementVersionId ?? null,
             ],
@@ -434,18 +459,33 @@ export class ChallengesService {
             ],
           );
           if (patch.reward) {
-            await tx.query(
-              `UPDATE challenge_reward_packages
-                  SET points = $2, user_xp = $3, pet_xp = $4, badge_achievement_version_id = $5
-                WHERE challenge_id = $1`,
-              [
-                id,
-                patch.reward.points,
-                patch.reward.userXp,
-                patch.reward.petXp,
-                patch.reward.badgeAchievementVersionId ?? null,
-              ],
-            );
+            // 보상이 그대로면 갱신하지 않는다: 참가자가 생긴 뒤 보상 행 UPDATE는 DB가 값과 상관없이 거절함.
+            // 사용자 XP는 관리자 화면에서 뺐으므로 보내지 않으면 지금 값을 유지한다.
+            const nextReward = {
+              points: patch.reward.points,
+              userXp: patch.reward.userXp ?? before.reward.userXp,
+              petXp: patch.reward.petXp,
+              badge: patch.reward.badgeAchievementVersionId ?? null,
+            };
+            const unchanged =
+              nextReward.points === before.reward.points &&
+              nextReward.userXp === before.reward.userXp &&
+              nextReward.petXp === before.reward.petXp &&
+              nextReward.badge === before.reward.badgeAchievementVersionId;
+            if (!unchanged) {
+              await tx.query(
+                `UPDATE challenge_reward_packages
+                    SET points = $2, user_xp = $3, pet_xp = $4, badge_achievement_version_id = $5
+                  WHERE challenge_id = $1`,
+                [
+                  id,
+                  nextReward.points,
+                  nextReward.userXp,
+                  nextReward.petXp,
+                  nextReward.badge,
+                ],
+              );
+            }
           }
         } catch (error) {
           if (

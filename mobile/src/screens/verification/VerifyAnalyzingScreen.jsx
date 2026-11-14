@@ -16,7 +16,7 @@ import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { useCameraVerification } from '../../client';
-import { Button, ErrorBanner, Icon, ProgressBar, Screen } from '../../components';
+import { Button, ErrorBanner, Icon, ProgressRing, Screen } from '../../components';
 import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
 
@@ -95,8 +95,7 @@ export default function VerifyAnalyzingScreen({ navigation, route }) {
 
         {phase === 'uploading' && (
           <View style={styles.progress}>
-            <ProgressBar rate={progress} />
-            <Text style={styles.percent}>{Math.round(progress * 100)}%</Text>
+            <ProgressRing rate={progress} size={84} thickness={8} />
           </View>
         )}
 
@@ -113,6 +112,5 @@ const styles = StyleSheet.create({
   heading: { ...typography.subtitle, color: colors.text, textAlign: 'center' },
   description: { ...typography.caption, color: colors.textSub, textAlign: 'center' },
   progress: { alignSelf: 'stretch', gap: spacing.xs, alignItems: 'center' },
-  percent: { ...typography.caption, color: colors.textSub },
   footer: { gap: spacing.sm, paddingBottom: spacing.xl },
 });

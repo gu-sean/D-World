@@ -3,28 +3,21 @@
 // `goalId`가 있으면 수정, 없으면 등록이다. 수정일 때는 시작일과 분야를 바꿀 수 없어서
 // 그 두 칸을 잠근 채로 보여 준다 — 이미 만들어진 미션들이 그 값에 묶여 있기 때문이다.
 //
-// 분야와 난이도 목록은 서버에서 받아 쓰고, 글자 수와 기간 규칙은 기능 모듈의 검사기로
-// 보내기 전에 걸러 낸다. 등록을 마치면 AI 계획을 바로 만들러 갈 수 있다.
+// 분야 목록은 서버에서 받아 쓰고, 글자 수와 기간 규칙은 기능 모듈의 검사기로 보내기 전에 걸러 낸다.
+// 최종 목표에는 보상이 없어 난이도를 고르지 않는다 (보상은 세부 미션마다, 미션 내용으로 난이도 판정).
+// 등록할 때 "AI 계획 받기"와 "직접 계획 짜기" 중 하나를 고른다. 직접 짜면 목표 상세에서 미션을 더한다.
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   format,
   useCreateGoal,
-  useDifficultyLevels,
   useGoal,
   useGoalCategories,
   useUpdateGoal,
   validators,
 } from '../../client';
-import {
-  Button,
-  DateField,
-  ErrorBanner,
-  OptionRow,
-  Screen,
-  TextField,
-} from '../../components';
+import { Button, DateField, ErrorBanner, OptionRow, Screen, TextField } from '../../components';
 import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
 
@@ -35,16 +28,15 @@ export default function GoalFormScreen({ navigation, route }) {
   const editing = Boolean(goalId);
 
   const categories = useGoalCategories();
-  const difficulties = useDifficultyLevels();
   const existing = useGoal(goalId);
   const createGoal = useCreateGoal();
+  const [planMode, setPlanMode] = useState(null); // 'ai' | 'manual' (누른 버튼)
   const updateGoal = useUpdateGoal();
 
   const [form, setForm] = useState({
     title: '',
     description: '',
     categoryCode: null,
-    difficultyCode: null,
     startDate: format.todayKst(),
     endDate: '',
     targetFrequency: '3',
@@ -60,7 +52,6 @@ export default function GoalFormScreen({ navigation, route }) {
       title: goal.title ?? '',
       description: goal.description ?? '',
       categoryCode: goal.categoryCode,
-      difficultyCode: goal.difficultyCode,
       startDate: goal.startDate,
       endDate: goal.endDate,
       targetFrequency: goal.targetFrequency ? String(goal.targetFrequency) : '',
@@ -76,32 +67,19 @@ export default function GoalFormScreen({ navigation, route }) {
   const titleCheck = validators.validateLength(form.title, 'goalTitle');
   const descriptionCheck = validators.validateLength(form.description, 'goalDescription');
   const periodCheck = validators.validatePeriod(form.startDate, form.endDate);
-  const ready =
-    titleCheck.ok &&
-    descriptionCheck.ok &&
-    periodCheck.ok &&
-    !!form.categoryCode &&
-    !!form.difficultyCode;
+  const ready = titleCheck.ok && descriptionCheck.ok && periodCheck.ok && !!form.categoryCode;
 
   const categoryOptions = useMemo(
     () => (categories.data ?? []).map((c) => ({ value: c.code, label: c.name })),
     [categories.data],
   );
-  const difficultyOptions = useMemo(
-    () => (difficulties.data ?? []).map((d) => ({ value: d.code, label: d.name })),
-    [difficulties.data],
-  );
-
-  const submit = () => {
+  const submit = (mode) => {
     const body = {
       title: form.title.trim(),
       description: form.description.trim() || null,
-      difficultyCode: form.difficultyCode,
       endDate: form.endDate,
       targetFrequency: form.targetFrequency ? Number(form.targetFrequency) : null,
-      dailyAvailableMinutes: form.dailyAvailableMinutes
-        ? Number(form.dailyAvailableMinutes)
-        : null,
+      dailyAvailableMinutes: form.dailyAvailableMinutes ? Number(form.dailyAvailableMinutes) : null,
     };
 
     if (editing) {
@@ -109,11 +87,14 @@ export default function GoalFormScreen({ navigation, route }) {
       return;
     }
 
+    setPlanMode(mode);
     createGoal.mutate(
       { ...body, categoryCode: form.categoryCode, startDate: form.startDate },
       {
         onSuccess: (goal) =>
-          navigation.replace(Routes.PLAN_GENERATING, { goalId: goal.id }),
+          mode === 'ai'
+            ? navigation.replace(Routes.PLAN_GENERATING, { goalId: goal.id })
+            : navigation.replace(Routes.GOAL_DETAIL, { goalId: goal.id }),
       },
     );
   };
@@ -156,13 +137,6 @@ export default function GoalFormScreen({ navigation, route }) {
           disabled={editing}
         />
 
-        <OptionRow
-          label="난이도"
-          options={difficultyOptions}
-          value={form.difficultyCode}
-          onChange={set('difficultyCode')}
-        />
-
         {editing ? (
           <View style={styles.lockedField}>
             <Text style={styles.lockedLabel}>시작일 (수정할 수 없어요)</Text>
@@ -197,13 +171,37 @@ export default function GoalFormScreen({ navigation, route }) {
         />
 
         <View style={styles.footer}>
-          <Button
-            title={editing ? '저장' : '만들고 계획 받기'}
-            onPress={submit}
-            loading={mutation.isPending}
-            disabled={!ready}
-            full
-          />
+          {editing ? (
+            <Button
+              title="저장"
+              onPress={() => submit()}
+              loading={mutation.isPending}
+              disabled={!ready}
+              full
+            />
+          ) : (
+            <>
+              <Text style={styles.planHint}>
+                세부 미션은 AI가 짜 주거나, 직접 하나씩 적을 수 있어요. 보상은 세부 미션마다
+                난이도에 맞춰 받아요.
+              </Text>
+              <Button
+                title="만들고 AI 계획 받기"
+                onPress={() => submit('ai')}
+                loading={mutation.isPending && planMode === 'ai'}
+                disabled={!ready || mutation.isPending}
+                full
+              />
+              <Button
+                title="만들고 직접 계획 짜기"
+                variant="secondary"
+                onPress={() => submit('manual')}
+                loading={mutation.isPending && planMode === 'manual'}
+                disabled={!ready || mutation.isPending}
+                full
+              />
+            </>
+          )}
         </View>
       </ScrollView>
     </Screen>
@@ -215,5 +213,6 @@ const styles = StyleSheet.create({
   lockedField: { gap: spacing.xs },
   lockedLabel: { ...typography.caption, color: colors.textSub },
   lockedValue: { ...typography.body, color: colors.textSub },
-  footer: { marginTop: spacing.md },
+  footer: { marginTop: spacing.md, gap: spacing.sm },
+  planHint: { ...typography.caption, color: colors.textSub },
 });

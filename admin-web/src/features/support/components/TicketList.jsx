@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';
+import { MemberCell } from '../../../components/MemberCell.jsx';
+import { MEMBER_FIELD, memberColumn } from '../../../components/memberColumns.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { labels } from '../../../constants/labels.js';
@@ -49,9 +51,10 @@ export function TicketList({ ticketType, basePath, title }) {
   const [params, setParams] = useListParams({ sort: DEFAULT_SORT });
   const query = useTickets({ ...params, ticketType });
 
+  // 회원 검색: 접수자 또는 신고 대상 회원 (닉네임 또는 회원 ID)
   const fields = isReport
-    ? [STATUS_FIELD, ASSIGNED_FIELD, TARGET_KIND_FIELD]
-    : [STATUS_FIELD, ASSIGNED_FIELD];
+    ? [MEMBER_FIELD, STATUS_FIELD, ASSIGNED_FIELD, TARGET_KIND_FIELD]
+    : [MEMBER_FIELD, STATUS_FIELD, ASSIGNED_FIELD];
 
   const columns = [
     {
@@ -61,20 +64,33 @@ export function TicketList({ ticketType, basePath, title }) {
       sorter: true,
       render: (value) => <DateText value={value} />,
     },
-    { title: '분류', dataIndex: 'category' },
+    {
+      title: '분류',
+      dataIndex: 'category',
+      render: (value) => labels.ticketCategory[value]?.text ?? value,
+    },
     { title: '제목', dataIndex: 'subject' },
-    { title: '접수자', dataIndex: 'reporterNickname', render: (value) => value ?? '-' },
+    memberColumn({ title: '접수자', idKey: 'reporterUserId', nicknameKey: 'reporterNickname' }),
     ...(isReport
       ? [
           {
             title: '대상',
             key: 'target',
-            render: (_, ticket) =>
-              ticket.targetKind
-                ? `${labels.ticketTargetKind[ticket.targetKind]?.text ?? ticket.targetKind} · ${
-                    ticket.targetSummary ?? '-'
-                  }`
-                : '-',
+            width: 300,
+            render: (_, ticket) => {
+              if (!ticket.targetKind) return '-';
+              const kind = labels.ticketTargetKind[ticket.targetKind]?.text ?? ticket.targetKind;
+              // 회원 신고는 다른 목록과 같은 모양(닉네임 + 회원 ID)으로 보인다
+              if (ticket.targetKind === 'user') {
+                return (
+                  <>
+                    <Typography.Text type="secondary">{kind}</Typography.Text>
+                    <MemberCell id={ticket.targetId} nickname={ticket.targetSummary} />
+                  </>
+                );
+              }
+              return `${kind} · ${ticket.targetSummary ?? '-'}`;
+            },
           },
           {
             title: '중복 신고',

@@ -1,20 +1,21 @@
 import { useState } from 'react';
-import { Button, Tag, Typography } from 'antd';
-import { Link } from 'react-router';
+import { Button, Tag, Tooltip, Typography } from 'antd';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';
+import { MEMBER_FIELD, memberColumn } from '../../../components/memberColumns.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { AuditLogDetailModal } from '../components/AuditLogDetailModal.jsx';
-import { auditResult } from '../labels.js';
+import { auditAction, auditActionGroups, auditResult } from '../labels.js';
 import { useAuditLogs } from '../queries.js';
 
 const DEFAULT_SORT = 'recordedAt,desc'; // docs/09 M101
 
 const FIELDS = [
-  { name: 'adminId', type: 'text', label: '관리자' },
-  { name: 'action', type: 'text', label: '작업 (앞부분, 예: verification.)' },
-  { name: 'targetUserId', type: 'text', label: '대상 회원 ID' },
+  // admin: 관리자 아이디(부분 일치) 또는 관리자 ID, member: 대상 회원 닉네임 또는 회원 ID
+  { name: 'admin', type: 'text', label: '관리자 아이디' },
+  { name: 'action', type: 'select', label: '작업', options: auditActionGroups },
+  { ...MEMBER_FIELD, label: '대상 회원 (닉네임 또는 회원 ID)' },
   {
     name: 'result',
     type: 'select',
@@ -39,12 +40,21 @@ export default function AuditLogPage() {
       render: (value) => <DateText value={value} format="YYYY-MM-DD HH:mm:ss" />,
     },
     { title: '관리자', dataIndex: 'adminLoginId' },
-    { title: '작업', dataIndex: 'action' },
     {
-      title: '대상 회원',
-      dataIndex: 'targetUserId',
-      render: (id) => (id ? <Link to={`/users/${id}`}>{id.slice(0, 8)}</Link> : '-'),
+      title: '작업',
+      dataIndex: 'action',
+      // 한국어로 보이고, 원래 코드는 마우스를 올리면 보인다
+      render: (value) => (
+        <Tooltip title={value}>
+          <span>{auditAction[value] ?? value}</span>
+        </Tooltip>
+      ),
     },
+    memberColumn({
+      title: '대상 회원',
+      idKey: 'targetUserId',
+      nicknameKey: 'targetNickname',
+    }),
     {
       title: '결과',
       dataIndex: 'result',

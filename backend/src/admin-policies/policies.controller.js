@@ -186,11 +186,13 @@ export class PoliciesController {
       categoryId: uuid(),
       difficultyId: uuid(),
       points: pointsRule(),
-      userXp: integer({ min: 0, max: MAX_POINTS }),
+      // 관리자 화면에서 사용자 XP를 뺐다: 없으면 포인트와 같은 값 (시드 보상표와 같은 규칙, 레벨이 계속 오르게)
+      userXp: integer({ min: 0, max: MAX_POINTS, optional: true }),
       petXp: integer({ min: 0, max: MAX_POINTS }),
       effectiveAt: effectiveAtRule(),
       reason: reasonRule(),
     });
+    if (input.userXp === undefined) input.userXp = input.points;
     return this.rewards.createRewardRate(
       request.auth.adminId,
       input,
@@ -247,11 +249,13 @@ export class PoliciesController {
     const raw = validateBody(body, {
       targetSuccessDays: integer(),
       points: pointsRule(),
-      userXp: integer({ min: 0, max: MAX_POINTS }),
+      // 관리자 화면에서 사용자 XP를 뺐다: 없으면 0 (시드 값과 같음)
+      userXp: integer({ min: 0, max: MAX_POINTS, optional: true }),
       petXp: integer({ min: 0, max: MAX_POINTS }),
       effectiveAt: effectiveAtRule(),
       reason: reasonRule(),
     });
+    if (raw.userXp === undefined) raw.userXp = 0;
     if (![7, 30, 100].includes(raw.targetSuccessDays)) {
       throw new BadRequestException([
         'targetSuccessDays: 7, 30, 100 중 하나여야 함',

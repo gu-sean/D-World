@@ -1,6 +1,7 @@
 import { Descriptions, Modal, Typography } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
-import { auditResult } from '../labels.js';
+import { MemberCell } from '../../../components/MemberCell.jsx';
+import { auditAction, auditResult } from '../labels.js';
 
 const preStyle = {
   margin: 0,
@@ -39,8 +40,16 @@ export function AuditLogDetailModal({ log, onClose }) {
       {log && (
         <>
           <Descriptions column={1} size="small" style={{ marginBottom: 16 }}>
-            <Descriptions.Item label="작업">{log.action}</Descriptions.Item>
+            <Descriptions.Item label="작업">
+              {auditAction[log.action] ?? log.action}
+              {auditAction[log.action] && (
+                <Typography.Text type="secondary"> ({log.action})</Typography.Text>
+              )}
+            </Descriptions.Item>
             <Descriptions.Item label="관리자">{log.adminLoginId}</Descriptions.Item>
+            <Descriptions.Item label="대상 회원">
+              <MemberCell id={log.targetUserId} nickname={log.targetNickname} />
+            </Descriptions.Item>
             <Descriptions.Item label="기록 시각">
               <DateText value={log.recordedAt} format="YYYY-MM-DD HH:mm:ss" />
             </Descriptions.Item>

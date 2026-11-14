@@ -140,12 +140,19 @@ export class AdminNoticesController {
       'createdAt,desc': 'n.created_at DESC, n.id DESC',
       'createdAt,asc': 'n.created_at ASC, n.id ASC',
     });
-    const params = [status ?? null, category ?? null];
-    const where =
-      '($1::text IS NULL OR n.status = $1) AND ($2::text IS NULL OR n.category = $2)';
+    // sendPush=true: 푸시 알림 메뉴(ADM-33)는 푸시를 보내는 공지만 본다
+    const sendPush = pickEnum(query, 'sendPush', ['true', 'false']);
+    const params = [
+      status ?? null,
+      category ?? null,
+      sendPush === undefined ? null : sendPush === 'true',
+    ];
+    const where = `($1::text IS NULL OR n.status = $1)
+      AND ($2::text IS NULL OR n.category = $2)
+      AND ($3::boolean IS NULL OR n.send_push = $3)`;
     const [{ rows }, count] = await Promise.all([
       this.database.query(
-        `${SELECT} WHERE ${where} ORDER BY ${paging.orderBy} LIMIT $3 OFFSET $4`,
+        `${SELECT} WHERE ${where} ORDER BY ${paging.orderBy} LIMIT $4 OFFSET $5`,
         [...params, paging.size, paging.offset],
       ),
       this.database.query(
@@ -208,7 +215,70 @@ export class AdminNoticesController {
     });
   }
 
-  /** M92: 초안만 고칠 수 있음, userIds를 보내면 수신자 전체를 바꿈 */
+  /**
+   * 게시·예약한 공지의 내용 수정: 받는 회원·목록 노출·푸시·연결 약관은 이미 알림이 나갔으므로 바꾸지 않는다.
+   * 관리자 웹 폼은 모든 칸을 함께 보내므로, 그 값이 지금과 같으면 그대로 두고 다르면 거절한다.
+   */
+  async updatePublishedContent(tx, current, input) {
+    const delivery = [
+      ['audienceType', current.audience_type],
+      ['showInList', current.show_in_list],
+      ['sendPush', current.send_push],
+      ['policyDocumentVersionId', current.policy_document_version_id],
+    ];
+    const changed = delivery
+      .filter(([key, now]) => input[key] !== undefined && input[key] !== now)
+      .map(([key]) => key);
+    if (input.userIds !== undefined) changed.push('userIds');
+    if (input.scheduledAt !== undefined && current.status === 'published') {
+      changed.push('scheduledAt');
+    }
+    if (changed.length > 0) {
+      throw new BadRequestException(
+        changed.map(
+          (key) =>
+            `${key}: 게시·예약한 공지는 내용(분류·제목·본문·이동 화면)만 고칠 수 있음`,
+        ),
+      );
+    }
+    const category = input.category ?? current.category;
+    if (
+      category !== current.category &&
+      [category, current.category].includes('policy')
+    ) {
+      throw new BadRequestException([
+        'category: 약관 공지는 게시 뒤 분류를 바꿀 수 없음',
+      ]);
+    }
+    const next = {
+      category,
+      title: (input.title ?? current.title).trim(),
+      body: (input.body ?? current.body).trim(),
+      linkScreen:
+        input.linkScreen === undefined ? current.link_screen : input.linkScreen,
+    };
+    await tx.query(
+      `UPDATE notices
+          SET category = $2, title = $3, body = $4, link_screen = $5,
+              scheduled_at = COALESCE($6, scheduled_at), updated_at = now()
+        WHERE id = $1`,
+      [
+        current.id,
+        next.category,
+        next.title,
+        next.body,
+        next.linkScreen ?? null,
+        current.status === 'scheduled' ? (input.scheduledAt ?? null) : null,
+      ],
+    );
+    return {
+      result: await this.get(tx, current.id),
+      before: { title: current.title, category: current.category },
+      after: { title: next.title, category: next.category },
+    };
+  }
+
+  /** M92: 초안은 전부, 게시·예약한 공지는 내용만 고칠 수 있음. userIds를 보내면 수신자 전체를 바꿈 */
   @Patch(':noticeId')
   @Bind(Req(), Param('noticeId'), Body())
   update(request, noticeId, body) {
@@ -226,7 +296,11 @@ export class AdminNoticesController {
       reason: input.reason.trim(),
       run: async (tx) => {
         const current = await this.lock(tx, id);
-        if (current.status !== 'draft') throw conflict(...STATE_CONFLICT);
+        if (current.status === 'cancelled') throw conflict(...STATE_CONFLICT);
+        // 게시·예약 뒤에는 내용(분류·제목·본문·이동 화면)만 고친다 (migration 015)
+        if (current.status !== 'draft') {
+          return this.updatePublishedContent(tx, current, input);
+        }
         const { rows: existing } = await tx.query(
           'SELECT user_id FROM notice_recipients WHERE notice_id = $1',
           [id],

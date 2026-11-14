@@ -1,11 +1,11 @@
 import {
-  BadRequestException,
   Bind,
   Body,
   Controller,
   Dependencies,
   Get,
   HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -14,6 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { RequireActive } from '../accounts/active-account.guard.js';
+import { AppException } from '../common/errors/app-exception.js';
 import {
   idOf,
   oneOf,
@@ -22,10 +23,9 @@ import {
   validateBody,
 } from '../common/validation.js';
 import { PHASES } from './challenges.constants.js';
-import { limitOf, userDefinitionRules } from './challenges.validation.js';
+import { limitOf } from './challenges.validation.js';
 import { ChallengesService } from './challenges.service.js';
 import { MobileChallengesService } from './mobile-challenges.service.js';
-import { fromMobileChallengeInput } from './mobile-challenges.service.js';
 import { ParticipationService } from './participation.service.js';
 import { ScoringService } from './scoring.service.js';
 import { UserChallengesService } from './user-challenges.service.js';
@@ -34,7 +34,14 @@ import {
   UserIdempotencyInterceptor,
 } from '../common/idempotency/user-idempotency.interceptor.js';
 
-/** 사용자: 공개된 챌린지 탐색 (열람은 이용 제한 중에도 가능) */
+const adminOnly = () =>
+  new AppException(
+    HttpStatus.FORBIDDEN,
+    'challenge_admin_only',
+    '챌린지는 관리자만 만들 수 있어요',
+  );
+
+/** 사용자: 공개된 챌린지 탐색과 참여 (열람은 이용 제한 중에도 가능) */
 @Controller('challenges')
 @UseInterceptors(UserIdempotencyInterceptor)
 @Dependencies(
@@ -57,10 +64,17 @@ export class ChallengesController {
     const filters = validateBody(query, {
       phase: oneOf(PHASES, { optional: true }),
       categoryId: uuid({ optional: true }),
+      // 08 A100: 앱은 분야를 code로 보낸다 (exercise·study·lifestyle)
+      categoryCode: string({ min: 1, max: 32, optional: true }),
+      // 08 A100: 모집 중이고 시작까지 2일 이하인 것만
+      closingSoon: oneOf(['true', 'false'], { optional: true }),
+      // 예전 앱 호환용으로 받기만 한다: 목록은 항상 관리자가 만든 챌린지뿐
+      origin: oneOf(['admin', 'user'], { optional: true }),
       cursor: string({ min: 1, max: 500, optional: true }),
     });
     return this.challenges.listPublic(request.auth.userId, {
       ...filters,
+      origin: 'admin',
       limit: limitOf(query),
     });
   }
@@ -71,36 +85,21 @@ export class ChallengesController {
     return this.challenges.getPublic(request.auth.userId, idOf(id));
   }
 
-  /** 챌린지 개설(초안). 보상 없음, 공개는 검수 신청 필요 */
+  // 챌린지는 관리자만 만들고 관리한다 (팀 결정). 회원은 참여·포기만 한다.
+  // 예전 회원 개설 경로(개설·수정·검수 신청)는 남겨 두되 항상 403으로 막는다.
   @Post()
-  @Idempotent()
-  @RequireActive()
-  @Bind(Req(), Body())
-  create(request, body) {
-    const input = validateBody(
-      fromMobileChallengeInput(body),
-      userDefinitionRules(),
-    );
-    return this.userChallenges.createDraft(request.auth.userId, input);
+  create() {
+    throw adminOnly();
   }
 
   @Patch(':id')
-  @RequireActive()
-  @Bind(Req(), Param('id'), Body())
-  update(request, id, body) {
-    const patch = validateBody(body, userDefinitionRules(true));
-    if (Object.keys(patch).length === 0) {
-      throw new BadRequestException(['바꿀 항목이 없음']);
-    }
-    return this.userChallenges.update(request.auth.userId, idOf(id), patch);
+  update() {
+    throw adminOnly();
   }
 
   @Post(':id/submit')
-  @RequireActive()
-  @HttpCode(200)
-  @Bind(Req(), Param('id'))
-  submit(request, id) {
-    return this.userChallenges.submit(request.auth.userId, idOf(id));
+  submit() {
+    throw adminOnly();
   }
 
   /** 시작일 전까지 참가, 이용 제한·재동의 필요 계정은 불가. 이미 참가했으면 같은 참가를 돌려줌 */

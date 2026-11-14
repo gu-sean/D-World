@@ -24,6 +24,9 @@ export class AuditLogsController {
     });
     return this.audit.list({
       ...filters,
+      // member: 대상 회원 닉네임 또는 회원 ID, admin: 관리자 로그인 ID 또는 관리자 ID
+      member: query.member,
+      admin: query.admin,
       action:
         typeof query.action === 'string' && query.action
           ? query.action.slice(0, 80)

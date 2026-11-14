@@ -157,7 +157,7 @@ export class UserNotificationsService {
               ORDER BY c.recorded_at DESC, c.id DESC LIMIT 1), false))`;
   }
 
-  async listNotices(userId, { limit, cursor }) {
+  async listNotices(userId, { limit, cursor, category }) {
     const after = decodeCursor(cursor);
     const { rows } = await this.database.query(
       `SELECT n.id, n.category, n.title, n.body, n.link_screen, n.published_at,
@@ -166,9 +166,10 @@ export class UserNotificationsService {
         WHERE ${this.visibleNotices('$1')}
           AND ($2::timestamptz IS NULL
                OR (n.published_at, n.id) < ($2::timestamptz, $3::uuid))
+          AND ($5::text IS NULL OR n.category = $5)
         ORDER BY n.published_at DESC, n.id DESC
         LIMIT $4`,
-      [userId, after.t, after.id, limit + 1],
+      [userId, after.t, after.id, limit + 1, category ?? null],
     );
     const page = rows.slice(0, limit);
     return {

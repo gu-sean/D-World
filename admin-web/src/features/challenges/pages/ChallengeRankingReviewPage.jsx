@@ -4,6 +4,7 @@ import { Button, Drawer, message, Space, Table, Tag, Typography } from 'antd';
 import { useParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { DateText } from '../../../components/DateText.jsx';
+import { memberColumn } from '../../../components/memberColumns.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
@@ -21,7 +22,7 @@ export default function ChallengeRankingReviewPage() {
 
   const columns = [
     { title: '순위', dataIndex: 'rankNo', width: 80 },
-    { title: '닉네임', dataIndex: 'nickname' },
+    memberColumn({ idKey: 'userId', nicknameKey: 'nickname' }),
     { title: '점수', dataIndex: 'score' },
     { title: '성공 일수', dataIndex: 'successfulDays' },
     {

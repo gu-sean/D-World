@@ -16,6 +16,13 @@ const withKey = (idempotencyKey) => ({ idempotencyKey });
 // ---- points (M70, M71) ----
 
 /**
+ * M11 GET /users/:id — 포인트 조정 전에 회원 ID가 누구인지 보여 주려고 쓴다
+ * (users 기능을 import하지 않고 같은 API를 부른다).
+ * @param {string} userId
+ */
+export const fetchMember = (userId) => http.get(`/users/${userId}`).then(data);
+
+/**
  * M70 GET /point-transactions (AdminPage). The header X-Pending-Points is the reward sum of
  * records still waiting for review, returned here as `pendingPoints`.
  * @param {{userId?: string, kind?: string, sourceType?: string, from?: string, to?: string,

@@ -6,6 +6,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { config } from '../../client';
 import { Button, Icon, Screen } from '../../components';
 import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
@@ -24,7 +25,9 @@ export default function ExistingAccountScreen({ navigation, route }) {
         <Text style={styles.description}>
           {kind === 'social'
             ? `이 번호는 ${providerName} 계정으로 가입돼 있어요. ${providerName}로 로그인해 주세요.`
-            : '이 번호로 가입한 계정이 있어요. 로그인하거나 비밀번호를 다시 정해 주세요.'}
+            : config.PASSWORD_RESET_ENABLED
+              ? '이 번호로 가입한 계정이 있어요. 로그인하거나 비밀번호를 다시 정해 주세요.'
+              : '이 번호로 가입한 계정이 있어요. 로그인해 주세요.'}
         </Text>
       </View>
 
@@ -34,7 +37,7 @@ export default function ExistingAccountScreen({ navigation, route }) {
           onPress={() => navigation.navigate(Routes.LOGIN)}
           full
         />
-        {kind === 'phone' && (
+        {kind === 'phone' && config.PASSWORD_RESET_ENABLED && (
           <Button
             title="비밀번호 재설정"
             variant="secondary"

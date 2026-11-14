@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { GoalsModule } from '../goals/goals.module.js';
+import { GoalGapsController } from './goal-gaps.controller.js';
+import { GoalGapsService } from './goal-gaps.service.js';
 import { MissionsController } from './missions.controller.js';
 import { MissionsService } from './missions.service.js';
 import { RewardResolver } from './reward-resolver.js';
@@ -7,8 +9,8 @@ import { RewardResolver } from './reward-resolver.js';
 /** 판정·AI 제안 수락이 import해서 RewardResolver와 미션 조회를 재사용 */
 @Module({
   imports: [GoalsModule],
-  controllers: [MissionsController],
-  providers: [MissionsService, RewardResolver],
+  controllers: [MissionsController, GoalGapsController],
+  providers: [MissionsService, RewardResolver, GoalGapsService],
   exports: [MissionsService, RewardResolver],
 })
 export class MissionsModule {}

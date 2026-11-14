@@ -10,9 +10,10 @@
  *   scroll?: boolean, padded?: boolean, children: React.ReactNode
  * }} props
  */
-import React from 'react';
+import React, { useContext } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 
 import Icon from './Icon';
 import { colors, screenPadding, spacing, typography } from '../theme';
@@ -27,9 +28,13 @@ export default function Screen({
   children,
 }) {
   const body = padded ? styles.padded : null;
+  // 탭 안 화면은 탭 막대가 아래 여백을 맡는다. 탭 밖(루트 스택) 화면은 하단 버튼이
+  // 시스템 내비게이션 막대에 붙지 않게 아래 안전 영역까지 띄운다.
+  const insideTabs = useContext(BottomTabBarHeightContext) !== undefined;
+  const edges = insideTabs ? ['top', 'left', 'right'] : ['top', 'left', 'right', 'bottom'];
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={edges}>
       {(title || onBack || right) && (
         <View style={styles.header}>
           {onBack ? (
@@ -79,7 +84,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
+    paddingLeft: spacing.sm,
+    // 오른쪽 버튼이 본문 카드와 같은 여백 안에 들어오게 본문 여백과 맞춘다
+    paddingRight: screenPadding,
     paddingVertical: spacing.sm,
     minHeight: 52,
   },

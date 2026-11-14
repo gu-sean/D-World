@@ -388,9 +388,10 @@ npm run push:check -- --token <기기 토큰>  # 그 기기 토큰까지 검증
 - 기본 인증 필요, 공개 경로만 `@Public()`, 관리자 경로는 `@AdminOnly()`
 - 새 활동(작성·제출·개설·참여) API에는 `@RequireActive()` (이용 제한·재동의 검사)
 - 관리자 리프레시 토큰은 쿠키 `dw_admin_refresh`로만 전달
-- 모바일 가입 흐름: A01 `verificationId` → A02 `verificationToken` → A05 가입
-  - 두 토큰은 서명 토큰(`common/crypto/signed-token.js`, 용도 구분·만료 포함), 별도 표 없음
-  - 인증번호 저장·제한은 `phone_verification_challenges` 그대로, 확인 후 유효기간 10분으로 연장
+- 모바일 가입 흐름: A01(번호만) → `verificationToken` → A05 가입 (인증번호·A02 확인 단계 없음, 시연용 단순화)
+  - A01 응답은 `accountStatus`(`new`·`phone_registered`·`not_registered`) + 필요할 때 `verificationToken`
+  - 토큰은 서명 토큰(`common/crypto/signed-token.js`, 용도 구분·만료 포함), 별도 표 없음
+  - A01이 `phone_verification_challenges`에 확인된 challenge(10분)를 바로 만들고, 가입·재설정에서 consume
   - 소셜 신규 계정은 `signupRequired` + `socialSignupToken`(10분)으로 가입
 - 로그아웃 `POST /auth/logout`: 본문 `refreshToken`이 있으면 그 세션 폐기(항상 204), 없으면 Bearer 세션 폐기
 - 상세: `docs/backend/02-auth-design.md`

@@ -2,11 +2,9 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   createCatalogItem,
   createDefinition,
-  createRewardRate,
   fetchCatalog,
   fetchDefinition,
   fetchDefinitions,
-  fetchRewardRates,
   reviewDefinition,
   updateCatalogItem,
   updateDefinition,
@@ -17,7 +15,6 @@ export const missionKeys = {
   definitionList: (params) => ['missions', 'definitions', 'list', params],
   definition: (id) => ['missions', 'definitions', 'detail', id],
   catalog: (kind) => ['missions', 'catalog', kind],
-  rewardRates: (params) => ['missions', 'reward-rates', params],
 };
 
 /** M42 */
@@ -84,18 +81,5 @@ export const useUpdateCatalogItem = (kind) => {
   return useMutation({
     mutationFn: ({ id, body, idempotencyKey }) => updateCatalogItem(kind, id, body, idempotencyKey),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: missionKeys.catalog(kind) }),
-  });
-};
-
-/** M74 */
-export const useRewardRates = (params) =>
-  useQuery({ queryKey: missionKeys.rewardRates(params), queryFn: () => fetchRewardRates(params) });
-
-/** M75. variables: `{body, idempotencyKey}` */
-export const useCreateRewardRate = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ body, idempotencyKey }) => createRewardRate(body, idempotencyKey),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['missions', 'reward-rates'] }),
   });
 };

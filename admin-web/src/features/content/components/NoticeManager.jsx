@@ -18,6 +18,15 @@ const optionsOf = (kind) =>
 const FIELDS = [
   { name: 'status', type: 'select', label: '상태', options: optionsOf('noticeStatus') },
   { name: 'category', type: 'select', label: '분류', options: optionsOf('noticeCategory') },
+  {
+    name: 'sendPush',
+    type: 'select',
+    label: '푸시',
+    options: [
+      { value: 'true', label: '푸시 보냄' },
+      { value: 'false', label: '푸시 없음' },
+    ],
+  },
 ];
 
 const audienceText = (notice) =>
@@ -78,7 +87,8 @@ function ScheduleModal({ notice, onNext, onCancel }) {
  */
 export function NoticeManager({ title, pushMode = false }) {
   const [params, setParams] = useListParams();
-  const query = useNotices(params);
+  // 푸시 알림 메뉴는 푸시를 보내는 공지만 보인다 (공지 메뉴는 전부)
+  const query = useNotices(pushMode ? { ...params, sendPush: 'true' } : params);
   const publish = usePublishNotice();
   const cancel = useCancelNotice();
   const [confirmElement, ask] = useConfirm();
@@ -144,11 +154,14 @@ export function NoticeManager({ title, pushMode = false }) {
       key: 'actions',
       render: (_, notice) => (
         <Space>
+          {/* 초안·예약·게시한 공지 모두 고칠 수 있다 (게시 뒤에는 내용만, NoticeForm) */}
+          {notice.status !== 'cancelled' && (
+            <Button size="small" onClick={() => setEditing({ notice })}>
+              수정
+            </Button>
+          )}
           {notice.status === 'draft' && (
             <>
-              <Button size="small" onClick={() => setEditing({ notice })}>
-                수정
-              </Button>
               <Button size="small" type="primary" onClick={() => askPublish(notice)}>
                 즉시 게시
               </Button>

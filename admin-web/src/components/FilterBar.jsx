@@ -91,7 +91,7 @@ export function FilterBar({ fields, value, onChange }) {
           <Input
             key={field.name}
             allowClear
-            style={{ width: 220 }}
+            style={{ width: field.width ?? 220 }}
             placeholder={label}
             aria-label={label}
             value={draft[field.name] ?? ''}

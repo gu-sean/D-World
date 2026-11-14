@@ -48,16 +48,6 @@ export function useLeaveChallenge() {
   });
 }
 
-/** A106 챌린지 만들기 (멱등). 입력 `ChallengeInput` */
-export function useCreateChallenge() {
-  return useAppMutation({
-    idempotent: true,
-    mutationFn: challengesApi.createChallenge,
-    onDone: (queryClient) => {
-      queryClient.invalidateQueries({ queryKey: ['challenges'] });
-    },
-  });
-}
 
 /**
  * A104 내 챌린지 (`MyChallenge[]`).
@@ -93,7 +83,6 @@ export default {
   useChallenge,
   useJoinChallenge,
   useLeaveChallenge,
-  useCreateChallenge,
   useMyChallenges,
   useChallengeRanking,
   useChallengeResult,

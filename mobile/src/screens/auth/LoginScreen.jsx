@@ -8,7 +8,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { useLogin, useSocialLogin, validators } from '../../client';
+import { config, useLogin, useSocialLogin, validators } from '../../client';
 import { Button, ErrorBanner, Screen, TextField } from '../../components';
 import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
@@ -96,13 +96,16 @@ export default function LoginScreen({ navigation }) {
           full
         />
 
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate(Routes.PHONE_NUMBER, { purpose: 'reset_password' })
-          }
-          accessibilityRole="button">
-          <Text style={styles.link}>비밀번호를 잊으셨나요?</Text>
-        </TouchableOpacity>
+        {/* 인증번호 단계가 없는 동안은 숨긴다 (config.PASSWORD_RESET_ENABLED) */}
+        {config.PASSWORD_RESET_ENABLED && (
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate(Routes.PHONE_NUMBER, { purpose: 'reset_password' })
+            }
+            accessibilityRole="button">
+            <Text style={styles.link}>비밀번호를 잊으셨나요?</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.divider}>

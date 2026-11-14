@@ -33,13 +33,15 @@ export class AdminVerificationsController {
   @Get()
   @Bind(Query(), Res({ passthrough: true }))
   async list(query, response) {
-    const status =
-      pickEnum(query, 'status', [
-        'review_required',
-        'approved',
-        'rejected',
-        'submitted',
-      ]) ?? 'review_required';
+    // status=all: 인증 기록(읽기 전용 이력) 화면이 모든 상태를 본다. 생략하면 예전처럼 review_required
+    const picked = pickEnum(query, 'status', [
+      'all',
+      'review_required',
+      'approved',
+      'rejected',
+      'submitted',
+    ]);
+    const status = picked === 'all' ? null : (picked ?? 'review_required');
     const method = pickEnum(query, 'method', ['camera', 'sensor']);
     const userId = query.userId ? idOf(query.userId) : undefined;
     const paging = parseAdminPage(query, {
@@ -50,6 +52,7 @@ export class AdminVerificationsController {
       status,
       method,
       userId,
+      member: query.member,
       paging,
     });
     response.setHeader('X-Completed-Today', String(completedToday));

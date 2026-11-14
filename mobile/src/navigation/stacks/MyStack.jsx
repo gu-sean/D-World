@@ -28,9 +28,6 @@ import StreakScreen from '../../screens/rewards/StreakScreen';
 import AchievementListScreen from '../../screens/rewards/AchievementListScreen';
 import PointHistoryScreen from '../../screens/rewards/PointHistoryScreen';
 import ShopScreen from '../../screens/rewards/ShopScreen';
-import ChallengeExploreScreen from '../../screens/challenges/ChallengeExploreScreen';
-import MyChallengesScreen from '../../screens/challenges/MyChallengesScreen';
-import ChallengeCreateScreen from '../../screens/challenges/ChallengeCreateScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -51,9 +48,6 @@ export default function MyStack() {
       <Stack.Screen name={Routes.POINT_HISTORY} component={PointHistoryScreen} />
       <Stack.Screen name={Routes.SHOP} component={ShopScreen} />
 
-      <Stack.Screen name={Routes.CHALLENGE_EXPLORE} component={ChallengeExploreScreen} />
-      <Stack.Screen name={Routes.MY_CHALLENGES} component={MyChallengesScreen} />
-      <Stack.Screen name={Routes.CHALLENGE_CREATE} component={ChallengeCreateScreen} />
 
       <Stack.Screen name={Routes.NOTIFICATION_INBOX} component={NotificationInboxScreen} />
       <Stack.Screen name={Routes.NOTICE_LIST} component={NoticeListScreen} />

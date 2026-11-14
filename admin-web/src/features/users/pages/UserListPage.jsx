@@ -4,6 +4,7 @@ import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';
 import { MaskedText } from '../../../components/MaskedText.jsx';
+import { memberColumn } from '../../../components/memberColumns.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { labels } from '../../../constants/labels.js';
@@ -12,7 +13,8 @@ import { useUsers } from '../queries.js';
 const DEFAULT_SORT = 'createdAt,desc'; // docs/09 M10
 
 const FIELDS = [
-  { name: 'query', type: 'text', label: '닉네임 또는 회원 ID' },
+  // M10은 `query`를 받는다 (다른 목록의 MEMBER_FIELD와 같은 규칙)
+  { name: 'query', type: 'text', label: '닉네임 또는 회원 ID', width: 320 },
   {
     name: 'status',
     type: 'select',
@@ -32,7 +34,7 @@ const FIELDS = [
 ];
 
 const COLUMNS = [
-  { title: '닉네임', dataIndex: 'nickname', render: (value) => value ?? '-' },
+  memberColumn({ idKey: 'id', nicknameKey: 'nickname' }),
   {
     title: '휴대폰',
     dataIndex: 'maskedPhoneNumber',

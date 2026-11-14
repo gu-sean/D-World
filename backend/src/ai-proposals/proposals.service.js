@@ -8,6 +8,7 @@ import { MAX_STEPS_PER_GOAL } from '../goals/goals.constants.js';
 import { StepsService } from '../goals/steps.service.js';
 import { MissionsService } from '../missions/missions.service.js';
 import { RewardResolver } from '../missions/reward-resolver.js';
+import { assessDifficulty } from '../missions/difficulty-rules.js';
 import { addDays, kstDayStart } from '../common/time/kst.js';
 import {
   MAX_PLAN_MISSIONS,
@@ -201,12 +202,16 @@ export class ProposalsService {
       for (const step of planSteps)
         this.steps.assertDueDate(goal, step.dueDate);
 
-      // 미션마다 값을 확정(카테고리·난이도는 생략하면 목표의 값)하고 규칙을 검증
+      // 미션마다 값을 확정하고 규칙을 검증
+      // 분야는 생략하면 목표의 값, 난이도는 AI·사용자 값이 아니라 미션 내용으로 규칙 판정 (보상은 미션마다)
       const resolved = [];
       const checkedPairs = new Set();
       for (const { mission, stepIndex } of entries) {
         const categoryId = mission.categoryId ?? goal.category_id;
-        const difficultyId = mission.difficultyId ?? goal.difficulty_id;
+        const difficultyId = await this.missions.difficultyIdOf(
+          tx,
+          assessDifficulty(mission).difficultyCode,
+        );
         if (
           (mission.targetValue === undefined) !==
           (mission.targetUnit === undefined)

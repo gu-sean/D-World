@@ -18,23 +18,8 @@ module.exports = {
   },
   overrides: [
     {
-      files: ['vite.config.js', 'vitest.config.js'],
+      files: ['vite.config.js'],
       env: { node: true },
-    },
-    {
-      // Vitest globals (vitest.config.js sets `globals: true`).
-      files: ['**/*.test.js', '**/*.test.jsx', 'src/test/**/*.js'],
-      globals: {
-        describe: 'readonly',
-        it: 'readonly',
-        test: 'readonly',
-        expect: 'readonly',
-        vi: 'readonly',
-        beforeAll: 'readonly',
-        beforeEach: 'readonly',
-        afterAll: 'readonly',
-        afterEach: 'readonly',
-      },
     },
   ],
 };

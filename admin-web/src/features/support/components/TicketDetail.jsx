@@ -3,6 +3,7 @@ import { Button, Card, Descriptions, message, Typography } from 'antd';
 import { Link, useParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { DateText } from '../../../components/DateText.jsx';
+import { MemberCell } from '../../../components/MemberCell.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
@@ -27,7 +28,8 @@ function TargetText({ ticket }) {
   if (ticket.targetKind === 'user' && ticket.targetId) {
     return (
       <>
-        {kind} · <Link to={`/users/${ticket.targetId}`}>{summary}</Link>
+        <Typography.Text type="secondary">{kind}</Typography.Text>
+        <MemberCell id={ticket.targetId} nickname={ticket.targetSummary} />
       </>
     );
   }
@@ -51,9 +53,17 @@ function TicketBody({ ticket, listPath }) {
       label: '상태',
       children: <StatusTag kind="ticketStatus" value={ticket.status} />,
     },
-    { key: 'category', label: '분류', children: ticket.category },
+    {
+      key: 'category',
+      label: '분류',
+      children: labels.ticketCategory[ticket.category]?.text ?? ticket.category,
+    },
     { key: 'subject', label: '제목', children: ticket.subject },
-    { key: 'reporter', label: '접수자', children: ticket.reporterNickname ?? '-' },
+    {
+      key: 'reporter',
+      label: '접수자',
+      children: <MemberCell id={ticket.reporterUserId} nickname={ticket.reporterNickname} />,
+    },
     { key: 'assigned', label: '담당', children: ticket.assignedAdminLoginId ?? '-' },
     ...(ticket.ticketType === 'report'
       ? [

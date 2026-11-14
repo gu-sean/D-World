@@ -48,6 +48,8 @@ export const queryKeys = {
   // 미션
   missions: (params) => ['missions', 'list', params ?? {}],
   mission: (missionId) => ['missions', 'detail', missionId],
+  difficultyPreview: (input) => ['missions', 'difficulty-preview', input ?? {}],
+  goalGaps: (goalId) => ['missions', 'goal-gaps', goalId],
   missionDefinitions: (params) => ['missionDefinitions', 'list', params ?? {}],
   nextMissions: (source) => ['missionDefinitions', 'next', source ?? 'all'],
 

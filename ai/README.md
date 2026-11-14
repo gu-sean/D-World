@@ -24,7 +24,7 @@ MediaPipe 모델은 models/pose_landmarker_lite.task에 별도 준비하고 영�
 - POST /internal/v1/dev/vision/local-video 로컬 영상 테스트
 - 운동 5종 코드 포함. 실제 샘플에서 푸쉬업과 런지 누락, 버피 0회 사례가 있어 추가 검증 필요
 - 플랭크는 analyze_video.py에서 화면 비율 보정 적용
-- 러닝 analyze_run.py는 임시 센서 JSON/gzip 형식을 사용하는 로컬 분석기. --demo로 실행 가능
+- 러닝 analyze_run.py는 임시 센서 JSON/gzip 형식을 사용하는 로컬 분석기. `python analyze_run.py --file <기록.json|.json.gz>`로 실행
 - 목표 계획(I03)·상황 추천(I04) Gemini API 포함
 - 주간·월간 리포트 I05 `POST /internal/v1/llm/reports`, 계획 재조정 I06 `POST /internal/v1/llm/plan-adjustments`: 202 접수 후 Gemini로 생성해 `callbackUrl`로 콜백
   - 같은 `ingestKey`는 멱등(내용이 다르면 409), 콜백 주소는 `BACKEND_CALLBACK_URL` 하위 `/reports`·`/plan-adjustments`만 허용

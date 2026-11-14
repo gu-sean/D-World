@@ -202,6 +202,10 @@ export class UserSupportService {
         body: row.body,
         createdAt: row.created_at,
       })),
+      // 07 SupportTicketDetail.replies: 회원에게 보이는 답변만 (앱 문의 상세가 이 키를 읽는다)
+      replies: events.rows
+        .filter((row) => row.event_type === 'reply' && row.body)
+        .map((row) => ({ body: row.body, createdAt: row.created_at })),
       resolution: done
         ? { userReply: done.user_reply, resolvedAt: done.resolved_at }
         : null,

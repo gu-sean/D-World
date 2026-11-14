@@ -23,14 +23,9 @@ export function useSession() {
   return { status: snapshot.status, profile: snapshot.profile, signOut: session.signOut };
 }
 
-/** A01 인증번호 보내기. 입력 `{phoneNumber, purpose}` */
+/** A01 휴대폰 번호 확인 (인증번호 없음). 입력 `{phoneNumber, purpose}` → 계정 상태·verificationToken */
 export function useRequestPhoneVerification() {
   return useAppMutation({ mutationFn: authApi.requestPhoneVerification });
-}
-
-/** A02 인증번호 확인. 입력 `{verificationId, code}` → `PhoneVerificationConfirmed` */
-export function useConfirmPhoneVerification() {
-  return useAppMutation({ mutationFn: authApi.confirmPhoneVerification });
 }
 
 /**
@@ -122,7 +117,6 @@ export function useLogout() {
 export default {
   useSession,
   useRequestPhoneVerification,
-  useConfirmPhoneVerification,
   useNicknameAvailability,
   useCurrentPolicies,
   useSignup,

@@ -10,7 +10,7 @@ import { lastDays, MAX_PERIOD_DAYS, resolvePeriod } from '../period.js';
 // Where each waiting-work queue is handled (docs/parts/admin-web.md §4). The names are the menu
 // names of src/app/menu.js.
 const QUEUES = {
-  verification: { label: '인증 검수', path: '/verifications' },
+  verification: { label: 'AI 판정 보류', path: '/verifications/appeals?tab=hold' },
   report: { label: '신고', path: '/support/abuse' },
   inquiry: { label: '문의', path: '/support/inquiries' },
   withdrawal: { label: '탈퇴 요청', path: '/users/withdrawals' },
@@ -27,7 +27,7 @@ const PERIOD_ERROR_TEXTS = {
 const STATS = [
   { key: 'activeUserCount', title: '활동 사용자' },
   { key: 'missionCount', title: '미션 수' },
-  { key: 'pendingVerificationCount', title: '검수 대기' },
+  { key: 'pendingVerificationCount', title: 'AI 판정 보류' },
   { key: 'openReportCount', title: '미처리 신고' },
 ];
 

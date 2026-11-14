@@ -26,8 +26,7 @@ import dayjs from 'dayjs';
 
 /** Same rules as the server, so the admin sees them next to the field. */
 function conditionError(values) {
-  const { conditionType, targetCount, categoryId, rewardPoints, rewardUserXp, rewardPetXp } =
-    values;
+  const { conditionType, targetCount, categoryId, rewardPoints, rewardPetXp } = values;
   if (conditionType === 'first_goal_completed' && targetCount !== 1) {
     return '첫 목표 완료는 목표 횟수가 1이어야 해요.';
   }
@@ -37,8 +36,7 @@ function conditionError(values) {
   if (conditionType === 'streak_milestone') {
     if (!STREAK_TARGET_DAYS.includes(targetCount))
       return '목표 횟수는 7, 30, 100 중 하나여야 해요.';
-    if (rewardPoints || rewardUserXp || rewardPetXp)
-      return '스트릭 마일스톤 업적은 보상이 0이어야 해요.';
+    if (rewardPoints || rewardPetXp) return '스트릭 마일스톤 업적은 보상이 0이어야 해요.';
   }
   return null;
 }
@@ -64,7 +62,6 @@ function AchievementDrawer({ target, onClose }) {
         conditionType: 'approved_mission_count',
         targetCount: 1,
         rewardPoints: 0,
-        rewardUserXp: 0,
         rewardPetXp: 0,
         status: 'draft',
         effectiveAt: dayjs().add(5, 'minute'),
@@ -154,13 +151,7 @@ function AchievementDrawer({ target, onClose }) {
         <Form.Item
           name="targetCount"
           label="목표 횟수"
-          dependencies={[
-            'conditionType',
-            'categoryId',
-            'rewardPoints',
-            'rewardUserXp',
-            'rewardPetXp',
-          ]}
+          dependencies={['conditionType', 'categoryId', 'rewardPoints', 'rewardPetXp']}
           rules={[
             { required: true, message: '목표 횟수를 입력해 주세요.' },
             ({ getFieldsValue }) => ({
@@ -186,7 +177,6 @@ function AchievementDrawer({ target, onClose }) {
         )}
         {[
           ['rewardPoints', '보상 포인트'],
-          ['rewardUserXp', '보상 사용자 XP'],
           ['rewardPetXp', '보상 펫 XP'],
         ].map(([name, label]) => (
           <Form.Item
@@ -234,7 +224,7 @@ export default function AchievementPolicyPage() {
     },
     {
       title: '보상',
-      render: (_, v) => `${v.rewardPoints}P / 사용자 ${v.rewardUserXp}XP / 펫 ${v.rewardPetXp}XP`,
+      render: (_, v) => `${v.rewardPoints}P / 펫 ${v.rewardPetXp}XP`,
     },
     {
       title: '희귀도',

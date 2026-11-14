@@ -3,6 +3,11 @@ import { AuditService } from '../../admin-auth/audit.service.js';
 import { adminPage } from '../../common/pagination/admin-page.js';
 import { AppException } from '../../common/errors/app-exception.js';
 import { AdminIdempotencyService } from '../../common/idempotency/admin-idempotency.service.js';
+import {
+  memberQueryParams,
+  memberWhere,
+  nicknameOf,
+} from '../../common/member-query.js';
 import { DatabaseService } from '../../database/database.service.js';
 import { MediaService } from '../../media/media.service.js';
 import { DecisionService } from '../decision.service.js';
@@ -42,14 +47,17 @@ export class AdminReviewService {
    * M30 인증 검수 목록(AdminPage): 상태·방식·사용자 필터, 기본은 보류(review_required)
    * 미션 조건과 AI 의견을 함께 보여 줌
    */
-  async list({ status, method, userId, paging }) {
-    const params = [status, method ?? null, userId ?? null];
-    const where = `r.status = $1
+  async list({ status, method, userId, member, paging }) {
+    // member: 닉네임 또는 회원 ID (common/member-query.js)
+    const search = memberQueryParams(member);
+    const params = [status, method ?? null, userId ?? search.id, search.like];
+    const where = `($1::text IS NULL OR r.status = $1)
           AND ($2::text IS NULL OR m.verification_method = $2)
-          AND ($3::uuid IS NULL OR r.user_id = $3)`;
+          AND ${memberWhere('r.user_id', '$4', '$3')}`;
     const [{ rows }, count, completed] = await Promise.all([
       this.database.query(
-        `SELECT r.id, r.mission_id, r.user_id, r.attempt_no, r.submission_no, r.evidence_kind,
+        `SELECT r.id, r.mission_id, r.user_id, ${nicknameOf('r.user_id')} AS nickname,
+                r.attempt_no, r.submission_no, r.evidence_kind,
                 r.submitted_at, r.metrics AS record_metrics, r.status,
                 m.title, m.description, m.verification_method, m.target_value, m.target_unit,
                 m.category_id, m.scheduled_date, m.status AS mission_status,
@@ -60,7 +68,7 @@ export class AdminReviewService {
            LEFT JOIN verification_results vr ON vr.record_id = r.id AND vr.is_current
           WHERE ${where}
           ORDER BY ${paging.orderBy}
-          LIMIT $4 OFFSET $5`,
+          LIMIT $5 OFFSET $6`,
         [...params, paging.size, paging.offset],
       ),
       this.database.query(
@@ -79,6 +87,7 @@ export class AdminReviewService {
           recordId: row.id,
           missionId: row.mission_id,
           userId: row.user_id,
+          nickname: row.nickname ?? null,
           status: row.status,
           attemptNo: row.attempt_no,
           submissionNo: row.submission_no,

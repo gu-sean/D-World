@@ -31,6 +31,7 @@ import {
   validateBody,
 } from '../common/validation.js';
 import { DatabaseService } from '../database/database.service.js';
+import { memberQueryParams, memberWhereAny } from '../common/member-query.js';
 import {
   accountActionView,
   AdminMembersService,
@@ -54,6 +55,7 @@ const listItemView = (row) => ({
   completedAt: row.completed_at,
   assignedAdminLoginId: row.assigned_login_id ?? null,
   reporterNickname: row.reporter_nickname ?? null,
+  reporterUserId: row.reporter_user_id ?? null,
   targetId: targetIdOf(row),
   targetSummary: row.target_label ?? null,
   sameTargetOpenCount: Number(row.same_target_open_count ?? 0),
@@ -125,24 +127,29 @@ export class AdminSupportController {
       'receivedAt,asc': 't.received_at ASC, t.id ASC',
       'receivedAt,desc': 't.received_at DESC, t.id DESC',
     });
+    // member: 접수자 또는 신고 대상 회원의 닉네임·회원 ID (common/member-query.js)
+    const member = memberQueryParams(query.member);
     const params = [
       ticketType ?? null,
       status ?? null,
       targetKind ?? null,
       assigned ?? null,
       request.auth.adminId,
+      member.id,
+      member.like,
     ];
     const where = `($1::text IS NULL OR t.ticket_type = $1)
       AND ($2::text IS NULL OR t.status = $2)
       AND ($3::text IS NULL OR t.target_kind = $3)
       AND ($4::text IS NULL
            OR ($4 = 'me' AND t.assigned_admin_id = $5)
-           OR ($4 = 'none' AND t.assigned_admin_id IS NULL))`;
+           OR ($4 = 'none' AND t.assigned_admin_id IS NULL))
+      AND ${memberWhereAny(['t.reporter_user_id', 't.target_user_id'], '$7', '$6')}`;
     const [{ rows }, count] = await Promise.all([
       this.database.query(
         `SELECT ${TICKET_COLUMNS} FROM support_tickets t ${TICKET_JOINS}
           WHERE ${where}
-          ORDER BY ${paging.orderBy} LIMIT $6 OFFSET $7`,
+          ORDER BY ${paging.orderBy} LIMIT $8 OFFSET $9`,
         [...params, paging.size, paging.offset],
       ),
       this.database.query(

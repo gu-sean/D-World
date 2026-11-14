@@ -30,7 +30,8 @@ const rewardRule = (optional = false) =>
   object(
     {
       points: integer({ min: 0, max: 1_000_000 }),
-      userXp: integer({ min: 0, max: 1_000_000 }),
+      // 사용자 XP는 관리자 화면에서 뺐다 (없으면 등록 0, 수정은 지금 값 유지)
+      userXp: integer({ min: 0, max: 1_000_000, optional: true }),
       petXp: integer({ min: 0, max: 1_000_000 }),
       badgeAchievementVersionId: uuid({ optional: true }),
     },

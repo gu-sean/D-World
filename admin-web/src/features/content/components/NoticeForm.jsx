@@ -37,12 +37,14 @@ function initialState(notice, pushMode) {
 }
 
 /** The first thing wrong with the form as a text, or null. */
-function validate(form) {
+function validate(form, locked) {
   if (!form.title.trim()) return '제목을 입력해 주세요.';
   if (!form.body.trim()) return '내용을 입력해 주세요.';
   if (form.linkScreen && !LINK_SCREEN_PATTERN.test(form.linkScreen)) {
     return '이동 화면은 영문 소문자로 시작하는 값(예: notices/123)으로 입력해 주세요.';
   }
+  // 게시·예약한 공지는 내용만 보내므로 받는 회원·예약 시각은 검사하지 않는다
+  if (locked) return null;
   if (form.audienceType === 'users') {
     const ids = splitIds(form.userIdsText);
     if (ids.length === 0) return '받을 회원의 ID를 입력해 주세요.';
@@ -56,7 +58,16 @@ function validate(form) {
 }
 
 /** The body of M91 / M92 without the `reason`. */
-function toInput(form) {
+function toInput(form, locked) {
+  // 게시·예약한 공지: 내용(분류·제목·본문·이동 화면)만 고친다 (백엔드 M92, migration 015)
+  if (locked) {
+    return {
+      category: form.category,
+      title: form.title.trim(),
+      body: form.body.trim(),
+      ...(form.linkScreen ? { linkScreen: form.linkScreen } : {}),
+    };
+  }
   const input = {
     category: form.category,
     title: form.title.trim(),
@@ -88,6 +99,9 @@ export function NoticeForm({ notice, pushMode = false, onConfirm, onClose }) {
   const policies = usePolicyDocuments({ page: 1, size: 100 });
   const [form, setForm] = useState(() => initialState(notice, pushMode));
   const [error, setError] = useState(null);
+  // 게시·예약한 공지를 고칠 때: 받는 회원·노출·푸시·예약·약관 연결은 잠근다
+  const locked = Boolean(notice) && notice.status !== 'draft';
+  const policyLocked = locked && notice.category === 'policy';
 
   const set = (patch) => {
     setForm((current) => ({ ...current, ...patch }));
@@ -100,15 +114,21 @@ export function NoticeForm({ notice, pushMode = false, onConfirm, onClose }) {
   }));
 
   const handleSave = () => {
-    const problem = validate(form);
+    const problem = validate(form, locked);
     if (problem) {
       setError(problem);
       return;
     }
-    const input = toInput(form);
+    const input = toInput(form, locked);
     onConfirm({
       title: notice ? '공지 수정' : '공지 저장',
-      summary: (
+      summary: locked ? (
+        <>
+          게시한 공지를 고쳐요: {input.title}
+          <br />
+          앱의 공지사항에 바로 반영돼요. 이미 보낸 알림 문구는 바뀌지 않아요.
+        </>
+      ) : (
         <>
           {notice ? '초안을 수정해요' : '초안으로 저장해요'}: {input.title}
           <br />
@@ -127,11 +147,26 @@ export function NoticeForm({ notice, pushMode = false, onConfirm, onClose }) {
   return (
     <Card title={notice ? '공지 수정' : pushMode ? '푸시 알림 만들기' : '공지 만들기'}>
       <div style={formStyle}>
+        {locked && (
+          <Alert
+            type="info"
+            showIcon
+            title="게시·예약한 공지는 분류·제목·내용·이동 화면만 고칠 수 있어요. 받는 회원과 푸시는 이미 정해져서 바꿀 수 없어요."
+          />
+        )}
         <Field label="분류">
           <Radio.Group
             value={form.category}
+            disabled={policyLocked}
             onChange={(event) => set({ category: event.target.value })}
-            options={categoryOptions}
+            options={
+              locked
+                ? categoryOptions.map((option) => ({
+                    ...option,
+                    disabled: option.value === 'policy' && !policyLocked,
+                  }))
+                : categoryOptions
+            }
           />
         </Field>
         {form.category === 'marketing' && (
@@ -144,6 +179,7 @@ export function NoticeForm({ notice, pushMode = false, onConfirm, onClose }) {
               aria-label="약관 버전"
               placeholder="약관 버전 선택"
               options={policyOptions}
+              disabled={locked}
               loading={policies.isLoading}
               value={form.policyDocumentVersionId}
               onChange={(value) => set({ policyDocumentVersionId: value })}
@@ -182,6 +218,7 @@ export function NoticeForm({ notice, pushMode = false, onConfirm, onClose }) {
         <Field label="받는 회원">
           <Radio.Group
             value={form.audienceType}
+            disabled={locked}
             onChange={(event) => set({ audienceType: event.target.value })}
             options={audienceOptions}
           />
@@ -191,6 +228,7 @@ export function NoticeForm({ notice, pushMode = false, onConfirm, onClose }) {
             <Input.TextArea
               aria-label="회원 ID"
               rows={3}
+              disabled={locked}
               value={form.userIdsText}
               onChange={(event) => set({ userIdsText: event.target.value })}
             />
@@ -200,6 +238,7 @@ export function NoticeForm({ notice, pushMode = false, onConfirm, onClose }) {
           <Switch
             aria-label="공지 목록에 표시"
             checked={form.showInList}
+            disabled={locked}
             onChange={(checked) => set({ showInList: checked })}
           />
         </Field>
@@ -210,7 +249,7 @@ export function NoticeForm({ notice, pushMode = false, onConfirm, onClose }) {
           <Switch
             aria-label="푸시 알림 발송"
             checked={form.sendPush}
-            disabled={pushMode}
+            disabled={pushMode || locked}
             onChange={(checked) => set({ sendPush: checked })}
           />
         </Field>
@@ -219,6 +258,7 @@ export function NoticeForm({ notice, pushMode = false, onConfirm, onClose }) {
             type="datetime-local"
             aria-label="예약 시각"
             style={{ maxWidth: 240 }}
+            disabled={locked}
             value={form.scheduledAt}
             onChange={(event) => set({ scheduledAt: event.target.value })}
           />

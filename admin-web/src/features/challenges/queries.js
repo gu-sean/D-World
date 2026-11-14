@@ -83,12 +83,6 @@ export const useChallengeAction = () =>
     api.changeChallengeStatus(id, { action, reason }, idempotencyKey),
   );
 
-/** M55. vars: `{id, decision, reason, idempotencyKey}` */
-export const useReviewChallenge = () =>
-  useChallengeMutation(({ id, decision, reason, idempotencyKey }) =>
-    api.reviewChallenge(id, { decision, reason }, idempotencyKey),
-  );
-
 /** M61. vars: `{id, participationId, action, dailyMissionId?, reason, idempotencyKey}` */
 export const useModerate = () =>
   useChallengeMutation(

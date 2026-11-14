@@ -119,7 +119,13 @@ export default function SettingsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   body: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xxl },
-  group: { backgroundColor: colors.surface, borderRadius: radius.md, overflow: 'hidden' },
+  group: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
   noteCard: { marginTop: spacing.md },
   note: { ...typography.caption, color: colors.textSub },
 });

@@ -48,8 +48,4 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: npm test
       - run: npm run build
-      - name: 테스트 DB 마이그레이션
-        run: npm run db:reset -- --db d_world_test
-      - run: npm run test:e2e

@@ -137,6 +137,25 @@ export class MissionsController {
     return { items };
   }
 
+  /**
+   * 미션 난이도·보상 미리 보기 (저장하지 않음)
+   * 직접 만드는 미션은 난이도를 고르지 않고 이 규칙으로 정해진다 (difficulty-rules.js)
+   */
+  @Post('difficulty-preview')
+  @HttpCode(200)
+  @Bind(Req(), Body())
+  previewDifficulty(request, body) {
+    const input = validateBody(body, {
+      goalId: uuid({ optional: true }),
+      categoryId: uuid({ optional: true }),
+      exerciseCode: oneOf(EXERCISE_CODES, { optional: true }),
+      targetValue: targetValue({ optional: true }),
+      targetUnit: targetUnit({ optional: true }),
+      estimatedDurationSeconds: duration({ optional: true }),
+    });
+    return this.missions.previewDifficulty(request.auth.userId, input);
+  }
+
   @Get()
   @Bind(Req(), Query())
   async list(request, query) {

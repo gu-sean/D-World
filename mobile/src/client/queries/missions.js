@@ -14,12 +14,47 @@ import { afterMissionChanged } from './invalidate.js';
  * @param {{date?: string, from?: string, to?: string, status?: string|string[], goalId?: string, categoryCode?: string}} [params]
  */
 export function useMissions(params = {}) {
-  const query = useInfiniteQuery(infiniteListOptions({
-    queryKey: queryKeys.missions(params),
-    limit: 50,
-    fetchPage: ({ cursor, limit }) => missionsApi.listMissions({ ...params, cursor, limit }),
-  }));
+  const query = useInfiniteQuery(
+    infiniteListOptions({
+      queryKey: queryKeys.missions(params),
+      limit: 50,
+      fetchPage: ({ cursor, limit }) => missionsApi.listMissions({ ...params, cursor, limit }),
+    }),
+  );
   return { ...query, items: flattenItems(query.data) };
+}
+
+/**
+ * 미션 난이도·보상 미리 보기. 입력이 바뀔 때마다 다시 계산한다 (저장 안 함)
+ * @param {{goalId?: string, categoryCode?: string, exerciseCode?: string, targetValue?: number,
+ *   targetUnit?: string, estimatedDurationSeconds?: number}|null} input null이면 부르지 않음
+ */
+export function useDifficultyPreview(input) {
+  return useQuery({
+    queryKey: queryKeys.difficultyPreview(input),
+    queryFn: () => missionsApi.previewDifficulty(input),
+    enabled: Boolean(input),
+    staleTime: 60_000,
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** 목표의 빈 주. 미션이 바뀌면 missions 무효화로 함께 새로 고친다 */
+export function useGoalGaps(goalId) {
+  return useQuery({
+    queryKey: queryKeys.goalGaps(goalId),
+    queryFn: () => missionsApi.getGoalGaps(goalId),
+    enabled: Boolean(goalId),
+  });
+}
+
+/** 빈 주 채우기 (멱등). 입력 `{goalId, weekStarts?}` */
+export function useFillGoalGaps() {
+  return useAppMutation({
+    idempotent: true,
+    mutationFn: missionsApi.fillGoalGaps,
+    onDone: afterMissionChanged,
+  });
 }
 
 /** A32 미션 상세 (`MissionDetail`) */
@@ -63,10 +98,13 @@ export function useCancelMission() {
  * @param {{categoryCode?: string, difficultyCode?: string, exerciseCode?: string, sort?: 'recent'|'duration'}} [params]
  */
 export function useMissionDefinitions(params = {}) {
-  const query = useInfiniteQuery(infiniteListOptions({
-    queryKey: queryKeys.missionDefinitions(params),
-    fetchPage: ({ cursor, limit }) => missionsApi.listMissionDefinitions({ ...params, cursor, limit }),
-  }));
+  const query = useInfiniteQuery(
+    infiniteListOptions({
+      queryKey: queryKeys.missionDefinitions(params),
+      fetchPage: ({ cursor, limit }) =>
+        missionsApi.listMissionDefinitions({ ...params, cursor, limit }),
+    }),
+  );
   return { ...query, items: flattenItems(query.data) };
 }
 

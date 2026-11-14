@@ -52,6 +52,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     paddingVertical: spacing.lg,
+    // 아이콘·화살표가 상자 가장자리에 붙지 않게 카드와 같은 안쪽 여백
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },

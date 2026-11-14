@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Input, Modal } from 'antd';
 import { newIdempotencyKey } from '../api/idempotency.js';
 
-const REASON_MAX_LENGTH = 500; // docs/05 §5.2: `reason` is 1~500 characters
-const REASON_REQUIRED_TEXT = '사유를 입력해 주세요.'; // ADMIN_REASON_REQUIRED, docs/05 §7
+const REASON_MAX_LENGTH = 500; // docs/05 §5.2: `reason` is at most 500 characters
 const FALLBACK_ERROR_TEXT = '잠시 후 다시 시도해 주세요.'; // COMMON_INTERNAL, docs/05 §7
 
 /**
  * Confirmation step of every change (docs/parts/admin-web.md §7 rule 1): shows what will happen,
- * asks for a reason (required, 1~500 characters) and hands over an Idempotency-Key.
+ * takes an optional reason (0~500 characters) and hands over an Idempotency-Key.
  *
+ * - 사유는 선택이다. 비워 두면 백엔드(DefaultReasonInterceptor)가 "관리자 처리"로 감사 로그에 남긴다.
  * - One key is made each time the modal opens. Trying again in the same modal (after `onSubmit`
  *   failed) uses the same key, so the server does not do the change twice (docs/05 §5.2, §5.3).
  * - After a failed try the reason cannot be edited, because the same key needs the same body.
@@ -22,14 +22,13 @@ const FALLBACK_ERROR_TEXT = '잠시 후 다시 시도해 주세요.'; // COMMON_
  * @param {boolean} props.open
  * @param {string} props.title
  * @param {import('react').ReactNode} props.summary target and action, e.g. "회원 A · 이용 정지"
- * @param {(input: {reason: string, idempotencyKey: string}) => Promise<unknown>} props.onSubmit
+ * @param {(input: {reason: string|undefined, idempotencyKey: string}) => Promise<unknown>} props.onSubmit
  * @param {() => void} props.onCancel
  * @param {boolean} [props.danger] red confirm button for destructive actions
  */
 export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, danger = false }) {
   const keyRef = useRef(null);
   const [reason, setReason] = useState('');
-  const [reasonError, setReasonError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [triedOnce, setTriedOnce] = useState(false);
@@ -39,7 +38,6 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
     if (!open) return;
     keyRef.current = newIdempotencyKey();
     setReason('');
-    setReasonError(null);
     setSubmitError(null);
     setSubmitting(false);
     setTriedOnce(false);
@@ -47,15 +45,11 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
 
   const handleOk = async () => {
     const trimmed = reason.trim();
-    if (!trimmed) {
-      setReasonError(REASON_REQUIRED_TEXT);
-      return;
-    }
-    setReasonError(null);
     setSubmitError(null);
     setSubmitting(true);
     try {
-      await onSubmit({ reason: trimmed, idempotencyKey: keyRef.current });
+      // 비어 있으면 보내지 않는다 (서버가 기본 문구를 채움)
+      await onSubmit({ reason: trimmed || undefined, idempotencyKey: keyRef.current });
     } catch (error) {
       setTriedOnce(true);
       setSubmitError(error?.message || FALLBACK_ERROR_TEXT);
@@ -79,25 +73,17 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
       onCancel={submitting ? undefined : onCancel}
     >
       <div style={{ marginBottom: 16 }}>{summary}</div>
-      <label htmlFor="confirm-action-reason">사유</label>
+      <label htmlFor="confirm-action-reason">사유 (선택)</label>
       <Input.TextArea
         id="confirm-action-reason"
-        rows={4}
+        rows={3}
         maxLength={REASON_MAX_LENGTH}
         showCount
-        status={reasonError ? 'error' : undefined}
+        placeholder="비워 두면 '관리자 처리'로 기록돼요."
         readOnly={triedOnce}
         value={reason}
-        onChange={(event) => {
-          setReason(event.target.value);
-          setReasonError(null);
-        }}
+        onChange={(event) => setReason(event.target.value)}
       />
-      {reasonError && (
-        <div role="alert" style={{ color: '#ff4d4f', marginTop: 4 }}>
-          {reasonError}
-        </div>
-      )}
       {submitError && (
         <div role="alert" style={{ color: '#ff4d4f', marginTop: 12 }}>
           {submitError}

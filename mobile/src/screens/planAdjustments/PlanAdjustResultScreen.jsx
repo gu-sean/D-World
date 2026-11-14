@@ -14,7 +14,11 @@ export default function PlanAdjustResultScreen({ navigation, route }) {
 
   const toGoal = () => {
     if (goalId) {
-      navigation.replace(Routes.GOAL_DETAIL, { goalId });
+      // 목표 상세는 목표 탭 묶음 안에 있다 (이 화면은 루트 스택)
+      navigation.navigate(Routes.MAIN, {
+        screen: Routes.GOALS_TAB,
+        params: { screen: Routes.GOAL_DETAIL, params: { goalId } },
+      });
     } else {
       navigation.popToTop();
     }

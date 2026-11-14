@@ -16,6 +16,16 @@ function BasicTab({ user }) {
 
   const items = [
     { key: 'nickname', label: '닉네임', children: user.nickname ?? '-' },
+    {
+      key: 'id',
+      label: '회원 ID',
+      // 다른 목록의 검색칸에 그대로 붙여 넣을 수 있게 전체를 보이고 복사 버튼을 둔다
+      children: (
+        <Typography.Text copyable={{ tooltips: ['회원 ID 복사', '복사했어요'] }} code>
+          {user.id}
+        </Typography.Text>
+      ),
+    },
     { key: 'status', label: '상태', children: <StatusTag kind="userStatus" value={user.status} /> },
     { key: 'phone', label: '휴대폰', children: <MaskedText value={user.maskedPhoneNumber} /> },
     { key: 'email', label: '이메일', children: <MaskedText value={user.maskedEmail} /> },
@@ -44,6 +54,27 @@ function BasicTab({ user }) {
   return (
     <>
       <Descriptions bordered size="small" column={2} items={items} />
+      {/* 이 회원으로 걸러진 다른 메뉴로 바로 간다 (모든 목록의 회원 검색은 `member`) */}
+      <Space wrap style={{ display: 'flex', marginTop: 16 }}>
+        <Link to={`/rewards/points?member=${user.id}`}>
+          <Button>포인트 내역</Button>
+        </Link>
+        <Link to={`/rewards/points/adjust?userId=${user.id}`}>
+          <Button>포인트 조정</Button>
+        </Link>
+        <Link to={`/verifications?member=${user.id}`}>
+          <Button>인증 기록</Button>
+        </Link>
+        <Link to={`/support/inquiries?member=${user.id}`}>
+          <Button>문의</Button>
+        </Link>
+        <Link to={`/support/abuse?member=${user.id}`}>
+          <Button>신고</Button>
+        </Link>
+        <Link to={`/access/audit-logs?member=${user.id}`}>
+          <Button>관리자 처리 이력</Button>
+        </Link>
+      </Space>
       <Space style={{ margin: '24px 0 12px' }}>
         <Typography.Title level={5} style={{ margin: 0 }}>
           계정 조치

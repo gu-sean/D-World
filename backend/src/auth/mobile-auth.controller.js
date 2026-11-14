@@ -54,18 +54,6 @@ export class MobileAuthController {
   }
 
   @Public()
-  @Throttle(STRICT)
-  @Post('auth/phone-verifications/:verificationId/confirm')
-  @HttpCode(200)
-  @Bind(Param('verificationId'), Body())
-  confirm(verificationId, body) {
-    const { code } = validateBody(body, {
-      code: string({ min: 6, max: 6, pattern: /^\d{6}$/ }),
-    });
-    return this.mobileAuth.confirmPhoneVerification(verificationId, code);
-  }
-
-  @Public()
   @Get('policy-documents/current')
   policies() {
     return this.mobileAuth.currentPolicies();

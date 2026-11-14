@@ -11,6 +11,7 @@ export const rewardKeys = {
   petLevels: ['rewards', 'pet-levels'],
   achievements: ['rewards', 'achievements'],
   species: ['rewards', 'pet-species'],
+  member: (userId) => ['rewards', 'member', userId],
 };
 
 /**
@@ -26,6 +27,15 @@ function useChange(fn, invalidate) {
 }
 
 // ---- queries ----
+
+/** 포인트 조정 대상 회원 확인. 회원 ID 형식이 맞을 때만 부른다. */
+export const useMember = (userId) =>
+  useQuery({
+    queryKey: rewardKeys.member(userId),
+    queryFn: () => api.fetchMember(userId),
+    enabled: Boolean(userId),
+    retry: false,
+  });
 
 export const usePointTransactions = (params) =>
   useQuery({

@@ -37,27 +37,47 @@ export default function ProgressRing({
           strokeWidth={thickness}
           fill="none"
         />
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={color}
-          strokeWidth={thickness}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - clamped)}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
+        {/* 0%일 때 둥근 선 끝이 점 하나로 보이지 않게 아예 그리지 않는다 */}
+        {clamped > 0 && (
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={color}
+            strokeWidth={thickness}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - clamped)}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        )}
       </Svg>
       <View style={styles.center}>
-        {children ?? <Text style={styles.percent}>{Math.round(clamped * 100)}%</Text>}
+        {children ?? (
+          <Text
+            style={[styles.percent, size < 72 && styles.percentSmall]}
+            numberOfLines={1}
+            adjustsFontSizeToFit>
+            {Math.round(clamped * 100)}%
+          </Text>
+        )}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  // RN 0.86에는 StyleSheet.absoluteFillObject가 없어서 직접 겹쳐 놓는다 (없으면 %가 원 아래로 밀려남)
+  center: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   percent: { ...typography.subtitle, color: colors.text },
+  percentSmall: { ...typography.caption, fontWeight: '700', color: colors.text },
 });

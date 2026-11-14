@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { Dependencies, Injectable } from '@nestjs/common';
 import { adminPage } from '../common/pagination/admin-page.js';
+import {
+  UUID_PATTERN,
+  escapeLike,
+  memberQueryParams,
+  memberWhere,
+  nicknameOf,
+} from '../common/member-query.js';
 import { DatabaseService } from '../database/database.service.js';
 
 /**
@@ -15,30 +22,48 @@ export class AuditService {
   }
 
   /** M101 감사 로그 목록(AdminPage): action은 앞부분 일치(예: verification.) */
-  async list({ adminId, action, targetUserId, result, from, to, paging }) {
+  async list({
+    adminId,
+    admin,
+    action,
+    targetUserId,
+    member,
+    result,
+    from,
+    to,
+    paging,
+  }) {
+    const target = memberQueryParams(member);
+    const adminText = typeof admin === 'string' ? admin.trim() : '';
+    const adminIsId = UUID_PATTERN.test(adminText);
     const params = [
-      adminId ?? null,
-      action ? `${action.replace(/[\\%_]/g, '\\$&')}%` : null,
-      targetUserId ?? null,
+      adminId ?? (adminIsId ? adminText : null),
+      action ? `${escapeLike(action)}%` : null,
+      targetUserId ?? target.id,
       result ?? null,
       from ?? null,
       to ?? null,
+      target.like,
+      adminText && !adminIsId ? `%${escapeLike(adminText)}%` : null,
     ];
     const where = `($1::uuid IS NULL OR l.admin_id = $1)
           AND ($2::text IS NULL OR l.action LIKE $2)
-          AND ($3::uuid IS NULL OR l.target_user_id = $3)
+          AND ${memberWhere('l.target_user_id', '$7', '$3')}
           AND ($4::text IS NULL OR l.result = $4)
           AND ($5::timestamptz IS NULL OR l.recorded_at >= $5)
-          AND ($6::timestamptz IS NULL OR l.recorded_at < $6)`;
+          AND ($6::timestamptz IS NULL OR l.recorded_at < $6)
+          AND ($8::text IS NULL OR l.admin_id IN (
+                SELECT aa.id FROM admin_accounts aa WHERE aa.login_id ILIKE $8))`;
     const [{ rows }, count] = await Promise.all([
       this.database.query(
         `SELECT l.id, l.admin_id, a.login_id, l.target_user_id, l.action, l.result,
-                l.reason, l.before_value, l.after_value, l.recorded_at
+                l.reason, l.before_value, l.after_value, l.recorded_at,
+                ${nicknameOf('l.target_user_id')} AS target_nickname
            FROM admin_audit_logs l
            JOIN admin_accounts a ON a.id = l.admin_id
           WHERE ${where}
           ORDER BY ${paging.orderBy}
-          LIMIT $7 OFFSET $8`,
+          LIMIT $9 OFFSET $10`,
         [...params, paging.size, paging.offset],
       ),
       this.database.query(
@@ -52,6 +77,7 @@ export class AuditService {
         adminId: row.admin_id,
         adminLoginId: row.login_id,
         targetUserId: row.target_user_id,
+        targetNickname: row.target_nickname ?? null,
         action: row.action,
         result: row.result,
         reason: row.reason,

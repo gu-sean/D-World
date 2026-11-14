@@ -24,6 +24,7 @@ const ROUTES = [
   { path: '/verifications/:recordId', page: 'verifications/VerificationDetailPage' }, // ADM-08
   { path: '/verifications/appeals', page: 'verifications/AppealListPage' }, // ADM-09
   { path: '/verifications/appeals/:appealId', page: 'verifications/AppealReviewPage' }, // ADM-09
+  { path: '/verifications/appeals/hold/:recordId', page: 'verifications/HoldReviewPage' }, // ADM-08 판정 (처리 대기)
   { path: '/verifications/criteria', page: 'verifications/VerificationCriteriaPage' }, // ADM-10
   { path: '/missions/definitions', page: 'missions/MissionDefinitionListPage' }, // ADM-13
   { path: '/missions/definitions/new', page: 'missions/MissionDefinitionFormPage' }, // ADM-14

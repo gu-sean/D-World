@@ -15,6 +15,9 @@ import GoalFormScreen from '../../screens/goals/GoalFormScreen';
 import PlanGeneratingScreen from '../../screens/goals/PlanGeneratingScreen';
 import PlanProposalScreen from '../../screens/goals/PlanProposalScreen';
 import PlanMissionsScreen from '../../screens/goals/PlanMissionsScreen';
+// 목표 상세에서 세부 미션을 더하거나 고친 뒤 목표 상세로 돌아오도록 목표 탭에도 둔다
+import MissionCatalogScreen from '../../screens/missions/MissionCatalogScreen';
+import MissionFormScreen from '../../screens/missions/MissionFormScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,6 +31,8 @@ export default function GoalsStack() {
       <Stack.Screen name={Routes.PLAN_GENERATING} component={PlanGeneratingScreen} />
       <Stack.Screen name={Routes.PLAN_PROPOSAL} component={PlanProposalScreen} />
       <Stack.Screen name={Routes.PLAN_MISSIONS} component={PlanMissionsScreen} />
+      <Stack.Screen name={Routes.MISSION_FORM} component={MissionFormScreen} />
+      <Stack.Screen name={Routes.MISSION_CATALOG} component={MissionCatalogScreen} />
     </Stack.Navigator>
   );
 }

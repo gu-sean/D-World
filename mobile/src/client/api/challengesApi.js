@@ -68,14 +68,6 @@ export function getChallengeRanking(challengeId) {
   return request({ method: 'GET', path: `/challenges/${encodeURIComponent(challengeId)}/rankings` });
 }
 
-/**
- * A106 챌린지 만들기 (멱등 필수). 검수 대기 상태로 올라간다.
- * @param {object} input `ChallengeInput` + `idempotencyKey`
- * @returns {Promise<object>} `Challenge`
- */
-export function createChallenge({ idempotencyKey, ...body }) {
-  return request({ method: 'POST', path: '/challenges', body, idempotent: true, idempotencyKey });
-}
 
 /**
  * A107 내 챌린지 결과.
@@ -93,6 +85,5 @@ export default {
   leaveChallenge,
   getMyChallenges,
   getChallengeRanking,
-  createChallenge,
   getChallengeResult,
 };

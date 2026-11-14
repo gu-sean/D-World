@@ -1,4 +1,5 @@
 import { addDays } from '../common/time/kst.js';
+import { assessDifficulty } from '../missions/difficulty-rules.js';
 
 export const RULE_PLAN_VERSION = 'rule-plan@0.1.0';
 
@@ -70,7 +71,9 @@ export function buildRulePlan(goal, { categoryCode, difficultyCode, today }) {
         title: `${goal.title} ${order}번째`,
         description: null,
         categoryCode,
-        difficultyCode,
+        // 미션마다 내용으로 판정 (목표 난이도를 물려받지 않음)
+        difficultyCode: assessDifficulty({ estimatedDurationSeconds: seconds })
+          .difficultyCode,
         exerciseCode: null,
         verificationMethod: 'camera',
         targetValue: null,

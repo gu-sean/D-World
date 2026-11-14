@@ -1,44 +1,38 @@
-// ADM-08 Verification detail and decision
-import { Link, useNavigate, useParams } from 'react-router';
-import { Card, Space, Typography } from 'antd';
+// ADM-08 인증 기록 상세 (읽기 전용)
+//
+// 증거·AI 결과·판정 이력을 본다. 판정 버튼은 없다: AI 판정 보류 건은 처리 대기에서 판정한다.
+import { Link, useParams } from 'react-router';
+import { Alert, Button, Space, Typography } from 'antd';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
-import DecisionForm from '../components/DecisionForm.jsx';
 import RecordSummary from '../components/RecordSummary.jsx';
-import { useDecideVerification, useVerification } from '../queries.js';
-
-const LABELS = { approved: '승인', rejected: '거절' };
+import { useVerification } from '../queries.js';
 
 export default function VerificationDetailPage() {
   const { recordId } = useParams();
-  const navigate = useNavigate();
   const query = useVerification(recordId);
-  const decide = useDecideVerification();
 
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-      <Typography.Title level={3}>인증 상세 검토</Typography.Title>
-      <Link to="/verifications">← 검수 대기 목록</Link>
+      <Typography.Title level={3}>인증 기록 상세</Typography.Title>
+      <Link to="/verifications">← 인증 기록</Link>
       <QueryBoundary query={query}>
         {(record) => (
           <>
-            <RecordSummary record={record} />
-            {record.status === 'review_required' ? (
-              <Card title="판정">
-                <DecisionForm
-                  labels={LABELS}
-                  confirmTitle="인증 판정을 확정할까요?"
-                  submitText="판정 저장"
-                  onDecide={async ({ decision, reason, idempotencyKey }) => {
-                    await decide.mutateAsync({ recordId, decision, reason, idempotencyKey });
-                    navigate('/verifications');
-                  }}
-                />
-              </Card>
-            ) : (
-              <Typography.Text type="secondary">
-                검수 대기 상태가 아니라서 판정할 수 없어요.
-              </Typography.Text>
+            {record.status === 'review_required' && (
+              <Alert
+                type="warning"
+                showIcon
+                title="AI가 판정을 보류한 건이에요. 처리 대기에서 판정해 주세요."
+                action={
+                  <Link to={`/verifications/appeals/hold/${record.recordId}`}>
+                    <Button size="small" type="primary">
+                      판정하러 가기
+                    </Button>
+                  </Link>
+                }
+              />
             )}
+            <RecordSummary record={record} />
           </>
         )}
       </QueryBoundary>

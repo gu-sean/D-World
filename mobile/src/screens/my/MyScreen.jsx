@@ -130,19 +130,7 @@ export default function MyScreen({ navigation }) {
                 />
               </View>
 
-              <SectionTitle title="챌린지" />
-              <View style={styles.group}>
-                <ListRow
-                  icon="flag"
-                  title="챌린지 둘러보기"
-                  onPress={() => navigation.navigate(Routes.CHALLENGE_EXPLORE)}
-                />
-                <ListRow
-                  icon="checklist"
-                  title="내 챌린지"
-                  onPress={() => navigation.navigate(Routes.MY_CHALLENGES)}
-                />
-              </View>
+              {/* 챌린지는 관리자만 만들고, 둘러보기·참여·내 챌린지는 모두 하단 챌린지 탭에 있다 */}
 
               <SectionTitle title="알림과 소식" />
               <View style={styles.group}>
@@ -167,7 +155,7 @@ export default function MyScreen({ navigation }) {
                   onPress={() => navigation.navigate(Routes.PROFILE_EDIT)}
                 />
                 <ListRow
-                  icon="search"
+                  icon="alert"
                   title="문의·신고"
                   onPress={() => navigation.navigate(Routes.SUPPORT_TICKET_LIST)}
                 />
@@ -215,5 +203,11 @@ const styles = StyleSheet.create({
   },
   statValue: { ...typography.subtitle, color: colors.text },
   statLabel: { ...typography.caption, color: colors.textSub },
-  group: { backgroundColor: colors.surface, borderRadius: radius.md, overflow: 'hidden' },
+  group: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
 });

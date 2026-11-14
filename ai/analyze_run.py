@@ -116,36 +116,18 @@ def evaluate(recording: RunRecording, ingest_key: str) -> SensorEvaluationRespon
     )
 
 
-def demo_recording() -> RunRecording:
-    # Synthetic route with 15 seconds of running followed by a vehicle segment.
-    return RunRecording(points=[
-        RunPoint(elapsed_seconds=seconds, latitude=37.5 + offset, longitude=127.0,
-                 accuracy_meters=5, steps_total=steps, activity=activity)
-        for seconds, offset, steps, activity in [
-            (0, 0, 0, "running"), (5, 0.00012, 14, "running"),
-            (10, 0.00024, 28, "running"), (15, 0.00036, 42, "running"),
-            (20, 0.00070, 42, "vehicle"), (25, 0.00110, 42, "vehicle"),
-        ]
-    ])
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="개발용 러닝 센서 기록 분석")
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--demo", action="store_true")
-    source.add_argument("--file", type=Path, help="로컬 센서 기록 JSON 또는 .json.gz")
+    parser.add_argument("--file", type=Path, required=True, help="로컬 센서 기록 JSON 또는 .json.gz")
     args = parser.parse_args()
     try:
-        if args.demo:
-            recording = demo_recording()
-        else:
-            opener = gzip.open if args.file.suffix.lower() == ".gz" else open
-            with opener(args.file, "rb") as stream:
-                limit = 8 * 1024 * 1024
-                content = stream.read(limit + 1)
-            if len(content) > limit:
-                raise ValueError("센서 기록은 압축 해제 후 8MB 이하여야 합니다.")
-            recording = RunRecording.model_validate_json(content)
+        opener = gzip.open if args.file.suffix.lower() == ".gz" else open
+        with opener(args.file, "rb") as stream:
+            limit = 8 * 1024 * 1024
+            content = stream.read(limit + 1)
+        if len(content) > limit:
+            raise ValueError("센서 기록은 압축 해제 후 8MB 이하여야 합니다.")
+        recording = RunRecording.model_validate_json(content)
     except (OSError, EOFError, ValidationError, ValueError) as error:
         parser.error(str(error))
     result = evaluate(recording, "sensor:00000000-0000-0000-0000-000000000000:dev")

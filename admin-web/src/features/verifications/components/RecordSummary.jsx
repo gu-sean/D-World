@@ -1,5 +1,6 @@
 import { Descriptions, Space, Table, Tag, Typography } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
+import { MemberCell } from '../../../components/MemberCell.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import EvidenceViewer from './EvidenceViewer.jsx';
 import { formatConfidence, formatTarget, METHOD_LABEL } from './format.js';
@@ -50,8 +51,8 @@ export default function RecordSummary({ record }) {
         <Descriptions.Item label="상태">
           <StatusTag kind="recordStatus" value={record.status} />
         </Descriptions.Item>
-        <Descriptions.Item label="사용자">
-          {record.userNickname ?? '-'} ({record.userId})
+        <Descriptions.Item label="회원">
+          <MemberCell id={record.userId} nickname={record.userNickname} />
         </Descriptions.Item>
         <Descriptions.Item label="증거 종류">
           {record.evidenceKind ? (

@@ -10,6 +10,7 @@ import {
   MAX_SCHEDULE_AHEAD_DAYS,
 } from './missions.constants.js';
 import { RewardResolver } from './reward-resolver.js';
+import { assessDifficulty, difficultyName } from './difficulty-rules.js';
 import { conflict, unprocessable } from '../common/errors/http-errors.js';
 
 const num = (value) => Number(value);
@@ -285,9 +286,10 @@ export class MissionsService {
         spec = {
           title: input.title,
           description: input.description || null,
-          // 목표에 연결하면 카테고리·난이도를 생략해 목표의 값을 기본으로 씀
+          // 목표에 연결하면 분야를 생략해 목표의 값을 씀
           categoryId: input.categoryId ?? goal?.category_id,
-          difficultyId: input.difficultyId ?? goal?.difficulty_id,
+          // 난이도는 사용자가 고르지 않는다: 미션 내용으로 규칙 판정 (보상은 미션마다, difficulty-rules.js)
+          difficultyId: null,
           targetValue: input.targetValue ?? null,
           targetUnit: input.targetUnit ?? null,
           estimatedDurationSeconds: input.estimatedDurationSeconds ?? null,
@@ -297,10 +299,12 @@ export class MissionsService {
             (input.exerciseCode === 'running' ? 'sensor' : 'camera'),
           exerciseCode: input.exerciseCode ?? null,
         };
-        if (!spec.categoryId || !spec.difficultyId) {
-          throw badRequest(
-            'categoryId와 difficultyId가 필요함(목표에 연결하면 생략 가능)',
-          );
+        spec.difficultyId = await this.difficultyIdOf(
+          tx,
+          assessDifficulty(spec).difficultyCode,
+        );
+        if (!spec.categoryId) {
+          throw badRequest('categoryId가 필요함(목표에 연결하면 생략 가능)');
         }
         if ((spec.targetValue === null) !== (spec.targetUnit === null)) {
           throw badRequest('targetValue와 targetUnit은 함께 지정해야 함');
@@ -340,6 +344,45 @@ export class MissionsService {
       // 완료된 단계에 필수 미션이 추가되면 다시 열림
       if (input.stepId) await this.goals.reevaluateStep(tx, input.stepId);
       return created;
+    });
+  }
+
+  /** 난이도 code → id */
+  async difficultyIdOf(db, code) {
+    const { rows } = await db.query(
+      'SELECT id FROM difficulty_levels WHERE code = $1',
+      [code],
+    );
+    if (!rows[0]) throw new Error(`난이도 ${code}가 없음`);
+    return rows[0].id;
+  }
+
+  /**
+   * 미션을 만들기 전에 판정될 난이도와 보상을 미리 보여 줌 (저장하지 않음)
+   * categoryId가 없으면 goalId의 분야를 씀
+   */
+  async previewDifficulty(userId, input) {
+    const judged = assessDifficulty(input);
+    return this.database.withTransaction(async (tx) => {
+      let categoryId = input.categoryId ?? null;
+      if (!categoryId && input.goalId) {
+        categoryId = (await this.goals.loadGoal(tx, userId, input.goalId))
+          .category_id;
+      }
+      let rewardPoints = null;
+      if (categoryId) {
+        const reward = await this.rewards.resolve(tx, {
+          categoryId,
+          difficultyId: await this.difficultyIdOf(tx, judged.difficultyCode),
+        });
+        rewardPoints = reward.points;
+      }
+      return {
+        difficultyCode: judged.difficultyCode,
+        difficultyName: difficultyName(judged.difficultyCode),
+        reason: judged.reason,
+        rewardPoints,
+      };
     });
   }
 
@@ -543,6 +586,34 @@ export class MissionsService {
         const targetUnit = patch.targetUnit ?? mission.target_unit;
         if ((targetValue === null) !== (targetUnit === null)) {
           throw badRequest('targetValue와 targetUnit은 함께 지정해야 함');
+        }
+
+        // 보상은 만들 때 고정되므로, 수치를 바꿔 난이도가 달라지면 수정 대신 새로 만들게 한다
+        const contentChanged = [
+          'targetValue',
+          'targetUnit',
+          'estimatedDurationSeconds',
+        ].some((key) => patch[key] !== undefined);
+        if (contentChanged && mission.source_type !== 'template') {
+          const next = assessDifficulty({
+            exerciseCode: mission.exercise_code,
+            targetValue,
+            targetUnit,
+            estimatedDurationSeconds:
+              patch.estimatedDurationSeconds ??
+              mission.estimated_duration_seconds,
+          }).difficultyCode;
+          const { rows: current } = await tx.query(
+            'SELECT code FROM difficulty_levels WHERE id = $1',
+            [mission.difficulty_id],
+          );
+          if (current[0]?.code !== next) {
+            throw conflict(
+              'difficulty_changed',
+              `이렇게 바꾸면 난이도가 '${difficultyName(next)}'(으)로 바뀌어요. 보상은 만들 때 정해져서, 이 미션을 취소하고 새로 만들어 주세요`,
+              { from: current[0]?.code ?? null, to: next },
+            );
+          }
         }
 
         const date = patch.scheduledDate ?? mission.scheduled_date;
