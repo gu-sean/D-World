@@ -4,9 +4,11 @@ import { newIdempotencyKey } from '../api/idempotency.js';
 import { ConfirmActionModal } from './ConfirmActionModal.jsx';
 import { completeUpload, createUploadUrl, putToStorage } from './imageUploadApi.js';
 
-const ACCEPTED_TYPES = ['image/png', 'image/webp', 'image/jpeg']; // M84 `mimeType`
+const BADGE_TYPES = ['image/png', 'image/webp', 'image/jpeg']; // M84 `mimeType`
+const PET_TYPES = [...BADGE_TYPES, 'image/gif']; // 펫 단계 이미지는 GIF도 가능
 const MAX_BYTES = 2 * 1024 * 1024; // M84 `sizeBytes` (≤2MB)
 const WRONG_TYPE_TEXT = 'PNG, WebP, JPEG 이미지만 올릴 수 있어요.';
+const WRONG_PET_TYPE_TEXT = 'PNG, WebP, JPEG, GIF 이미지만 올릴 수 있어요.';
 const TOO_BIG_TEXT = '2MB 이하의 이미지만 올릴 수 있어요.';
 
 /**
@@ -33,8 +35,9 @@ export function ImageUploadField({ assetKind, ownerId, value, onChange }) {
     const file = event.target.files?.[0];
     event.target.value = ''; // so that the same file can be chosen again
     if (!file) return;
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setFileError(WRONG_TYPE_TEXT);
+    const acceptedTypes = assetKind === 'pet_stage' ? PET_TYPES : BADGE_TYPES;
+    if (!acceptedTypes.includes(file.type)) {
+      setFileError(assetKind === 'pet_stage' ? WRONG_PET_TYPE_TEXT : WRONG_TYPE_TEXT);
     } else if (file.size > MAX_BYTES) {
       setFileError(TOO_BIG_TEXT);
     } else {
@@ -70,7 +73,7 @@ export function ImageUploadField({ assetKind, ownerId, value, onChange }) {
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPTED_TYPES.join(',')}
+        accept={(assetKind === 'pet_stage' ? PET_TYPES : BADGE_TYPES).join(',')}
         hidden
         data-testid="image-upload-input"
         onChange={handleFileChosen}

@@ -5,10 +5,11 @@
 //
 // 연결된 로그인 수단(휴대폰·소셜)은 여기서 바꿀 수 없어 보여 주기만 한다.
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { labels, useMe, useUpdateProfile, validators } from '../../client';
 import {
+  FormScrollView,
   Button,
   Card,
   ErrorBanner,
@@ -26,18 +27,36 @@ export default function ProfileEditScreen({ navigation }) {
   const updateProfile = useUpdateProfile();
 
   const [nickname, setNickname] = useState('');
+  const [age, setAge] = useState('');
+  const [heightCm, setHeightCm] = useState('');
+  const [weightKg, setWeightKg] = useState('');
   const [touched, setTouched] = useState(false);
 
   useEffect(() => {
-    if (me.data?.nickname) setNickname(me.data.nickname);
-  }, [me.data?.nickname]);
+    if (!me.data) return;
+    setNickname(me.data.nickname ?? '');
+    setAge(me.data.age == null ? '' : String(me.data.age));
+    setHeightCm(me.data.heightCm == null ? '' : String(me.data.heightCm));
+    setWeightKg(me.data.weightKg == null ? '' : String(me.data.weightKg));
+  }, [me.data]);
 
   const check = validators.validateNickname(nickname);
-  const changed = me.data ? nickname.trim() !== me.data.nickname : false;
+  const fitnessCheck = validators.validateFitnessProfile({ age, heightCm, weightKg });
+  const changed = me.data
+    ? nickname.trim() !== me.data.nickname ||
+      Number(age) !== me.data.age ||
+      Number(heightCm) !== me.data.heightCm ||
+      Number(weightKg) !== me.data.weightKg
+    : false;
 
   const save = () =>
     updateProfile.mutate(
-      { nickname: nickname.trim() },
+      {
+        nickname: nickname.trim(),
+        age: Number(age),
+        heightCm: Number(heightCm),
+        weightKg: Number(weightKg),
+      },
       { onSuccess: () => navigation.goBack() },
     );
 
@@ -45,7 +64,7 @@ export default function ProfileEditScreen({ navigation }) {
     <Screen title="프로필 수정" onBack={() => navigation.goBack()} padded={false}>
       <QueryState query={me}>
         {(data) => (
-          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          <FormScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
             <ErrorBanner error={updateProfile.error} />
 
             <TextField
@@ -58,6 +77,27 @@ export default function ProfileEditScreen({ navigation }) {
               maxLength={12}
               hint="한글·영문·숫자 2~12자"
               error={touched && !check.ok ? check.message : null}
+            />
+
+            <TextField
+              label="나이"
+              value={age}
+              onChangeText={(text) => setAge(text.replace(/\D/g, '').slice(0, 3))}
+              keyboardType="number-pad"
+            />
+            <TextField
+              label="키 (cm)"
+              value={heightCm}
+              onChangeText={(text) => setHeightCm(text.replace(/[^\d.]/g, '').slice(0, 6))}
+              keyboardType="decimal-pad"
+            />
+            <TextField
+              label="몸무게 (kg)"
+              value={weightKg}
+              onChangeText={(text) => setWeightKg(text.replace(/[^\d.]/g, '').slice(0, 6))}
+              keyboardType="decimal-pad"
+              error={!fitnessCheck.ok ? fitnessCheck.message : null}
+              hint="수정하면 다음 난이도 추천부터 반영돼요."
             />
 
             <Card style={styles.card}>
@@ -92,10 +132,10 @@ export default function ProfileEditScreen({ navigation }) {
               title="저장"
               onPress={save}
               loading={updateProfile.isPending}
-              disabled={!check.ok || !changed}
+              disabled={!check.ok || !fitnessCheck.ok || !changed}
               full
             />
-          </ScrollView>
+          </FormScrollView>
         )}
       </QueryState>
     </Screen>

@@ -30,11 +30,12 @@ export default function NoticeListScreen({ navigation }) {
         <OptionRow options={CATEGORIES} value={category} onChange={setCategory} />
       </View>
 
-      <QueryState
+      <QueryState skeleton="row"
         query={notices}
         data={notices.items}
         isEmpty={notices.items.length === 0}
-        emptyTitle="공지가 없어요">
+        emptyTitle="공지가 없어요"
+        emptyIcon="bell">
         {(list) => (
           <FlatList
             data={list}

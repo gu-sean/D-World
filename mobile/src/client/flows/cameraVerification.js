@@ -24,7 +24,7 @@ import { afterVerificationDecided } from '../queries/invalidate.js';
 
 /** 05 §11 파일 업로드 규격. */
 export const MEDIA_LIMITS = {
-  camera_video: 80 * 1024 * 1024,
+  camera_video: 150 * 1024 * 1024, // 최대 10분 영상 (백엔드 MEDIA_RULES와 같은 값)
   camera_photo: 10 * 1024 * 1024,
   sensor_raw: 5 * 1024 * 1024,
 };

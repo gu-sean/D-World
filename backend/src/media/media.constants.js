@@ -12,7 +12,8 @@ export const MEDIA_RULES = {
   },
   camera_video: {
     mimeTypes: { 'video/mp4': 'mp4' },
-    maxBytes: 80 * MB,
+    // 앱 촬영 최대 10분(960px·1Mbps 압축 시 약 85MB)에 여유를 둔 값. 앱 MEDIA_LIMITS와 같게 유지
+    maxBytes: 150 * MB,
     maxPerRecord: 1,
     method: 'camera',
   },

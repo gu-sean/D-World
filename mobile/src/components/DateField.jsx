@@ -67,6 +67,7 @@ export default function DateField({ label, value, onChange, error, min, max, qui
               key={item.label}
               onPress={() => apply(item)}
               accessibilityRole="button"
+              hitSlop={{ top: 8, bottom: 8, left: 2, right: 2 }}
               style={styles.chip}>
               <Text style={styles.chipLabel}>{item.label}</Text>
             </TouchableOpacity>

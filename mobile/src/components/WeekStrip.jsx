@@ -39,6 +39,9 @@ export default function WeekStrip({ days = [], selectedDate, onSelect }) {
             onPress={() => onSelect?.(day.date)}
             activeOpacity={0.8}
             accessibilityRole="button"
+            accessibilityLabel={`${weekday}요일 ${dayNumber}일${
+              done ? ', 모두 완료' : partial ? ', 일부 완료' : ''
+            }`}
             accessibilityState={{ selected }}
             style={styles.cell}>
             <Text style={[styles.weekday, selected && styles.weekdaySelected]}>{weekday}</Text>
@@ -52,13 +55,7 @@ export default function WeekStrip({ days = [], selectedDate, onSelect }) {
                 {dayNumber}
               </Text>
             </View>
-            <View
-              style={[
-                styles.dot,
-                done && styles.dotDone,
-                partial && styles.dotPartial,
-              ]}
-            />
+            <View style={[styles.dot, done && styles.dotDone, partial && styles.dotPartial]} />
           </TouchableOpacity>
         );
       })}
@@ -83,7 +80,7 @@ const styles = StyleSheet.create({
   dayBoxToday: { borderColor: colors.primary },
   dayBoxSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
   dayNumber: { ...typography.body, color: colors.text },
-  dayNumberSelected: { color: '#FFFFFF', fontWeight: '600' },
+  dayNumberSelected: { color: colors.onPrimary, fontWeight: '600' },
   dot: { width: 5, height: 5, borderRadius: radius.full, backgroundColor: 'transparent' },
   dotDone: { backgroundColor: colors.success },
   dotPartial: { backgroundColor: colors.border },

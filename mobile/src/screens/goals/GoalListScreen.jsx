@@ -35,11 +35,12 @@ export default function GoalListScreen({ navigation, route }) {
         <OptionRow options={FILTERS} value={status} onChange={setStatus} />
       </View>
 
-      <QueryState
+      <QueryState skeleton="card"
         query={goals}
         data={goals.items}
         isEmpty={goals.items.length === 0}
-        emptyTitle="해당하는 목표가 없어요">
+        emptyTitle="해당하는 목표가 없어요"
+        emptyIcon="flag">
         {(items) => (
           <FlatList
             data={items}

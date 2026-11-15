@@ -12,9 +12,10 @@
  *   multiline?: boolean, editable?: boolean, autoFocus?: boolean, right?: React.ReactNode
  * }} props
  */
-import React from 'react';
+import React, { useRef } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { useFormScroll } from './FormScrollView';
 import { colors, radius, spacing, typography } from '../theme';
 
 export default function TextField({
@@ -33,6 +34,8 @@ export default function TextField({
   right,
 }) {
   const length = (value ?? '').length;
+  const inputRef = useRef(null);
+  const formScroll = useFormScroll();
 
   return (
     <View style={styles.wrap}>
@@ -55,6 +58,9 @@ export default function TextField({
           !editable && styles.boxDisabled,
         ]}>
         <TextInput
+          ref={inputRef}
+          accessibilityLabel={label}
+          onFocus={() => formScroll?.scrollToField(inputRef)}
           style={[styles.input, multiline && styles.inputMultiline]}
           value={value}
           onChangeText={onChangeText}

@@ -15,6 +15,8 @@ buildscript {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        // 푸시(FCM): google-services.json을 읽어 Firebase 설정을 앱에 넣는다
+        classpath("com.google.gms:google-services:4.4.2")
     }
 }
 

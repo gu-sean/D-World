@@ -245,11 +245,24 @@ export function formatRelative(value, nowMs = Date.now()) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}시간 전`;
   const today = toDateString(nowMs);
-  const that = toDateString(ms);
+  const valueDate = toDateString(ms);
   const yesterday = toDateString(nowMs - 86400000);
-  if (that === today) return `${hours}시간 전`;
-  if (that === yesterday) return '어제';
+  if (valueDate === today) return `${hours}시간 전`;
+  if (valueDate === yesterday) return '어제';
   return formatDate(value);
+}
+
+/**
+ * 한글 단어가 줄 끝에서 중간에 끊기지 않게 한다.
+ * 안드로이드는 한글을 글자마다 끊을 수 있어서 "시작하/는"처럼 갈라진다.
+ * 같은 단어 안의 글자 사이에 '줄바꿈 금지(WORD JOINER)' 문자를 끼우면 공백에서만 줄이 바뀐다.
+ * 화면에는 보이지 않는다.
+ * @param {string} text
+ * @returns {string}
+ */
+export function keepWords(text) {
+  if (typeof text !== 'string') return text;
+  return text.replace(/(\S)(?=\S)/g, '$1\u2060');
 }
 
 /** `format` 객체로 한 번에 내보낸다 (parts/mobile-client §4.2). */
@@ -268,6 +281,7 @@ export const format = {
   formatTarget,
   formatMissionMeta,
   formatRelative,
+  keepWords,
 };
 
 export default format;

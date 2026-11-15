@@ -21,6 +21,9 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import Icon from './Icon';
 import { colors, radius, spacing, typography } from '../theme';
 
+/** 작은 버튼(sm)은 글자 크기를 그대로 두고 눌림 영역만 넓혀 44dp 이상을 맞춘다 */
+const SMALL_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
+
 export default function Button({
   title,
   onPress,
@@ -39,6 +42,7 @@ export default function Button({
       onPress={onPress}
       disabled={inactive}
       activeOpacity={0.8}
+      hitSlop={size === 'sm' ? SMALL_HIT_SLOP : undefined}
       accessibilityRole="button"
       accessibilityState={{ disabled: inactive, busy: loading }}
       style={[
@@ -63,9 +67,9 @@ export default function Button({
 }
 
 const TONES = {
-  primary: { background: colors.primary, border: colors.primary, label: '#FFFFFF' },
+  primary: { background: colors.primary, border: colors.primary, label: colors.onPrimary },
   secondary: { background: colors.surface, border: colors.border, label: colors.text },
-  danger: { background: colors.danger, border: colors.danger, label: '#FFFFFF' },
+  danger: { background: colors.danger, border: colors.danger, label: colors.onPrimary },
   text: { background: 'transparent', border: 'transparent', label: colors.primary },
 };
 

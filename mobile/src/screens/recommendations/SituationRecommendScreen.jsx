@@ -63,6 +63,8 @@ export default function SituationRecommendScreen({ navigation, route }) {
 
   useEffect(() => {
     load();
+    // 추천 종류나 위치 사용이 바뀔 때만 다시 불러온다. `load`는 매번 새로 만들어지고,
+    // 이동 여부(`preset.isMoving`)는 종류에서 정해지는 값이라 따로 볼 필요가 없다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, useLocation]);
 

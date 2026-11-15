@@ -2,11 +2,11 @@
 from fastapi import APIRouter
 
 from app.api.v1.health import router as health_router
-from app.api.v1.schema_check import router as schema_router
-from app.core.settings import get_settings
 from app.api.v1.llm import router as llm_router
 from app.api.v1.llm_jobs import router as llm_jobs_router
+from app.api.v1.schema_check import router as schema_router
 from app.api.v1.vision import router as vision_router
+from app.core.settings import get_settings
 
 router = APIRouter(prefix="/internal/v1")
 

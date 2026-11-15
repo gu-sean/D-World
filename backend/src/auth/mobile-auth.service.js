@@ -6,6 +6,7 @@ import { readToken, signToken } from '../common/crypto/signed-token.js';
 import { AppException } from '../common/errors/app-exception.js';
 import { DatabaseService } from '../database/database.service.js';
 import { ConsentService } from '../accounts/consent.service.js';
+import { DifficultyAdvisorService } from '../accounts/difficulty-advisor.service.js';
 import { AuthService } from './auth.service.js';
 import {
   CONFIRMED_TTL_MINUTES,
@@ -51,6 +52,7 @@ export function maskPhone(e164) {
   SessionsService,
   SocialVerifierService,
   ConsentService,
+  DifficultyAdvisorService,
 )
 export class MobileAuthService {
   constructor(
@@ -61,6 +63,7 @@ export class MobileAuthService {
     sessions,
     socialVerifier,
     consents,
+    difficultyAdvisor,
   ) {
     this.database = database;
     this.config = config;
@@ -69,6 +72,7 @@ export class MobileAuthService {
     this.sessions = sessions;
     this.socialVerifier = socialVerifier;
     this.consents = consents;
+    this.difficultyAdvisor = difficultyAdvisor;
   }
 
   get secret() {
@@ -78,11 +82,23 @@ export class MobileAuthService {
   /** 07 Session: { profile, tokens } */
   async toSession(result) {
     const { rows } = await this.database.query(
-      'SELECT nickname FROM profiles WHERE user_id = $1',
+      `SELECT p.nickname, p.age, p.height_cm, p.weight_kg,
+              dl.code AS recommended_difficulty_code, p.difficulty_reason
+         FROM profiles p
+         LEFT JOIN difficulty_levels dl ON dl.id = p.recommended_difficulty_id
+        WHERE p.user_id = $1`,
       [result.userId],
     );
     return {
-      profile: { id: result.userId, nickname: rows[0]?.nickname ?? null },
+      profile: {
+        id: result.userId,
+        nickname: rows[0]?.nickname ?? null,
+        age: rows[0]?.age ?? null,
+        heightCm: rows[0]?.height_cm == null ? null : Number(rows[0].height_cm),
+        weightKg: rows[0]?.weight_kg == null ? null : Number(rows[0].weight_kg),
+        recommendedDifficultyCode: rows[0]?.recommended_difficulty_code ?? null,
+        difficultyReason: rows[0]?.difficulty_reason ?? null,
+      },
       tokens: {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
@@ -160,8 +176,12 @@ export class MobileAuthService {
         provider: social.provider,
         identity: { subject: social.subject, email: social.email },
         nickname: input.nickname,
+        age: input.age,
+        heightCm: input.heightCm,
+        weightKg: input.weightKg,
         consents: input.consents,
       });
+      await this.difficultyAdvisor.recommend(result.userId, { mode: 'signup' });
       return this.toSession(result);
     }
     const step = readToken(
@@ -177,8 +197,12 @@ export class MobileAuthService {
       challengeId: step.challengeId,
       password: input.password,
       nickname: input.nickname,
+      age: input.age,
+      heightCm: input.heightCm,
+      weightKg: input.weightKg,
       consents: input.consents,
     });
+    await this.difficultyAdvisor.recommend(result.userId, { mode: 'signup' });
     return this.toSession(result);
   }
 

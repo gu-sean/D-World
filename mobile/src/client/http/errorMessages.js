@@ -105,7 +105,7 @@ export const errorMessages = {
   PERMISSION_DENIED: '권한이 필요해요.',
   CAPTURE_CANCELLED: '촬영을 취소했어요.',
   FILE_TOO_LARGE: '파일이 너무 커요.',
-  VIDEO_TOO_LONG: '영상은 2분까지 찍을 수 있어요.',
+  VIDEO_TOO_LONG: '영상은 10분까지 찍을 수 있어요.',
   UPLOAD_FAILED: '업로드에 실패했어요.',
   GPS_UNAVAILABLE: '위치를 잡을 수 없어요.',
   DECISION_TIMEOUT: '결과가 늦어지고 있어요. 알림으로 알려드릴게요.',

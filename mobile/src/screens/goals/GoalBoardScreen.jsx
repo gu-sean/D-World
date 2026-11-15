@@ -40,19 +40,48 @@ export default function GoalBoardScreen({ navigation }) {
       title="내 목표"
       padded={false}
       right={
-        <Button
-          title="새 목표"
-          size="sm"
-          icon="plus"
-          onPress={() => navigation.navigate(Routes.GOAL_FORM)}
-        />
+        // 목표가 없을 때는 아래 '첫 목표 만들기'가 주 버튼이라 헤더 버튼은 숨긴다
+        goals.items.length > 0 ? (
+          <Button
+            title="새 목표"
+            size="sm"
+            icon="plus"
+            onPress={() => navigation.navigate(Routes.GOAL_FORM)}
+          />
+        ) : null
       }>
+      <View style={styles.aiSection}>
+        <Card style={styles.aiCard}>
+          <Text style={styles.aiTitle}>AI 목표·미션 추천</Text>
+          <Text style={styles.aiText}>
+            회원정보와 최근 수행 기록을 분석해 시작 난이도와 다음 미션을 추천해요.
+          </Text>
+          <View style={styles.aiActions}>
+            <Button
+              title="AI 목표 추천"
+              size="sm"
+              onPress={() => navigation.navigate(Routes.GOAL_FORM, { aiRecommended: true })}
+            />
+            <Button
+              title="LLM 미션 추천"
+              size="sm"
+              variant="secondary"
+              onPress={() => navigation.navigate(Routes.NEXT_MISSION)}
+            />
+          </View>
+        </Card>
+      </View>
       <QueryState
+        skeleton="card"
         query={goals}
         data={goals.items}
         isEmpty={goals.items.length === 0}
         emptyTitle="아직 목표가 없어요"
-        emptyText="이루고 싶은 것을 적으면 AI가 단계별 계획을 만들어 드려요.">
+        emptyText="이루고 싶은 것을 적으면 AI가 단계별 계획을 만들어 드려요."
+        emptyIcon="flag"
+        emptyAction={
+          <Button title="첫 목표 만들기" onPress={() => navigation.navigate(Routes.GOAL_FORM)} />
+        }>
         {(items) => (
           <FlatList
             data={items}
@@ -145,6 +174,11 @@ export default function GoalBoardScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  aiSection: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  aiCard: { gap: spacing.sm, borderColor: colors.primary, backgroundColor: '#F5F8FF' },
+  aiTitle: { ...typography.bodyStrong, color: colors.primary },
+  aiText: { ...typography.caption, color: colors.textSub },
+  aiActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   list: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
   card: { gap: spacing.sm },
   mainRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },

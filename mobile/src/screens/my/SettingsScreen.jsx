@@ -5,10 +5,10 @@
 //
 // 로그아웃과 탈퇴는 되돌리기 어려우므로 로그아웃은 한 번 더 묻고, 탈퇴는
 // 안내가 긴 별도 화면으로 보낸다.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { config, useLogout, useMe, useUpdateProfile } from '../../client';
+import { config, haptics, useLogout, useMe, useUpdateProfile } from '../../client';
 import {
   Card,
   ConfirmDialog,
@@ -23,6 +23,12 @@ import { colors, radius, spacing, typography } from '../../theme';
 
 export default function SettingsScreen({ navigation }) {
   const [askLogout, setAskLogout] = useState(false);
+  const [vibration, setVibration] = useState(true);
+
+  useEffect(() => {
+    haptics.isEnabled().then(setVibration);
+    return haptics.subscribe(setVibration);
+  }, []);
 
   const me = useMe();
   const updateProfile = useUpdateProfile();
@@ -44,10 +50,25 @@ export default function SettingsScreen({ navigation }) {
                 right={
                   <Switch
                     value={!!data.notificationEnabled}
+                    thumbColor={data.notificationEnabled ? colors.primary : colors.surface}
                     onValueChange={(notificationEnabled) =>
                       updateProfile.mutate({ notificationEnabled })
                     }
                     disabled={updateProfile.isPending}
+                    trackColor={{ true: colors.primarySoft }}
+                  />
+                }
+              />
+              <ListRow
+                icon="vibrate"
+                title="진동"
+                description="업적·진화·미션 완료 때 가볍게 울려요"
+                right={
+                  <Switch
+                    value={vibration}
+                    thumbColor={vibration ? colors.primary : colors.surface}
+                    onValueChange={haptics.setEnabled}
+                    trackColor={{ true: colors.primarySoft }}
                   />
                 }
               />

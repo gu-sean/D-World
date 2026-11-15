@@ -57,6 +57,15 @@ export function useAcceptRecommendation() {
   });
 }
 
+/** LLM 추천 여러 건을 선택해 한 번에 미션으로 추가한다. */
+export function useAcceptRecommendations() {
+  return useAppMutation({
+    idempotent: true,
+    mutationFn: recommendationsApi.acceptRecommendations,
+    onDone: (queryClient) => afterRecommendationDecided(queryClient, { missionCreated: true }),
+  });
+}
+
 /** A92 추천 거절. 입력 `{recommendationId}` */
 export function useDismissRecommendation() {
   return useAppMutation({
@@ -76,6 +85,7 @@ export function useActiveRecommendations() {
 export default {
   useSituationalRecommendations,
   useAcceptRecommendation,
+  useAcceptRecommendations,
   useDismissRecommendation,
   useActiveRecommendations,
 };

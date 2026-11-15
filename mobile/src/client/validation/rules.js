@@ -90,6 +90,22 @@ export function validateNickname(value) {
   return ok;
 }
 
+/** 가입·프로필에서 받는 난이도 추천용 신체정보. */
+export function validateFitnessProfile({ age, heightCm, weightKg }) {
+  const values = [
+    ['나이', age, 13, 100],
+    ['키', heightCm, 100, 250],
+    ['몸무게', weightKg, 30, 300],
+  ];
+  for (const [label, raw, min, max] of values) {
+    const value = Number(String(raw ?? '').trim());
+    if (!Number.isFinite(value)) return fail(`${label}를 숫자로 입력해 주세요.`);
+    if (value < min || value > max) return fail(`${label}는 ${min}~${max} 사이여야 해요.`);
+  }
+  if (!Number.isInteger(Number(age))) return fail('나이는 정수로 입력해 주세요.');
+  return ok;
+}
+
 /**
  * 펫 별명 (11 §8.1). 내 펫 안에서 유일한지는 서버(A84)가 본다.
  * @param {string} value
@@ -176,6 +192,7 @@ export const validators = {
   validatePassword,
   validatePasswordConfirm,
   validateNickname,
+  validateFitnessProfile,
   validatePetNickname,
   validateOtp,
   validateTarget,

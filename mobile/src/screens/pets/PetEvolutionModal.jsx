@@ -5,11 +5,11 @@
 // 새로 생긴 대사는 무엇인지 보여 준다.
 //
 // 아직 못 본 진화 기록을 서버에서 받아 가장 최근 것을 띄운다.
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { labels, usePetEvolutionEvents } from '../../client';
-import { Button, Icon, PetAvatar } from '../../components';
+import { haptics, labels, usePetEvolutionEvents } from '../../client';
+import { Button, Icon, PetAvatar, Pop } from '../../components';
 import { colors, radius, spacing, typography } from '../../theme';
 
 export default function PetEvolutionModal({ navigation, route }) {
@@ -19,13 +19,21 @@ export default function PetEvolutionModal({ navigation, route }) {
 
   const close = () => navigation.goBack();
 
+  // 진화 기록이 도착해 새 모습이 보이는 순간 한 번 진동한다.
+  const arrived = !!latest;
+  useEffect(() => {
+    if (arrived) haptics.medium();
+  }, [arrived]);
+
   return (
     <View style={styles.backdrop}>
       <View style={styles.card}>
         <Icon name="star" size={34} color={colors.warning} />
         <Text style={styles.heading}>펫이 자랐어요!</Text>
 
-        <PetAvatar pet={{ stageCode: latest?.toStageCode }} size={96} />
+        <Pop kind="bump" key={latest?.toStageCode ?? 'wait'}>
+          <PetAvatar pet={{ stageCode: latest?.toStageCode }} size={96} />
+        </Pop>
 
         {!!latest && (
           <>
@@ -55,7 +63,7 @@ export default function PetEvolutionModal({ navigation, route }) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(17, 20, 28, 0.5)',
+    backgroundColor: colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,

@@ -19,9 +19,10 @@ import {
   QueryState,
   Screen,
   SectionTitle,
+  SegmentedControl,
 } from '../../components';
 import Routes from '../../navigation/routes';
-import { categoryStyle, colors, spacing, typography } from '../../theme';
+import { categoryStyle, colors, radius, spacing, typography } from '../../theme';
 
 const PERIODS = [
   { value: 'week', label: '주간' },
@@ -29,10 +30,19 @@ const PERIODS = [
   { value: 'all', label: '전체' },
 ];
 
+/** 기록이 없을 때 안내 문구에 쓰는 기간 이름 */
+const PERIOD_WORD = { week: '이번 주', month: '이번 달', all: '' };
+
 /** 분야별 진행은 그 기간의 완료 미션 수 / 계획 미션 수다 (07 §10 ReportSummary.categories). */
 function progressText(item) {
-  return `${format.formatNumber(item.completedCount)}개 / ${format.formatNumber(item.plannedCount)}개`;
+  return `${format.formatNumber(item.completedCount)}개 / ${format.formatNumber(
+    item.plannedCount,
+  )}개`;
 }
+
+/** 선택한 기간에 계획·완료한 미션이 하나도 없으면 숫자 대신 시작을 권한다 */
+const isBlank = (summary) =>
+  summary.plannedMissionCount === 0 && summary.completedMissionCount === 0;
 
 export default function ReportScreen({ navigation }) {
   const [period, setPeriod] = useState('week');
@@ -45,8 +55,13 @@ export default function ReportScreen({ navigation }) {
     { value: null, label: '전체' },
     ...(categories.data ?? []).map((c) => ({ value: c.code, label: c.name })),
   ];
-  const categoryName = (code) =>
-    (categories.data ?? []).find((c) => c.code === code)?.name ?? code;
+  // 기록이 없는 기간에도 분야별 막대 틀은 보여 준다(선택한 분야가 있으면 그 분야만)
+  // 분야가 하나뿐이면 분야 필터와 '분야별 진행'은 같은 말을 반복하므로 숨긴다(분야가 늘면 다시 보인다)
+  const showCategories = (categories.data ?? []).length > 1;
+  const placeholderCategories = categoryOptions.filter(
+    (c) => c.value !== null && (categoryCode === null || c.value === categoryCode),
+  );
+  const categoryName = (code) => (categories.data ?? []).find((c) => c.code === code)?.name ?? code;
 
   return (
     <Screen
@@ -62,11 +77,19 @@ export default function ReportScreen({ navigation }) {
         />
       }>
       <View style={styles.filters}>
-        <OptionRow options={PERIODS} value={period} onChange={setPeriod} />
-        <OptionRow options={categoryOptions} value={categoryCode} onChange={setCategoryCode} />
+        <SegmentedControl options={PERIODS} value={period} onChange={setPeriod} />
+        {showCategories && (
+          <OptionRow
+            label="분야"
+            size="sm"
+            options={categoryOptions}
+            value={categoryCode}
+            onChange={setCategoryCode}
+          />
+        )}
       </View>
 
-      <QueryState query={report}>
+      <QueryState skeleton="summary" query={report}>
         {(summary) => (
           <ScrollView
             contentContainerStyle={styles.body}
@@ -77,39 +100,95 @@ export default function ReportScreen({ navigation }) {
               {format.formatDate(summary.periodStart)} ~ {format.formatDate(summary.periodEnd)}
             </Text>
 
-            <Card style={styles.summaryCard}>
-              <ProgressRing rate={summary.achievementRate} />
-              <View style={styles.summaryTexts}>
-                <Text style={styles.summaryTitle}>
-                  미션 {summary.completedMissionCount} / {summary.plannedMissionCount}
-                </Text>
-                <Text style={styles.summarySub}>
-                  목표 진행 평균 {Math.round(summary.goalProgressRate * 100)}%
-                </Text>
-                <Text style={styles.summarySub}>{summary.streakDays}일 연속 달성</Text>
-              </View>
-            </Card>
-
-            <View>
-              <SectionTitle title="분야별 진행" />
-              <Card style={styles.categories}>
-                {summary.categories.length === 0 && (
-                  <Text style={styles.categoryEmpty}>이 기간에 기록된 미션이 없어요.</Text>
-                )}
-                {summary.categories.map((item) => (
-                  <View key={item.categoryCode} style={styles.categoryRow}>
-                    <View style={styles.categoryHead}>
-                      <Text style={styles.categoryName}>{categoryName(item.categoryCode)}</Text>
-                      <Text style={styles.categoryValue}>{progressText(item)}</Text>
-                    </View>
-                    <ProgressBar
-                      rate={item.achievementRate}
-                      color={categoryStyle(item.categoryCode).color}
-                    />
+            {isBlank(summary) ? (
+              <Card style={styles.summaryCard}>
+                <ProgressRing rate={0}>
+                  <Text style={styles.ringBlank}>시작 전</Text>
+                </ProgressRing>
+                <View style={styles.summaryTexts}>
+                  <Text style={styles.summaryTitle}>
+                    {PERIOD_WORD[period] ? `${PERIOD_WORD[period]} 미션을` : '미션을'}
+                    {'\n'}시작해 볼까요?
+                  </Text>
+                  <Text style={styles.summarySub}>완료하면 진행률이 올라가요</Text>
+                  <View style={styles.streakChip}>
+                    <Text style={styles.streakChipText}>
+                      {summary.streakDays > 0
+                        ? `${summary.streakDays}일 연속 달성 중`
+                        : '오늘 시작하면 연속 1일!'}
+                    </Text>
                   </View>
-                ))}
+                </View>
               </Card>
-            </View>
+            ) : (
+              <Card style={styles.summaryCard}>
+                <ProgressRing rate={summary.achievementRate} />
+                <View style={styles.summaryTexts}>
+                  <Text style={styles.summaryTitle}>
+                    미션 {summary.plannedMissionCount}개 중 {summary.completedMissionCount}개 완료
+                  </Text>
+                  <Text style={styles.summarySub}>
+                    목표 진행 평균 {Math.round(summary.goalProgressRate * 100)}%
+                  </Text>
+                  <Text style={styles.summarySub}>{summary.streakDays}일 연속 달성</Text>
+                </View>
+              </Card>
+            )}
+
+            {!showCategories && summary.categories.length === 0 && (
+              <Card style={styles.categories}>
+                <View style={styles.blankFooter}>
+                  <Text style={styles.categoryEmpty}>아직 기록된 미션이 없어요</Text>
+                  <Button
+                    title="오늘의 미션 보기"
+                    size="sm"
+                    variant="text"
+                    onPress={() => navigation.navigate(Routes.HOME_TAB)}
+                  />
+                </View>
+              </Card>
+            )}
+
+            {showCategories && (
+              <View>
+                <SectionTitle title="분야별 진행" />
+                <Card style={styles.categories}>
+                  {summary.categories.length === 0 &&
+                    placeholderCategories.map((c) => (
+                      <View key={c.value} style={styles.categoryRow}>
+                        <View style={styles.categoryHead}>
+                          <Text style={styles.categoryName}>{c.label}</Text>
+                          <Text style={styles.categoryValue}>0개 / 0개</Text>
+                        </View>
+                        <ProgressBar rate={0} color={categoryStyle(c.value).color} />
+                      </View>
+                    ))}
+                  {summary.categories.length === 0 && (
+                    <View style={styles.blankFooter}>
+                      <Text style={styles.categoryEmpty}>아직 기록된 미션이 없어요</Text>
+                      <Button
+                        title="오늘의 미션 보기"
+                        size="sm"
+                        variant="text"
+                        onPress={() => navigation.navigate(Routes.HOME_TAB)}
+                      />
+                    </View>
+                  )}
+                  {summary.categories.map((item) => (
+                    <View key={item.categoryCode} style={styles.categoryRow}>
+                      <View style={styles.categoryHead}>
+                        <Text style={styles.categoryName}>{categoryName(item.categoryCode)}</Text>
+                        <Text style={styles.categoryValue}>{progressText(item)}</Text>
+                      </View>
+                      <ProgressBar
+                        rate={item.achievementRate}
+                        color={categoryStyle(item.categoryCode).color}
+                      />
+                    </View>
+                  ))}
+                </Card>
+              </View>
+            )}
 
             {!!summary.insight && (
               <View>
@@ -159,7 +238,7 @@ export default function ReportScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  filters: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
+  filters: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.md },
   body: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
   period: { ...typography.caption, color: colors.textSub },
   summaryCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
@@ -169,6 +248,24 @@ const styles = StyleSheet.create({
   categories: { gap: spacing.md },
   categoryRow: { gap: spacing.xs },
   categoryEmpty: { ...typography.caption, color: colors.textSub },
+  blankFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.xs,
+  },
+  ringBlank: { ...typography.caption, color: colors.textSub, fontWeight: '600' },
+  streakChip: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.primarySoft,
+  },
+  streakChipText: { ...typography.caption, color: colors.primary, fontWeight: '600' },
   categoryHead: { flexDirection: 'row', justifyContent: 'space-between' },
   categoryName: { ...typography.body, color: colors.text },
   categoryValue: { ...typography.caption, color: colors.textSub },

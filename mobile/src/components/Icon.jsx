@@ -16,7 +16,13 @@ export default function Icon({ name, size = 22, color = colors.text, strokeWidth
   const shapes = ICONS[name] ?? [];
 
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no">
       {shapes.map((shape, index) =>
         shape.d ? (
           <Path

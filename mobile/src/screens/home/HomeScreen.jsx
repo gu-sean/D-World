@@ -6,14 +6,9 @@
 // 날짜를 바꿔 가며 볼 수 있다. 달력에서 다른 날을 고르면 그 날짜로 다시 조회하고,
 // 미션을 누르면 상세로 간다. 인사말·정렬·진행률은 모두 서버가 계산한 값을 그대로 쓴다.
 import React, { useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import {
-  format,
-  useActiveRecommendations,
-  useHome,
-  useMyChallenges,
-} from '../../client';
+import { format, useActiveRecommendations, useHome, useMe, useMyChallenges } from '../../client';
 import {
   Button,
   Card,
@@ -27,12 +22,20 @@ import {
   WeekStrip,
 } from '../../components';
 import Routes from '../../navigation/routes';
-import { colors, spacing, typography } from '../../theme';
+import { colors, radius, spacing, typography } from '../../theme';
+
+/** 배너 부제: 오늘 미션 상태에 따라 바뀐다 */
+function bannerSubText({ totalCount, completedCount }) {
+  if (totalCount === 0) return '첫 미션을 골라 볼까요?';
+  if (completedCount >= totalCount) return '오늘 할 일을\n모두 끝냈어요';
+  return '하나 더 하면 연속 기록이\n이어져요';
+}
 
 export default function HomeScreen({ navigation }) {
   const [date, setDate] = useState(() => format.todayKst());
 
   const home = useHome(date);
+  const me = useMe();
   const myChallenges = useMyChallenges('enrolled');
   const recommendations = useActiveRecommendations();
 
@@ -41,7 +44,7 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <Screen padded={false}>
-      <QueryState query={home}>
+      <QueryState skeleton="summary" query={home}>
         {(summary) => (
           <ScrollView
             contentContainerStyle={styles.body}
@@ -49,25 +52,44 @@ export default function HomeScreen({ navigation }) {
               <RefreshControl refreshing={home.isFetching} onRefresh={home.refetch} />
             }>
             <View style={styles.greeting}>
-              <Text style={styles.message}>{summary.message}</Text>
+              <Text style={styles.message}>
+                {me.data?.nickname
+                  ? `${me.data.nickname}님, 오늘도 한 걸음 가볼까요?`
+                  : summary.message}
+              </Text>
               <Text style={styles.date}>{format.formatDate(summary.date)}</Text>
             </View>
 
-            <Card>
-              <WeekStrip days={summary.week} selectedDate={date} onSelect={setDate} />
-            </Card>
+            <ImageBackground
+              source={require('../../assets/images/home-sunrise.png')}
+              style={styles.banner}
+              imageStyle={styles.bannerImage}
+              resizeMode="cover">
+              <View style={styles.bannerTexts}>
+                <Text style={styles.bannerTitle}>오늘의 한 걸음</Text>
+                <Text style={styles.bannerSub}>{bannerSubText(summary.summary)}</Text>
+              </View>
+            </ImageBackground>
 
-            <Card style={styles.progressCard}>
-              <ProgressRing rate={summary.summary.progressRate} />
-              <View style={styles.progressTexts}>
-                <Text style={styles.progressTitle}>
-                  오늘 {summary.summary.completedCount} / {summary.summary.totalCount}
-                </Text>
-                <Text style={styles.progressSub}>
-                  {summary.summary.streakDays > 0
-                    ? `${summary.summary.streakDays}일 연속 달성 중`
-                    : '오늘 하나만 해내도 연속 기록이 시작돼요'}
-                </Text>
+            <Card style={styles.dayCard}>
+              <WeekStrip days={summary.week} selectedDate={date} onSelect={setDate} />
+              <View style={styles.divider} />
+              <View style={styles.progressRow}>
+                <ProgressRing rate={summary.summary.progressRate} />
+                <View style={styles.progressTexts}>
+                  <Text style={styles.progressTitle}>
+                    {summary.summary.totalCount === 0
+                      ? '오늘 할 미션이 없어요'
+                      : `오늘 ${summary.summary.totalCount}개 중 ${summary.summary.completedCount}개 완료`}
+                  </Text>
+                  <Text style={styles.progressSub}>
+                    {summary.summary.totalCount === 0
+                      ? '미션을 추가하면 진행률이 여기에 보여요'
+                      : summary.summary.streakDays > 0
+                      ? `${summary.summary.streakDays}일 연속 달성 중`
+                      : '오늘 하나만 해내도 연속 기록이 시작돼요'}
+                  </Text>
+                </View>
               </View>
             </Card>
 
@@ -83,8 +105,8 @@ export default function HomeScreen({ navigation }) {
                   <View style={styles.emptyButton}>
                     <Button
                       title="미션 추가하기"
-                      variant="secondary"
-                      size="sm"
+                      icon="plus"
+                      full
                       onPress={() => navigation.navigate(Routes.MISSION_CATALOG, { date })}
                     />
                   </View>
@@ -156,18 +178,35 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
+/** 홈 배너 그림(해 뜨는 언덕)에 맞춘 색 — 그림을 바꾸면 함께 바꾼다 */
+const BANNER_FILL = '#FCE3C6';
+const BANNER_SUB_TEXT = '#3F322B';
+
 const styles = StyleSheet.create({
   body: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
   greeting: { gap: 2 },
   message: { ...typography.title, color: colors.text },
   date: { ...typography.caption, color: colors.textSub },
-  progressCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  banner: {
+    height: 128,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    backgroundColor: BANNER_FILL,
+  },
+  bannerImage: { borderRadius: radius.lg },
+  bannerTexts: { paddingHorizontal: spacing.lg, gap: spacing.xs },
+  bannerTitle: { ...typography.title, color: colors.text },
+  bannerSub: { ...typography.caption, color: BANNER_SUB_TEXT },
+  dayCard: { gap: spacing.sm },
+  divider: { height: 1, backgroundColor: colors.border },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   progressTexts: { flex: 1, gap: spacing.xs },
   progressTitle: { ...typography.subtitle, color: colors.text },
   progressSub: { ...typography.caption, color: colors.textSub },
   missions: { gap: spacing.sm },
   emptyText: { ...typography.body, color: colors.textSub },
-  emptyButton: { marginTop: spacing.md, alignSelf: 'flex-start' },
+  emptyButton: { marginTop: spacing.md },
   challenge: { gap: spacing.xs },
   challengeTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   challengeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flex: 1 },

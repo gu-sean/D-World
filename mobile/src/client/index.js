@@ -30,6 +30,7 @@ export {
 export {
   useMe,
   useUpdateProfile,
+  useDifficultyRecommendation,
   useSubmitConsents,
   useRequestWithdrawal,
 } from './queries/me.js';
@@ -119,6 +120,7 @@ export {
 export {
   useSituationalRecommendations,
   useAcceptRecommendation,
+  useAcceptRecommendations,
   useDismissRecommendation,
   useActiveRecommendations,
 } from './queries/recommendations.js';
@@ -160,6 +162,8 @@ export { format } from './format/format.js';
 export { labels, labelOf } from './labels.js';
 /** 알림·공지의 `linkScreen` → `{name, params}` (07 §17) */
 export { parseLinkScreen } from './links.js';
+/** 보상 순간 진동 `light`·`medium`, 켜기/끄기 */
+export { default as haptics } from './device/haptics.js';
 /** 권한 `check`·`request`·`openSettings` (parts/mobile-ui §8) */
 export { permissions } from './device/permissions.js';
 /** `.env`에서 읽은 설정값 (12 §8.4). 비밀값은 들어 있지 않다. */

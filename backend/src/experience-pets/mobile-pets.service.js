@@ -33,13 +33,26 @@ export class MobilePetsService {
       unlockTargetCount: view.unlock.targetCount ?? null,
       unlocked: view.unlock.met,
       owned: view.ownedPetId !== null,
+      // 07 DTO 사전 PetSpecies 키(앱이 읽는 이름)
+      isUnlocked: view.unlock.met,
+      isOwned: view.ownedPetId !== null,
+      unlockCondition: {
+        type: view.unlock.type,
+        targetCount: view.unlock.targetCount ?? null,
+        categoryCode: view.unlock.categoryId
+          ? (categoryCodes.get(view.unlock.categoryId) ?? null)
+          : null,
+        achievementTitle: null,
+        progressCount: view.unlock.current ?? 0,
+      },
       hatchMissionCount: view.hatchMissionCount,
       stages: view.stages.map((stage) => ({
         stageNo: stage.stageNo,
         stageCode: stage.stageCode,
         minTotalXp: stage.minTotalXp,
         bonusRate: stage.bonusBasisPoints / 10_000,
-        imageUrl: null,
+        imageUrl: stage.imageUrl ?? null,
+        stillUrl: stage.stillUrl ?? null,
       })),
     };
   }

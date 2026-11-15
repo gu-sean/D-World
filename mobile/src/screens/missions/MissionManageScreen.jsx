@@ -26,20 +26,31 @@ export default function MissionManageScreen({ navigation, route }) {
   return (
     <Screen title="미션 관리" onBack={() => navigation.goBack()} padded={false}>
       <View style={styles.dateBar}>
-        <TouchableOpacity onPress={() => move(-1)} accessibilityRole="button" hitSlop={8}>
+        <TouchableOpacity
+          onPress={() => move(-1)}
+          accessibilityRole="button"
+          accessibilityLabel="이전 날"
+          hitSlop={8}>
           <Icon name="chevronLeft" size={22} color={colors.textSub} />
         </TouchableOpacity>
 
         <View style={styles.dateTexts}>
           <Text style={styles.date}>{format.formatDate(date)}</Text>
           {date !== format.todayKst() && (
-            <TouchableOpacity onPress={() => setDate(format.todayKst())} hitSlop={8}>
+            <TouchableOpacity
+              onPress={() => setDate(format.todayKst())}
+              accessibilityRole="button"
+              hitSlop={8}>
               <Text style={styles.today}>오늘로</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        <TouchableOpacity onPress={() => move(1)} accessibilityRole="button" hitSlop={8}>
+        <TouchableOpacity
+          onPress={() => move(1)}
+          accessibilityRole="button"
+          accessibilityLabel="다음 날"
+          hitSlop={8}>
           <Icon name="chevronRight" size={22} color={colors.textSub} />
         </TouchableOpacity>
       </View>

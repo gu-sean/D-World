@@ -44,6 +44,7 @@ export default function VerifyPermissionScreen({ navigation, route }) {
 
   useEffect(() => {
     permissions.check(guide.kinds[0]).then(setStatus);
+    // 권한 종류(`kind`)가 바뀔 때만 상태를 다시 확인한다. `guide`는 `kind`에서 정해지는 값이다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
 

@@ -97,7 +97,7 @@ export const pointTransactionKind = {
   refund_offset: '환불 상계',
 };
 export const streakDayStatus = { pending: '판정 대기', success: '성공', failed: '실패' };
-export const achievementRarity = { common: 'Common', rare: 'Rare', legendary: 'Legendary' };
+export const achievementRarity = { common: '일반', rare: '희귀', legendary: '전설' };
 export const petStageCode = { egg: '알', baby: '아기', adult: '성체' };
 export const shopItemKind = { consumable: '소모품', permanent: '영구' };
 export const shopOrderStatus = { completed: '완료', cancelled: '취소' };

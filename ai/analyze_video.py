@@ -2,17 +2,16 @@
 import argparse
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 import cv2
 import mediapipe as mp
 
-from app.vision.squat import SquatCounter
-from app.vision.pushup import PushupCounter
+from app.vision.burpee import BurpeeCounter
+from app.vision.geometry import to_square_coords
 from app.vision.lunge import LungeCounter
 from app.vision.plank import PlankCounter
-from app.vision.burpee import BurpeeCounter
-
+from app.vision.pushup import PushupCounter
+from app.vision.squat import SquatCounter
 
 EXERCISES = {
     "squat": SquatCounter,
@@ -115,25 +114,15 @@ def analyze(exercise_code, video_path):
                         counter.previous_time = timestamp_ms / 1000
                     continue
 
-                landmarks = pose_result.pose_landmarks[0]
+                height, width = frame.shape[:2]
+                # MediaPipe는 축마다 따로 정규화하므로 5종 모두 같은 길이 단위로 맞춘다
+                landmarks = to_square_coords(
+                    pose_result.pose_landmarks[0], width, height
+                )
                 current_time = timestamp_ms / 1000
 
                 if exercise_code == "plank":
-                    height, width = frame.shape[:2]
-                    # MediaPipe normalizes each axis independently.
-                    # Use the same scale on both axes for posture geometry.
-                    aspect_scale = height / width
-                    scaled_landmarks = [
-                        SimpleNamespace(
-                            x=point.x,
-                            y=point.y * aspect_scale,
-                            visibility=point.visibility,
-                        )
-                        for point in landmarks
-                    ]
-                    last_state = counter.update(
-                        scaled_landmarks, current_time
-                    )
+                    last_state = counter.update(landmarks, current_time)
                 else:
                     last_state = counter.update(landmarks)
 
@@ -154,6 +143,7 @@ def analyze(exercise_code, video_path):
         "analyzedFrames": analyzed_frames,
         "detectedFrames": detected_frames,
         "detectionRatio": round(detection_ratio, 3),
+        "durationSeconds": round(frame_index / fps, 2),
         "lastState": last_state,
         "validationStatus": "unverified",
     }

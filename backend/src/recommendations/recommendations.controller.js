@@ -16,10 +16,12 @@ import {
   UserIdempotencyInterceptor,
 } from '../common/idempotency/user-idempotency.interceptor.js';
 import {
+  array,
   boolean,
   idOf,
   number,
   oneOf,
+  shortId,
   validateBody,
 } from '../common/validation.js';
 import { RecommendationsService } from './recommendations.service.js';
@@ -53,6 +55,19 @@ export class RecommendationsController {
   @Bind(Req())
   active(request) {
     return this.recommendations.active(request.auth.userId);
+  }
+
+  /** LLM 추천 목록에서 여러 미션을 골라 한 번에 추가한다. */
+  @Post('accept-batch')
+  @Idempotent()
+  @RequireActive()
+  @Bind(Req(), Body())
+  acceptBatch(request, body) {
+    const input = validateBody(body, {
+      recommendationIds: array(shortId(), { min: 1, max: 3 }),
+      goalId: shortId({ optional: true }),
+    });
+    return this.recommendations.acceptBatch(request.auth.userId, input);
   }
 
   /** A91 */

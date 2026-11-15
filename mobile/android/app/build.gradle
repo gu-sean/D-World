@@ -115,9 +115,15 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // 펫 이미지가 움직이는 GIF라서 애니메이션 GIF 디코더가 필요하다 (Fresco 버전은 react-android와 같게)
+    implementation("com.facebook.fresco:animated-gif:3.6.0")
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
     }
 }
+
+// 푸시(FCM): google-services.json을 읽는다(파일은 커밋하지 않는다)
+apply plugin: "com.google.gms.google-services"

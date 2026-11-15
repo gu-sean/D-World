@@ -10,10 +10,11 @@
 // 이의 제기는 거절된 현재 판정에만, 통보 뒤 7일 안에 할 수 있다 — 가능 여부는
 // 서버가 `canAppeal`로 알려 준다.
 import React, { useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, StyleSheet, Text, View } from 'react-native';
 
 import { format, labels, useAppeal, useRecord, validators } from '../../client';
 import {
+  FormScrollView,
   Button,
   Card,
   ErrorBanner,
@@ -81,7 +82,7 @@ export default function VerifyResultScreen({ navigation, route }) {
 
           return (
             <>
-              <ScrollView contentContainerStyle={styles.body}>
+              <FormScrollView contentContainerStyle={styles.body}>
                 <View style={styles.hero}>
                   <Icon
                     name={approved ? 'check' : rejected ? 'close' : 'clock'}
@@ -90,7 +91,11 @@ export default function VerifyResultScreen({ navigation, route }) {
                     strokeWidth={2.4}
                   />
                   <Text style={styles.heading}>
-                    {approved ? '인증에 성공했어요' : rejected ? '인증하지 못했어요' : '확인하고 있어요'}
+                    {approved
+                      ? '인증에 성공했어요'
+                      : rejected
+                      ? '인증하지 못했어요'
+                      : '확인하고 있어요'}
                   </Text>
                   <StatusTag
                     text={labels.recordStatus[data.status]}
@@ -110,8 +115,8 @@ export default function VerifyResultScreen({ navigation, route }) {
                 {reviewing && (
                   <Card>
                     <Text style={styles.reviewText}>
-                      자동으로 판단하기 어려워 관리자가 직접 확인하고 있어요.
-                      결과가 나오면 알림으로 알려 드릴게요.
+                      자동으로 판단하기 어려워 관리자가 직접 확인하고 있어요. 결과가 나오면 알림으로
+                      알려 드릴게요.
                     </Text>
                   </Card>
                 )}
@@ -147,7 +152,7 @@ export default function VerifyResultScreen({ navigation, route }) {
                     남은 제출 횟수 {data.mission?.remainingSubmissions ?? 0}회
                   </Text>
                 )}
-              </ScrollView>
+              </FormScrollView>
 
               <View style={styles.footer}>
                 {approved && (
@@ -182,7 +187,11 @@ export default function VerifyResultScreen({ navigation, route }) {
                 )}
 
                 {reviewing && (
-                  <Button title="홈으로" onPress={() => navigation.navigate(Routes.HOME_TAB)} full />
+                  <Button
+                    title="홈으로"
+                    onPress={() => navigation.navigate(Routes.HOME_TAB)}
+                    full
+                  />
                 )}
               </View>
 
@@ -259,7 +268,7 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(17, 20, 28, 0.45)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalCard: {

@@ -12,6 +12,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import Card from './Card';
 import CategoryChip from './CategoryChip';
+import ExerciseIllustration from './ExerciseIllustration';
 import Icon from './Icon';
 import StatusTag, { STATUS_TONE } from './StatusTag';
 import { format, labels } from '../client';
@@ -30,47 +31,52 @@ export default function MissionCard({ mission, onPress, showDate = false }) {
   const reward = mission.rewardPreview?.points ?? 0;
 
   return (
-    <Card onPress={onPress} style={styles.card}>
-      <View style={styles.topRow}>
-        <CategoryChip categoryCode={mission.categoryCode} name={mission.categoryName} size="sm" />
-        <StatusTag
-          text={labels.missionStatus[mission.status]}
-          tone={STATUS_TONE[mission.status]}
-        />
-      </View>
-
-      <Text style={styles.title} numberOfLines={2}>
-        {mission.title}
-      </Text>
-
-      <View style={styles.metaRow}>
-        {!!target && <Text style={styles.meta}>{target}</Text>}
-        {!!duration && (
-          <>
-            <Text style={styles.dot}>·</Text>
-            <Text style={styles.meta}>{duration}</Text>
-          </>
-        )}
-        {showDate && (
-          <>
-            <Text style={styles.dot}>·</Text>
-            <Text style={styles.meta}>{format.formatDate(mission.scheduledDate)}</Text>
-          </>
-        )}
-      </View>
-
-      {reward > 0 && (
-        <View style={styles.rewardRow}>
-          <Icon name="coin" size={14} color={colors.warning} />
-          <Text style={styles.reward}>{format.formatPoints(reward)}</Text>
+    <Card onPress={onPress} style={styles.row}>
+      {/* 운동 미션이면 왼쪽에 자세 그림, 아니면(운동 코드 없음) 그림 없이 글만 */}
+      <ExerciseIllustration exerciseCode={mission.exerciseCode} size={52} />
+      <View style={styles.content}>
+        <View style={styles.topRow}>
+          <CategoryChip categoryCode={mission.categoryCode} name={mission.categoryName} size="sm" />
+          <StatusTag
+            text={labels.missionStatus[mission.status]}
+            tone={STATUS_TONE[mission.status]}
+          />
         </View>
-      )}
+
+        <Text style={styles.title} numberOfLines={2}>
+          {mission.title}
+        </Text>
+
+        <View style={styles.metaRow}>
+          {!!target && <Text style={styles.meta}>{target}</Text>}
+          {!!duration && (
+            <>
+              <Text style={styles.dot}>·</Text>
+              <Text style={styles.meta}>{duration}</Text>
+            </>
+          )}
+          {showDate && (
+            <>
+              <Text style={styles.dot}>·</Text>
+              <Text style={styles.meta}>{format.formatDate(mission.scheduledDate)}</Text>
+            </>
+          )}
+        </View>
+
+        {reward > 0 && (
+          <View style={styles.rewardRow}>
+            <Icon name="coin" size={14} color={colors.warning} />
+            <Text style={styles.reward}>{format.formatPoints(reward)}</Text>
+          </View>
+        )}
+      </View>
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { gap: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  content: { flex: 1, gap: spacing.sm },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { ...typography.bodyStrong, color: colors.text },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },

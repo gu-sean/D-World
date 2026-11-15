@@ -1,19 +1,19 @@
 
 import argparse
 import csv
-import sys
 import json
+import sys
 from pathlib import Path
 
 import cv2
 import mediapipe as mp
 
-from app.vision.squat import SquatCounter
-from app.vision.pushup import PushupCounter
+from app.vision.burpee import BurpeeCounter
+from app.vision.geometry import to_square_coords
 from app.vision.lunge import LungeCounter
 from app.vision.plank import PlankCounter
-from app.vision.burpee import BurpeeCounter
-
+from app.vision.pushup import PushupCounter
+from app.vision.squat import SquatCounter
 
 EXERCISES = {
     "squat": SquatCounter,
@@ -130,7 +130,11 @@ def analyze(exercise_code, video_path, trace_path="squat_trace.csv"):
                     record_trace(timestamp_ms, {}, "no_pose")
                     continue
 
-                landmarks = pose_result.pose_landmarks[0]
+                height, width = frame.shape[:2]
+                # analyze_video.py와 같은 화면 비율 보정 (5종 공통)
+                landmarks = to_square_coords(
+                    pose_result.pose_landmarks[0], width, height
+                )
                 current_time = timestamp_ms / 1000
 
                 previous_count = getattr(counter, "count", 0)

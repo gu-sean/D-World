@@ -24,10 +24,18 @@ class Settings(BaseSettings):
     VISION_ENGINE: Literal["fixed", "mediapipe"] = "fixed"
     SENSOR_ENGINE: Literal["fixed", "run"] = "fixed"
     POSE_MODEL_PATH: str = "models/pose_landmarker_lite.task"
+    # true면 반복 수·감지 비율로 바로 승인/반려(app/vision/decision.py), false면 모두 관리자 검토
+    VISION_AUTO_DECISION: bool = True
+    # 제출 영상 지문(sha256) 기록 파일. 같은 영상을 다른 인증에 다시 내면 반려
+    MEDIA_REGISTRY_PATH: str = "data/media_registry.sqlite3"
+    # 난이도 추천: chain = Gemini 3회(프로필→수행 기록→안전 검토), single = 한 번에 세 단계
+    LLM_DIFFICULTY_MODE: Literal["chain", "single"] = "chain"
 
     LLM_PROVIDER: Literal["mock", "gemini"] = "mock"
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.8-flash"
+    GEMINI_FALLBACK_MODEL: str = "gemini-2.5-flash-lite"
+    LLM_PLAN_LOCAL_FALLBACK: bool = False
     GEMINI_THINKING_LEVEL: Literal["", "minimal", "low", "medium", "high"] = "low"
     LLM_MAX_REQUESTS_PER_MINUTE: int = Field(default=5, gt=0)
     LLM_MAX_REQUESTS_PER_DAY: int = Field(default=100, gt=0)

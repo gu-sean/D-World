@@ -44,7 +44,7 @@ export default function ShopScreen({ navigation }) {
       padded={false}>
       <ErrorBanner error={order.error} />
 
-      <QueryState query={items} emptyTitle="지금은 살 수 있는 물건이 없어요">
+      <QueryState skeleton="card" query={items} emptyTitle="지금은 살 수 있는 물건이 없어요" emptyIcon="gift">
         {(list) => (
           <FlatList
             data={list}

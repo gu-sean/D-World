@@ -9,7 +9,8 @@
  *   options: {value: string, label: string}[],
  *   value: string|null,
  *   onChange: (value: string) => void,
- *   disabled?: boolean
+ *   disabled?: boolean,
+ *   size?: 'md' | 'sm'
  * }} props
  */
 import React from 'react';
@@ -17,10 +18,22 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../theme';
 
-export default function OptionRow({ label, options = [], value, onChange, disabled = false }) {
+/** 칩 높이(md 약 38dp, sm 약 27dp)에 맞춰 눌림 영역을 44dp 이상으로 넓힌다 */
+const CHIP_HIT_SLOP = { top: 4, bottom: 4, left: 2, right: 2 };
+const SMALL_CHIP_HIT_SLOP = { top: 9, bottom: 9, left: 4, right: 4 };
+
+export default function OptionRow({
+  label,
+  options = [],
+  value,
+  onChange,
+  disabled = false,
+  size = 'md',
+}) {
+  const small = size === 'sm';
   return (
     <View style={styles.wrap}>
-      {!!label && <Text style={styles.label}>{label}</Text>}
+      {!!label && <Text style={[styles.label, small && styles.labelSmall]}>{label}</Text>}
       <View style={styles.options}>
         {options.map((option) => {
           const selected = option.value === value;
@@ -29,10 +42,21 @@ export default function OptionRow({ label, options = [], value, onChange, disabl
               key={option.value}
               onPress={() => !disabled && onChange(option.value)}
               disabled={disabled}
+              hitSlop={small ? SMALL_CHIP_HIT_SLOP : CHIP_HIT_SLOP}
               accessibilityRole="button"
               accessibilityState={{ selected, disabled }}
-              style={[styles.option, selected && styles.optionSelected, disabled && styles.dim]}>
-              <Text style={[styles.optionLabel, selected && styles.optionLabelSelected]}>
+              style={[
+                styles.option,
+                small && styles.optionSmall,
+                selected && styles.optionSelected,
+                disabled && styles.dim,
+              ]}>
+              <Text
+                style={[
+                  styles.optionLabel,
+                  small && styles.optionLabelSmall,
+                  selected && styles.optionLabelSelected,
+                ]}>
                 {option.label}
               </Text>
             </TouchableOpacity>
@@ -46,6 +70,7 @@ export default function OptionRow({ label, options = [], value, onChange, disabl
 const styles = StyleSheet.create({
   wrap: { gap: spacing.xs },
   label: { ...typography.caption, color: colors.textSub },
+  labelSmall: { fontWeight: '600' },
   options: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
   option: {
     paddingHorizontal: spacing.lg,
@@ -55,8 +80,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  optionSelected: { borderColor: colors.primary, backgroundColor: '#EBF1FF' },
+  optionSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  optionSmall: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   dim: { opacity: 0.5 },
   optionLabel: { ...typography.body, color: colors.textSub },
+  optionLabelSmall: { ...typography.caption, fontSize: 13 },
   optionLabelSelected: { color: colors.primary, fontWeight: '600' },
 });

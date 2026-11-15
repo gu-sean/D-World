@@ -17,6 +17,7 @@ import {
   CategoryChip,
   ConfirmDialog,
   ErrorBanner,
+  ExerciseIllustration,
   Icon,
   QueryState,
   Screen,
@@ -59,6 +60,12 @@ export default function MissionDetailScreen({ navigation, route }) {
           <>
             <ScrollView contentContainerStyle={styles.body}>
               <ErrorBanner error={cancelMission.error} />
+
+              {!!detail.exerciseCode && (
+                <Card style={styles.illustration}>
+                  <ExerciseIllustration exerciseCode={detail.exerciseCode} variant="sequence" />
+                </Card>
+              )}
 
               <Card style={styles.header}>
                 <View style={styles.topRow}>
@@ -203,6 +210,7 @@ function Fact({ label, value }) {
 
 const styles = StyleSheet.create({
   body: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
+  illustration: { alignItems: 'center' },
   header: { gap: spacing.sm },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { ...typography.title, color: colors.text },

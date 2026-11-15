@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- 업적·진화·미션 완료 때 가벼운 진동 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <!-- 운동 영상·사진 촬영 (react-native-image-picker) -->
     <uses-permission android:name="android.permission.CAMERA" />
 

@@ -13,12 +13,16 @@ import { Public } from '../common/auth/public.decorator.js';
 import {
   array,
   boolean,
+  integer,
   nickname,
+  number,
   object,
+  oneOf,
   shortId,
   validateBody,
 } from '../common/validation.js';
 import { AccountsService } from './accounts.service.js';
+import { DifficultyAdvisorService } from './difficulty-advisor.service.js';
 
 const consentItem = object({
   documentVersionId: shortId(),
@@ -26,10 +30,11 @@ const consentItem = object({
 });
 
 @Controller()
-@Dependencies(AccountsService)
+@Dependencies(AccountsService, DifficultyAdvisorService)
 export class AccountsController {
-  constructor(accounts) {
+  constructor(accounts, difficultyAdvisor) {
     this.accounts = accounts;
+    this.difficultyAdvisor = difficultyAdvisor;
   }
 
   @Public()
@@ -61,8 +66,27 @@ export class AccountsController {
     const data = validateBody(body, {
       nickname: nickname({ optional: true }),
       notificationEnabled: boolean({ optional: true }),
+      age: integer({ min: 13, max: 100, optional: true }),
+      heightCm: number({ min: 100, max: 250, optional: true }),
+      weightKg: number({ min: 30, max: 300, optional: true }),
     });
     return this.accounts.updateProfile(request.auth.userId, data);
+  }
+
+  @Post('me/difficulty-recommendations')
+  @Bind(Req(), Body())
+  recommendDifficulty(request, body) {
+    return this.difficultyAdvisor.recommend(
+      request.auth.userId,
+      validateBody(body, {
+        mode: oneOf(['ai_recommendation', 'manual']),
+        requestedDifficultyCode: oneOf(['easy', 'normal', 'hard'], {
+          optional: true,
+        }),
+        targetFrequency: integer({ min: 1, max: 7, optional: true }),
+        dailyAvailableMinutes: integer({ min: 5, max: 240, optional: true }),
+      }),
+    );
   }
 
   @Post('me/consents')

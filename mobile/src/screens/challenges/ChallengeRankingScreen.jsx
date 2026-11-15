@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  rowMe: { backgroundColor: '#EBF1FF', paddingHorizontal: spacing.sm, borderRadius: 8 },
+  rowMe: { backgroundColor: colors.primarySoft, paddingHorizontal: spacing.sm, borderRadius: 8 },
   rowStandalone: { borderBottomWidth: 0, paddingVertical: 0 },
   rank: { ...typography.subtitle, color: colors.text, width: 36, textAlign: 'center' },
   nameBox: { flex: 1 },

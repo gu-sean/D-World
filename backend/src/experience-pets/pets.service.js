@@ -3,9 +3,14 @@ import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { rethrowConstraint } from '../common/errors/constraint.js';
 import { DatabaseService } from '../database/database.service.js';
+import { OBJECT_STORAGE } from '../media/storage/object-storage.js';
+import { presignGetCached } from '../media/storage/presign-cache.js';
 import { ExperienceService } from './experience.service.js';
 
 const num = (value) => Number(value);
+
+/** 앱에 주는 펫 이미지 주소(임시 URL) 유효 시간 */
+const IMAGE_URL_TTL_SEC = 3600;
 
 const notFound = (code, message) => () =>
   new AppException(HttpStatus.NOT_FOUND, code, message);
@@ -23,11 +28,29 @@ const nicknameTaken = conflict('pet_nickname_taken', '이미 사용 중인 펫 �
  * 해금 조건은 DB 트리거(guard_user_pet)가 최종 검증하며, 여기서는 사용자에게 보여 줄 진행도와 오류를 만듦
  */
 @Injectable()
-@Dependencies(DatabaseService, ExperienceService)
+@Dependencies(DatabaseService, ExperienceService, OBJECT_STORAGE)
 export class PetsService {
-  constructor(database, experience) {
+  constructor(database, experience, storage) {
     this.database = database;
     this.experience = experience;
+    this.storage = storage;
+  }
+
+  /** GIF 키의 정지 썸네일(첫 장면 PNG): 같은 이름에 .still.png, GIF가 아니면 원본 그대로 */
+  stillUrl(key) {
+    if (!key) return null;
+    return this.imageUrl(
+      key.endsWith('.gif') ? key.replace(/\.gif$/, '.still.png') : key,
+    );
+  }
+
+  /** 저장소 키 → 앱이 바로 읽을 수 있는 임시 URL, 키가 없으면 null */
+  imageUrl(key) {
+    if (!key) return null;
+    return presignGetCached(this.storage, {
+      key,
+      expiresInSec: IMAGE_URL_TTL_SEC,
+    });
   }
 
   /** 선택 가능한 종류(공개·3단계 완비)의 최신 유효 버전, speciesId를 주면 그 종류만 */
@@ -133,9 +156,12 @@ export class PetsService {
     const [progress, stages, owned] = await Promise.all([
       this.unlockProgress(db, userId),
       db.query(
-        `SELECT species_version_id, stage_no, stage_code, min_total_xp, bonus_basis_points
-           FROM pet_stage_versions WHERE species_version_id = ANY($1::short_id[])
-          ORDER BY species_version_id, stage_no`,
+        `SELECT sv.species_version_id, sv.stage_no, sv.stage_code, sv.min_total_xp,
+                sv.bonus_basis_points, i.r2_object_key AS image_key
+           FROM pet_stage_versions sv
+           LEFT JOIN pet_stage_images i ON i.id = sv.image_id
+          WHERE sv.species_version_id = ANY($1::short_id[])
+          ORDER BY sv.species_version_id, sv.stage_no`,
         [species.map((s) => s.version_id)],
       ),
       db.query('SELECT species_id, id FROM user_pets WHERE user_id = $1', [
@@ -143,6 +169,23 @@ export class PetsService {
       ]),
     ]);
     const ownedBySpecies = new Map(owned.rows.map((r) => [r.species_id, r.id]));
+    const imageUrls = new Map(
+      await Promise.all(
+        stages.rows.map(async (r) => [
+          `${r.species_version_id}:${r.stage_no}`,
+          await this.imageUrl(r.image_key),
+        ]),
+      ),
+    );
+
+    const stillUrls = new Map(
+      await Promise.all(
+        stages.rows.map(async (r) => [
+          `${r.species_version_id}:${r.stage_no}`,
+          await this.stillUrl(r.image_key),
+        ]),
+      ),
+    );
 
     return species.map((s) => ({
       speciesId: s.species_id,
@@ -162,6 +205,10 @@ export class PetsService {
           stageCode: r.stage_code,
           minTotalXp: num(r.min_total_xp),
           bonusBasisPoints: r.bonus_basis_points,
+          imageUrl:
+            imageUrls.get(`${r.species_version_id}:${r.stage_no}`) ?? null,
+          stillUrl:
+            stillUrls.get(`${r.species_version_id}:${r.stage_no}`) ?? null,
         })),
     }));
   }
@@ -220,8 +267,17 @@ export class PetsService {
           ],
         );
 
+        // A84: 대표 펫이 없으면 이 펫을 대표로 정하고 보류 XP를 지급
+        let representative = makeRepresentative;
+        if (!representative) {
+          const { rows: profile } = await tx.query(
+            'SELECT representative_pet_id FROM profiles WHERE user_id = $1',
+            [userId],
+          );
+          representative = profile[0]?.representative_pet_id == null;
+        }
         let assigned = [];
-        if (makeRepresentative) {
+        if (representative) {
           assigned = await this.setRepresentativeIn(tx, userId, petId);
         }
         return {
@@ -253,6 +309,7 @@ export class PetsService {
       `SELECT p.id, p.species_id, s.code, v.name AS species_name, p.nickname,
               p.total_xp, p.level_no, p.stage_no, p.selected_at,
               v.hatch_mission_count, sv.stage_code, sv.bonus_basis_points,
+              si.r2_object_key AS image_key,
               ARRAY(SELECT d.text_content FROM pet_stage_dialogues d
                      WHERE d.species_version_id = p.species_version_id
                        AND d.stage_no = p.stage_no
@@ -276,12 +333,19 @@ export class PetsService {
          JOIN pet_species_versions v ON v.id = p.species_version_id
          JOIN pet_stage_versions sv
            ON sv.species_version_id = p.species_version_id AND sv.stage_no = p.stage_no
+         LEFT JOIN pet_stage_images si ON si.id = sv.image_id
          LEFT JOIN profiles pr ON pr.user_id = p.user_id
         WHERE p.user_id = $1 AND ($2::short_id IS NULL OR p.id = $2)
         ORDER BY p.selected_at, p.id`,
       [userId, petId],
     );
-    return rows.map((r) => ({
+    const imageUrls = await Promise.all(
+      rows.map((r) => this.imageUrl(r.image_key)),
+    );
+    const stillUrls = await Promise.all(
+      rows.map((r) => this.stillUrl(r.image_key)),
+    );
+    return rows.map((r, index) => ({
       id: r.id,
       speciesId: r.species_id,
       speciesCode: r.code,
@@ -302,7 +366,14 @@ export class PetsService {
       // 모바일 클라이언트(07 Pet) 키
       bonusRate: (r.bonus_basis_points ?? 0) / 10_000,
       isRepresentative: Boolean(r.representative),
-      imageUrl: null,
+      imageUrl: imageUrls[index],
+      stillUrl: stillUrls[index],
+      // 07 DTO 사전 Pet 키: 알 단계일 때만 부화 진행, 대사는 하나
+      hatchProgress:
+        r.stage_code === 'egg'
+          ? { required: r.hatch_mission_count, done: num(r.hatch_progress) }
+          : null,
+      dialogue: (r.dialogues ?? [])[0] ?? null,
       dialogues: r.dialogues ?? [],
       hatchedAt: r.selected_at,
     }));

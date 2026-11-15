@@ -40,6 +40,17 @@ export function acceptRecommendation({ recommendationId, idempotencyKey }) {
   });
 }
 
+/** LLM 추천 중 선택한 1~3개를 한 번에 목표 또는 오늘 미션으로 추가한다. */
+export function acceptRecommendations({ recommendationIds, goalId, idempotencyKey }) {
+  return request({
+    method: 'POST',
+    path: '/recommendations/accept-batch',
+    body: { recommendationIds, goalId },
+    idempotent: true,
+    idempotencyKey,
+  });
+}
+
 /**
  * A92 추천 거절. 사유는 MVP에서 받지 않는다.
  * @param {{recommendationId: string}} input
@@ -64,6 +75,7 @@ export function getActiveRecommendations() {
 export default {
   requestSituational,
   acceptRecommendation,
+  acceptRecommendations,
   dismissRecommendation,
   getActiveRecommendations,
   SITUATIONAL_TIMEOUT_MS,

@@ -18,6 +18,7 @@ const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
  * @param {Uint8Array} bytes
  * @returns {string}
  */
+/* eslint-disable no-bitwise -- base64 변환은 비트 연산이 본질이다 */
 export function bytesToBase64(bytes) {
   let out = '';
   for (let i = 0; i < bytes.length; i += 3) {
@@ -31,6 +32,7 @@ export function bytesToBase64(bytes) {
   }
   return out;
 }
+/* eslint-enable no-bitwise */
 
 /** 앱 캐시 폴더. 판정이 끝나면 여기 파일을 지운다 (§8). */
 export function cacheDir() {
@@ -38,7 +40,8 @@ export function cacheDir() {
 }
 
 /**
- * 영상을 서버 분석 규격(긴 변 1280px·2.5Mbps)으로 줄인다 (parts/mobile-client §6).
+ * 영상을 서버 분석 규격(긴 변 960px·1Mbps)으로 줄인다 (parts/mobile-client §6).
+ * 동작 인식(MediaPipe)에는 이 화질로 충분하고, 최대 10분 영상이 약 85MB로 업로드 제한(150MB) 안에 든다.
  * `preserveMetadata: false`로 영상에 든 촬영 위치(GPS)를 지운다 — 좌표 저장 금지.
  * @param {string} path 접두사 없는 경로
  * @returns {Promise<string>} 줄인 파일 경로 (실패하면 원본 경로)
@@ -47,8 +50,8 @@ export async function compressVideo(path) {
   try {
     const result = await Video.compress(`file://${path}`, {
       compressionMethod: 'manual',
-      maxSize: 1280,
-      bitrate: 2500000,
+      maxSize: 960,
+      bitrate: 1000000,
       preserveMetadata: false,
     });
     return typeof result === 'string' ? result.replace(/^file:\/\//, '') : path;

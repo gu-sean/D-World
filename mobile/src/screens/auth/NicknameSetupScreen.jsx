@@ -18,19 +18,26 @@ export default function NicknameSetupScreen({ navigation, route }) {
   const { verificationToken, password, socialSignupToken, consents } = route.params ?? {};
 
   const [nickname, setNickname] = useState('');
+  const [age, setAge] = useState('');
+  const [heightCm, setHeightCm] = useState('');
+  const [weightKg, setWeightKg] = useState('');
   const [touched, setTouched] = useState(false);
 
   const availability = useNicknameAvailability(nickname);
   const signup = useSignup();
 
   const formatCheck = validators.validateNickname(nickname);
+  const fitnessCheck = validators.validateFitnessProfile({ age, heightCm, weightKg });
   const taken = availability.data?.available === false;
-  const ready = formatCheck.ok && availability.data?.available === true;
+  const ready = formatCheck.ok && fitnessCheck.ok && availability.data?.available === true;
 
   const submit = () => {
     signup.mutate(
       {
         nickname,
+        age: Number(age),
+        heightCm: Number(heightCm),
+        weightKg: Number(weightKg),
         consents,
         ...(socialSignupToken ? { socialSignupToken } : { verificationToken, password }),
       },
@@ -71,6 +78,36 @@ export default function NicknameSetupScreen({ navigation, route }) {
         autoFocus
       />
 
+      <View style={styles.fitnessIntro}>
+        <Text style={styles.fitnessTitle}>시작 난이도 추천 정보</Text>
+        <Text style={styles.fitnessText}>
+          나이·키·몸무게와 이후 수행 기록을 에이전트들이 차례로 검토해 쉬움·보통·어려움을
+          추천해요.
+        </Text>
+      </View>
+      <TextField
+        label="나이"
+        value={age}
+        onChangeText={(text) => setAge(text.replace(/\D/g, '').slice(0, 3))}
+        placeholder="예) 25"
+        keyboardType="number-pad"
+      />
+      <TextField
+        label="키 (cm)"
+        value={heightCm}
+        onChangeText={(text) => setHeightCm(text.replace(/[^\d.]/g, '').slice(0, 6))}
+        placeholder="예) 175"
+        keyboardType="decimal-pad"
+      />
+      <TextField
+        label="몸무게 (kg)"
+        value={weightKg}
+        onChangeText={(text) => setWeightKg(text.replace(/[^\d.]/g, '').slice(0, 6))}
+        placeholder="예) 68"
+        keyboardType="decimal-pad"
+        error={age || heightCm || weightKg ? (!fitnessCheck.ok ? fitnessCheck.message : null) : null}
+      />
+
       <View style={styles.footer}>
         <Button
           title="가입 완료"
@@ -88,5 +125,8 @@ const styles = StyleSheet.create({
   intro: { paddingVertical: spacing.xl, gap: spacing.xs },
   heading: { ...typography.title, color: colors.text },
   description: { ...typography.body, color: colors.textSub },
+  fitnessIntro: { marginTop: spacing.lg, gap: spacing.xs },
+  fitnessTitle: { ...typography.bodyStrong, color: colors.text },
+  fitnessText: { ...typography.caption, color: colors.textSub },
   footer: { marginTop: spacing.xl },
 });

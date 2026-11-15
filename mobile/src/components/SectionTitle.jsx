@@ -10,12 +10,19 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { colors, spacing, typography } from '../theme';
 
+/** 글자만 있는 링크는 위아래를 넓혀 44dp 이상을 맞춘다 */
+const LINK_HIT_SLOP = { top: 14, bottom: 14, left: 12, right: 12 };
+
 export default function SectionTitle({ title, actionText, onAction }) {
   return (
     <View style={styles.row}>
       <Text style={styles.title}>{title}</Text>
       {!!actionText && !!onAction && (
-        <TouchableOpacity onPress={onAction} accessibilityRole="button" hitSlop={8}>
+        <TouchableOpacity
+          onPress={onAction}
+          accessibilityRole="button"
+          accessibilityLabel={`${title} ${actionText}`}
+          hitSlop={LINK_HIT_SLOP}>
           <Text style={styles.action}>{actionText}</Text>
         </TouchableOpacity>
       )}

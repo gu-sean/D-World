@@ -9,13 +9,20 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, spacing, typography } from '../theme';
 
 export default function ProgressBar({ rate, color = colors.primary, height = 8, label }) {
   const clamped = Math.max(0, Math.min(1, Number(rate) || 0));
 
+  const percent = Math.round(clamped * 100);
+
   return (
-    <View style={styles.wrap}>
+    <View
+      style={styles.wrap}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label ? `${label}, 진행률 ${percent}퍼센트` : `진행률 ${percent}퍼센트`}
+      accessibilityValue={{ min: 0, max: 100, now: percent }}>
       {!!label && <Text style={styles.label}>{label}</Text>}
       <View style={[styles.track, { height, borderRadius: height / 2 }]}>
         <View

@@ -6,10 +6,11 @@
 // 신고는 대상이 반드시 있어야 하므로, 신고 대상 없이 들어왔으면 그 사실을 알리고
 // 보내지 않는다 — 대상은 신고 버튼이 있던 화면(회원·미션·챌린지)에서 넘겨 준다.
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
 import { labels, useCreateSupportTicket, validators } from '../../client';
 import {
+  FormScrollView,
   Button,
   Card,
   ErrorBanner,
@@ -73,14 +74,14 @@ export default function SupportTicketFormScreen({ navigation, route }) {
       title={isReport ? '신고하기' : '문의하기'}
       onBack={() => navigation.goBack()}
       padded={false}>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <FormScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <ErrorBanner error={createTicket.error} />
 
         {targetMissing && (
           <Card style={styles.warnCard}>
             <Text style={styles.warnText}>
-              신고는 신고할 대상이 있어야 올릴 수 있어요. 신고하려는 회원·미션·챌린지
-              화면에서 신고 버튼을 눌러 주세요.
+              신고는 신고할 대상이 있어야 올릴 수 있어요. 신고하려는 회원·미션·챌린지 화면에서 신고
+              버튼을 눌러 주세요.
             </Text>
           </Card>
         )}
@@ -130,7 +131,7 @@ export default function SupportTicketFormScreen({ navigation, route }) {
         <Text style={styles.note}>
           답변은 알림으로 알려 드리고, 문의 상세에서도 확인할 수 있어요.
         </Text>
-      </ScrollView>
+      </FormScrollView>
     </Screen>
   );
 }

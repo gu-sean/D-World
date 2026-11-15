@@ -43,7 +43,7 @@ export class AdminAssetsController {
     const input = validateBody(body, {
       assetKind: oneOf(['badge', 'pet_stage']),
       ownerId: shortId(),
-      mimeType: oneOf(['image/png', 'image/webp', 'image/jpeg']),
+      mimeType: oneOf(['image/png', 'image/webp', 'image/jpeg', 'image/gif']),
       sizeBytes: integer({ min: 1, max: MAX_ASSET_BYTES }),
       reason: string(REASON_RULE_OPTIONS),
     });

@@ -18,6 +18,9 @@ import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import Icon from './Icon';
 import { colors, screenPadding, spacing, typography } from '../theme';
 
+/** 아이콘만 있는 버튼은 눌림 영역을 사방으로 넓혀 48dp 안팎을 맞춘다 */
+const ICON_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
+
 export default function Screen({
   title,
   subtitle,
@@ -38,7 +41,12 @@ export default function Screen({
       {(title || onBack || right) && (
         <View style={styles.header}>
           {onBack ? (
-            <TouchableOpacity onPress={onBack} style={styles.backButton} accessibilityRole="button">
+            <TouchableOpacity
+              onPress={onBack}
+              style={styles.backButton}
+              hitSlop={ICON_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel="뒤로 가기">
               <Icon name="chevronLeft" size={24} color={colors.text} />
             </TouchableOpacity>
           ) : (

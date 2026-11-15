@@ -54,8 +54,8 @@ export default function AiReportDetailScreen({ navigation, route }) {
               <View>
                 <SectionTitle title="다음에 해볼 만한 것" />
                 <View style={styles.goals}>
-                  {data.nextGoals.map((goal, index) => (
-                    <Card key={index} style={styles.goalCard}>
+                  {data.nextGoals.map((goal) => (
+                    <Card key={`${goal.categoryCode ?? ''}-${goal.text}`} style={styles.goalCard}>
                       {!!goal.categoryCode && (
                         <CategoryChip categoryCode={goal.categoryCode} size="sm" />
                       )}

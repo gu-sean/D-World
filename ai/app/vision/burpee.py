@@ -122,10 +122,9 @@ class BurpeeCounter:
             if pose == "crouch":
                 self.stage = "returning"
 
-        elif self.stage == "returning":
-            if pose == "standing":
-                self.count += 1
-                self.stage = "standing"
+        elif self.stage == "returning" and pose == "standing":
+            self.count += 1
+            self.stage = "standing"
 
         return self.result(pose, True)
 

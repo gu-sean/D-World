@@ -6,10 +6,11 @@
 // 신청이 받아들여지면 서버가 모든 세션을 끊으므로 앱은 곧바로 로그인 화면으로
 // 돌아간다 — 기능 모듈이 세션을 정리해 주고, 이 화면은 결과만 알린다.
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { StyleSheet, Switch, Text, View } from 'react-native';
 
 import { useRequestWithdrawal, validators } from '../../client';
 import {
+  FormScrollView,
   Button,
   Card,
   ConfirmDialog,
@@ -38,14 +39,11 @@ export default function WithdrawalScreen({ navigation }) {
   const reasonCheck = validators.validateLength(reason, 'withdrawalReason');
 
   const send = () =>
-    withdraw.mutate(
-      { reason: reason.trim() || null },
-      { onSuccess: () => setAsking(false) },
-    );
+    withdraw.mutate({ reason: reason.trim() || null }, { onSuccess: () => setAsking(false) });
 
   return (
     <Screen title="회원 탈퇴" onBack={() => navigation.goBack()} padded={false}>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <FormScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <ErrorBanner error={withdraw.error} />
 
         <View style={styles.hero}>
@@ -88,7 +86,7 @@ export default function WithdrawalScreen({ navigation }) {
         <Text style={styles.note}>
           신청하면 바로 로그아웃되고, 실제 삭제는 운영팀 확인 뒤에 처리돼요.
         </Text>
-      </ScrollView>
+      </FormScrollView>
 
       <ConfirmDialog
         visible={asking}

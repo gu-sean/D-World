@@ -9,7 +9,9 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { permissions, useCameraVerification, useMission } from '../../client';
-import { Button, Card, Icon, QueryState, Screen } from '../../components';
+import EXERCISE_POSES from '../../assets/exercisePoses';
+import { VIDEO_DURATION_LIMIT_TEXT } from '../../client/device/camera';
+import { Button, Card, ExerciseIllustration, Icon, QueryState, Screen } from '../../components';
 import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
 
@@ -17,7 +19,7 @@ import { colors, spacing, typography } from '../../theme';
 const COMMON_TIPS = [
   '밝은 곳에서 찍어 주세요.',
   '기기를 고정해 두고 움직이지 않게 해 주세요.',
-  '영상은 2분까지 찍을 수 있어요.',
+  `영상은 ${VIDEO_DURATION_LIMIT_TEXT}까지 찍을 수 있어요.`,
 ];
 
 export default function VerifyGuideScreen({ navigation, route }) {
@@ -42,7 +44,12 @@ export default function VerifyGuideScreen({ navigation, route }) {
           <>
             <ScrollView contentContainerStyle={styles.body}>
               <View style={styles.hero}>
-                <Icon name="camera" size={44} color={colors.primary} />
+                {/* 운동 미션이면 따라 할 동작 그림, 사진 인증 미션이면 카메라 아이콘 */}
+                {EXERCISE_POSES[detail.exerciseCode] ? (
+                  <ExerciseIllustration exerciseCode={detail.exerciseCode} variant="sequence" />
+                ) : (
+                  <Icon name="camera" size={44} color={colors.primary} />
+                )}
                 <Text style={styles.title}>{detail.title}</Text>
                 <Text style={styles.subtitle}>
                   {detail.exerciseCode ? '영상으로 인증해요' : '사진으로 인증해요'}

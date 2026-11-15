@@ -69,7 +69,7 @@ export default function MyScreen({ navigation }) {
               )}
 
               <Card style={styles.profile}>
-                <PetAvatar pet={data.representativePet} size={64} />
+                <PetAvatar pet={data.representativePet} size={64} animated={false} />
                 <View style={styles.profileText}>
                   <Text style={styles.nickname}>{data.nickname}</Text>
                   <Text style={styles.level}>

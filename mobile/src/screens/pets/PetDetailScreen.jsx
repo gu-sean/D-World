@@ -30,7 +30,7 @@ export default function PetDetailScreen({ navigation, route }) {
             <ScrollView contentContainerStyle={styles.body}>
               <Card style={styles.head}>
                 <PetAvatar
-                  pet={{ imageUrl: data.stages?.[1]?.imageUrl ?? null, stageCode: 'baby' }}
+                  pet={{ imageUrl: data.stages?.[2]?.imageUrl ?? null, stageCode: 'adult' }}
                   size={110}
                 />
                 <Text style={styles.name}>{data.name}</Text>
@@ -61,8 +61,13 @@ export default function PetDetailScreen({ navigation, route }) {
                   {(data.stages ?? []).map((stage) => (
                     <View key={stage.stageNo} style={styles.stageRow}>
                       <PetAvatar
-                        pet={{ imageUrl: stage.imageUrl, stageCode: stage.stageCode }}
+                        pet={{
+                          imageUrl: stage.imageUrl,
+                          stillUrl: stage.stillUrl,
+                          stageCode: stage.stageCode,
+                        }}
                         size={48}
+                        animated={false}
                       />
                       <View style={styles.stageTexts}>
                         <Text style={styles.stageName}>
@@ -87,7 +92,7 @@ export default function PetDetailScreen({ navigation, route }) {
             {!data.isOwned && (
               <View style={styles.footer}>
                 <Button
-                  title={data.isUnlocked ? '이 알 부화하기' : '아직 만날 수 없어요'}
+                  title={data.isUnlocked ? '이 알 키우기' : '아직 만날 수 없어요'}
                   onPress={() => navigation.navigate(Routes.PET_HATCH, { speciesId })}
                   disabled={!data.isUnlocked}
                   full

@@ -376,6 +376,55 @@ export class RecommendationsService {
     return mission;
   }
 
+  /** 같은 LLM 추천 묶음에서 사용자가 고른 항목을 모두 미션으로 만든다. */
+  async acceptBatch(userId, { recommendationIds, goalId }) {
+    const uniqueIds = [...new Set(recommendationIds)];
+    const recommendations = await this.database.withTransaction(async (tx) => {
+      const found = [];
+      for (const id of uniqueIds) {
+        const recommendation = await this.lock(tx, userId, id);
+        if (recommendation.status !== 'shown') {
+          throw conflict('RECOMMENDATION_NOT_OPEN', '이미 처리한 추천');
+        }
+        if (recommendation.lapsed) throw expired('추천 시간이 지났어요.');
+        if (!recommendation.mission_definition_id) {
+          throw conflict(
+            'RECOMMENDATION_NOT_OPEN',
+            '미션으로 만들 수 없는 추천',
+          );
+        }
+        found.push(recommendation);
+      }
+      if (new Set(found.map((item) => item.run_id)).size !== 1) {
+        throw conflict(
+          'RECOMMENDATION_NOT_OPEN',
+          '같은 추천 목록에서 골라 주세요.',
+        );
+      }
+      return found;
+    });
+
+    const missions = [];
+    for (const recommendation of recommendations) {
+      const [mission] = await this.missions.createMissions(userId, {
+        definitionId: recommendation.mission_definition_id,
+        goalId: goalId ?? null,
+        scheduledDates: [kstDate()],
+      });
+      await this.missions.attachChallengeIds(mission);
+      missions.push(mission);
+    }
+
+    await this.database.query(
+      `UPDATE ai_mission_recommendations
+          SET status = CASE WHEN id = ANY($1::short_id[]) THEN 'accepted' ELSE 'dismissed' END,
+              decided_at = now()
+        WHERE run_id = $2 AND user_id = $3 AND status = 'shown'`,
+      [uniqueIds, recommendations[0].run_id, userId],
+    );
+    return missions;
+  }
+
   /** A92: 본문 없이 닫기 */
   async dismiss(userId, id) {
     await this.database.withTransaction(async (tx) => {

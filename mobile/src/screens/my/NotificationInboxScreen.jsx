@@ -59,12 +59,13 @@ export default function NotificationInboxScreen({ navigation }) {
         />
       </View>
 
-      <QueryState
+      <QueryState skeleton="row"
         query={notifications}
         data={notifications.items}
         isEmpty={notifications.items.length === 0}
         emptyTitle="알림이 없어요"
-        emptyText="미션을 하면 인증 결과와 보상 소식이 여기로 와요.">
+        emptyText="미션을 하면 인증 결과와 보상 소식이 여기로 와요."
+        emptyIcon="bell">
         {(list) => (
           <FlatList
             data={list}

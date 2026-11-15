@@ -6,10 +6,18 @@
 //
 // 고친 계획은 확인 화면으로 넘겨 주고, 수락할 때 `plan`으로 함께 보낸다.
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { format, usePlanAdjustment } from '../../client';
-import { Button, Card, Icon, QueryState, Screen, TextField } from '../../components';
+import {
+  FormScrollView,
+  Button,
+  Card,
+  Icon,
+  QueryState,
+  Screen,
+  TextField,
+} from '../../components';
 import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
 
@@ -69,7 +77,7 @@ export default function PlanAdjustEditScreen({ navigation, route }) {
       <QueryState query={adjustment}>
         {() => (
           <>
-            <ScrollView contentContainerStyle={styles.body}>
+            <FormScrollView contentContainerStyle={styles.body}>
               <Text style={styles.hint}>
                 제목과 목표량만 고칠 수 있어요. 빼고 싶은 미션은 오른쪽 버튼을 누르세요.
               </Text>
@@ -131,7 +139,7 @@ export default function PlanAdjustEditScreen({ navigation, route }) {
                   미션을 너무 많이 빼면 목표를 제때 끝내기 어려워요.
                 </Text>
               </View>
-            </ScrollView>
+            </FormScrollView>
 
             <View style={styles.footer}>
               <Button

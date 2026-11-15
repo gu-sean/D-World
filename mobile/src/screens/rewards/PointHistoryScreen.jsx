@@ -64,11 +64,12 @@ export default function PointHistoryScreen({ navigation }) {
         <OptionRow options={FILTERS} value={direction} onChange={setDirection} />
       </View>
 
-      <QueryState
+      <QueryState skeleton="row"
         query={transactions}
         data={transactions.items}
         isEmpty={transactions.items.length === 0}
-        emptyTitle="아직 내역이 없어요">
+        emptyTitle="아직 내역이 없어요"
+        emptyIcon="coin">
         {(items) => (
           <FlatList
             data={items}

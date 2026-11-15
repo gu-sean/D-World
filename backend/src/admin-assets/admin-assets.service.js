@@ -1,5 +1,5 @@
 import { newId } from '../common/ids.js';
-import { Dependencies, Injectable } from '@nestjs/common';
+import { BadRequestException, Dependencies, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { conflict, notFound } from '../common/errors/http-errors.js';
 import { badgeImageKey, petImageKey } from '../media/storage/keys.js';
@@ -11,6 +11,7 @@ const EXTENSIONS = {
   'image/png': 'png',
   'image/webp': 'webp',
   'image/jpeg': 'jpg',
+  'image/gif': 'gif',
 };
 const VIEW_URL_TTL_SEC = 3600;
 
@@ -41,6 +42,12 @@ export class AdminAssetsService {
 
   /** M84: 업로드 티켓 발급 */
   async createTicket(tx, { adminId, assetKind, ownerId, mimeType, sizeBytes }) {
+    // 배지 이미지 표는 GIF를 받지 않음(펫 단계 이미지만 GIF 허용)
+    if (assetKind === 'badge' && mimeType === 'image/gif') {
+      throw new BadRequestException([
+        'mimeType: 배지는 PNG, WebP, JPEG만 가능',
+      ]);
+    }
     const assetId = newId();
     const extension = EXTENSIONS[mimeType];
     const prefix = this.config.get('R2_KEY_PREFIX');

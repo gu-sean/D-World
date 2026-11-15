@@ -121,7 +121,9 @@ export default function GoalDetailScreen({ navigation, route }) {
               </View>
 
               <Text style={styles.title}>{detail.title}</Text>
-              {!!detail.description && <Text style={styles.description}>{detail.description}</Text>}
+              {!!detail.description && (
+                <Text style={styles.description}>{format.keepWords(detail.description)}</Text>
+              )}
 
               <Text style={styles.period}>
                 {format.formatDate(detail.startDate)} ~ {format.formatDate(detail.endDate)}
@@ -166,14 +168,15 @@ export default function GoalDetailScreen({ navigation, route }) {
                     <Card key={step.id} style={[styles.step, step.isCurrent && styles.stepCurrent]}>
                       <View style={styles.stepHeader}>
                         <Text style={styles.stepNo}>{step.stepNo}단계</Text>
-                        {step.isCurrent && <StatusTag text="진행 중" tone="primary" />}
                         {step.status === 'completed' && (
                           <Icon name="check" size={16} color={colors.success} strokeWidth={2.4} />
                         )}
                       </View>
                       <Text style={styles.stepTitle}>{step.title}</Text>
                       {!!step.description && (
-                        <Text style={styles.stepDescription}>{step.description}</Text>
+                        <Text style={styles.stepDescription}>
+                          {format.keepWords(step.description)}
+                        </Text>
                       )}
                       <Text style={styles.stepMeta}>
                         {format.formatDate(step.dueDate)}까지 · 미션 {step.completedMissionCount}/
@@ -254,6 +257,15 @@ export default function GoalDetailScreen({ navigation, route }) {
                         size="sm"
                         variant="secondary"
                         onPress={() => navigation.navigate(Routes.MISSION_CATALOG, { goalId })}
+                        full
+                      />
+                    </View>
+                    <View style={styles.addSlot}>
+                      <Button
+                        title="LLM 추천에서 고르기"
+                        size="sm"
+                        variant="secondary"
+                        onPress={() => navigation.navigate(Routes.NEXT_MISSION, { goalId })}
                         full
                       />
                     </View>
@@ -340,7 +352,7 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     marginTop: spacing.sm,
   },
-  stats: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
+  stats: { flex: 1, flexDirection: 'row', justifyContent: 'space-between' },
   stat: { gap: 2 },
   statValue: { ...typography.bodyStrong, color: colors.text },
   statLabel: { ...typography.caption, color: colors.textSub },

@@ -10,6 +10,7 @@ import { useAppMutation } from './mutation.js';
 import * as authApi from '../api/authApi.js';
 import session, { subscribe, getSnapshot } from '../auth/session.js';
 import { validateNickname } from '../validation/rules.js';
+import { unregisterPushDevice } from '../../setup/pushRegistration.js';
 
 /** A03 닉네임 확인을 보내기 전에 기다리는 시간 (parts/mobile-client §4.2). */
 export const NICKNAME_DEBOUNCE_MS = 400;
@@ -111,7 +112,12 @@ export function useResetPassword() {
 
 /** A10 로그아웃. 서버 호출이 실패해도 로컬 세션은 끊는다. */
 export function useLogout() {
-  return useAppMutation({ mutationFn: () => session.signOut() });
+  return useAppMutation({ mutationFn: async () => {
+      // 토큰이 아직 살아 있을 때 서버에서 푸시 기기를 해제한다(실패해도 로그아웃은 진행)
+      await unregisterPushDevice();
+      return session.signOut();
+    },
+  });
 }
 
 export default {

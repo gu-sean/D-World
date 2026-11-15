@@ -9,8 +9,18 @@ import { launchCamera } from 'react-native-image-picker';
 import AppError from '../http/AppError.js';
 import { ensure } from './permissions.js';
 
-/** 영상 최대 길이 (05 §11, parts/ai §4). */
-export const VIDEO_DURATION_LIMIT_SECONDS = 120;
+/**
+ * 영상 최대 길이 (05 §11, parts/ai §4).
+ * 10분: 연속 수행 목표 중 가장 긴 스쿼트 200회(약 8분)까지 한 영상에 담기게. 바꾸면
+ * files.js 압축 규격과 MEDIA_LIMITS·백엔드 MEDIA_RULES·AI MAX_MEDIA_BYTES도 같이 본다.
+ */
+export const VIDEO_DURATION_LIMIT_SECONDS = 600;
+
+/** "10분", "90초" 처럼 안내 문구에 쓰는 길이 */
+export const VIDEO_DURATION_LIMIT_TEXT =
+  VIDEO_DURATION_LIMIT_SECONDS % 60 === 0
+    ? `${VIDEO_DURATION_LIMIT_SECONDS / 60}분`
+    : `${VIDEO_DURATION_LIMIT_SECONDS}초`;
 
 /** `file:///a/b.mp4` → `/a/b.mp4`. blob-util은 접두사 없는 경로를 쓴다. */
 export function stripFileScheme(uri) {
@@ -88,4 +98,10 @@ export function capturePhoto() {
   );
 }
 
-export default { captureVideo, capturePhoto, stripFileScheme, VIDEO_DURATION_LIMIT_SECONDS };
+export default {
+  captureVideo,
+  capturePhoto,
+  stripFileScheme,
+  VIDEO_DURATION_LIMIT_SECONDS,
+  VIDEO_DURATION_LIMIT_TEXT,
+};

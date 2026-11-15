@@ -13,8 +13,8 @@ from pydantic import Field
 
 from app.core.auth import require_internal_token
 from app.core.errors import AiError
+from app.core.job_ledger import JobLedger
 from app.core.settings import get_settings
-from app.storage import r2
 from app.schemas.contracts import (
     AcceptedResponse,
     ApiModel,
@@ -23,15 +23,19 @@ from app.schemas.contracts import (
     VisionAnalysisCallback,
     VisionAnalysisRequest,
 )
+from app.storage import r2
+from app.vision.decision import Judgement, judge
+from app.vision.media_registry import get_registry
 
 router = APIRouter(tags=["vision"], dependencies=[Depends(require_internal_token)])
 ENGINE = "vision-rule@0.1.0"
 log = logging.getLogger(__name__)
-_lock = threading.Lock()
-# Process-local development ledger; no eviction to avoid accidental duplicate execution.
-_jobs: dict[str, dict] = {}
+_lock = threading.Lock()  # _active 보호
+# 접수 기록(멱등). 끝난 작업은 시간이 지나거나 가득 차면 지운다 (app/core/job_ledger.py)
+_jobs = JobLedger()
 _active = 0
-MAX_MEDIA_BYTES = 100 * 1024 * 1024
+# 백엔드 업로드 상한(150MB)보다 약간 크게: 최대 10분 영상
+MAX_MEDIA_BYTES = 160 * 1024 * 1024
 
 
 def require_local_mode():
@@ -71,8 +75,8 @@ def local_file(key: str) -> Path:
         raise AiError("AI_INVALID_MEDIA", 400, "허용되지 않는 영상 경로입니다.")
     if not path.is_file():
         raise AiError("AI_MEDIA_NOT_FOUND", 404, "영상 파일을 찾을 수 없습니다.")
-    if path.stat().st_size > 100 * 1024 * 1024:
-        raise AiError("AI_MEDIA_TOO_LARGE", 413, "개발 영상은 100MB 이하여야 합니다.")
+    if path.stat().st_size > MAX_MEDIA_BYTES:
+        raise AiError("AI_MEDIA_TOO_LARGE", 413, "개발 영상은 160MB 이하여야 합니다.")
     return path
 
 
@@ -83,14 +87,44 @@ def analyze_local(exercise: str, path: Path) -> dict:
     return analyze(exercise, str(path))
 
 
-def metrics_for(exercise: str, result: dict, sha: str | None = None):
+def metrics_for(
+    exercise: str, result: dict, sha: str | None = None, flags: list[str] | None = None
+):
     return VerificationMetrics(
         exercise_code=exercise,
         rep_count=result.get("repCount"),
         hold_seconds=result.get("holdSeconds"),
+        duration_seconds=result.get("durationSeconds"),
         person_detected=result.get("detectedFrames", 0) > 0,
         media_sha256=sha,
-        flags=["algorithm_unverified"],
+        flags=["algorithm_unverified", *(flags or [])],
+    )
+
+
+def judgement_for(
+    request: VisionAnalysisRequest, result: dict, duplicate_of: str | None = None
+) -> Judgement:
+    elapsed = (request.submitted_at - request.record_started_at).total_seconds()
+    if not get_settings().VISION_AUTO_DECISION:
+        # 자동 판정을 꺼도 명백한 부정(중복·미리 찍은 영상)은 표시해서 검수자에게 넘긴다
+        flags = judge(
+            request.exercise_code, request.target_value, request.target_unit, result,
+            elapsed_seconds=elapsed, duplicate_of=duplicate_of,
+        ).flags
+        return Judgement(
+            "review_required",
+            "운동 알고리즘 정확도 검증 전이므로 수동 검토가 필요합니다.",
+            0.0,
+            [f for f in flags if f in {"duplicate_media", "recorded_before_start"}],
+        )
+    return judge(
+        request.exercise_code,
+        request.target_value,
+        request.target_unit,
+        result,
+        request.criteria.rules,
+        elapsed_seconds=elapsed,
+        duplicate_of=duplicate_of,
     )
 
 
@@ -144,20 +178,31 @@ def run_job(request: VisionAnalysisRequest, path: Path | None):
         ):
             callback.failure_reason = "AI_MEDIA_INTEGRITY_MISMATCH"
         else:
-            result = analyze_local(request.exercise_code, path)
+            duplicate_of = get_registry().claim(digest.hexdigest(), request.record_id)
+            # 이미 낸 영상이면 분석할 필요 없이 반려
+            result = {} if duplicate_of else analyze_local(request.exercise_code, path)
+            verdict = judgement_for(request, result, duplicate_of)
             callback.status = "completed"
-            callback.decision = "review_required"
-            callback.reason = (
-                "운동 알고리즘 정확도 검증 전이므로 수동 검토가 필요합니다."
-            )
+            callback.decision = verdict.decision
+            callback.reason = verdict.reason
+            callback.confidence = verdict.confidence
             callback.metrics = metrics_for(
-                request.exercise_code, result, digest.hexdigest()
+                request.exercise_code, result, digest.hexdigest(), verdict.flags
+            )
+            log.info(
+                "Vision judged record=%s exercise=%s decision=%s reps=%s hold=%s detection=%s",
+                request.record_id,
+                request.exercise_code,
+                verdict.decision,
+                result.get("repCount"),
+                result.get("holdSeconds"),
+                result.get("detectionRatio"),
             )
     except FileNotFoundError:
         callback.failure_reason = "AI_MODEL_OR_MEDIA_NOT_FOUND"
     except AiError as error:  # R2 내려받기 오류(없음·너무 큼·허용 안 되는 키)
         callback.failure_reason = error.code
-    except Exception:  # noqa: BLE001 - isolate third-party analysis and delivery failures
+    except Exception:
         log.exception("Vision analysis failed")
         callback.failure_reason = "AI_VIDEO_ANALYSIS_FAILED"
     finally:
@@ -165,14 +210,11 @@ def run_job(request: VisionAnalysisRequest, path: Path | None):
             temp.unlink(missing_ok=True)
     payload = callback.model_dump(mode="json", by_alias=True)
     try:
-        with _lock:
-            _jobs[request.ingest_key]["callback"] = payload
+        _jobs.update(request.ingest_key, callback=payload)
         send_callback(get_settings().BACKEND_CALLBACK_URL, payload)
-        with _lock:
-            _jobs[request.ingest_key]["state"] = "delivered"
+        _jobs.update(request.ingest_key, state="delivered")
     except Exception:  # noqa: BLE001 - isolate third-party analysis and delivery failures
-        with _lock:
-            _jobs[request.ingest_key]["state"] = "callback_failed"
+        _jobs.update(request.ingest_key, state="callback_failed")
         log.error("Vision callback delivery failed; development ledger retains result")
     finally:
         with _lock:
@@ -208,7 +250,7 @@ def submit(request: VisionAnalysisRequest, background: BackgroundTasks):
                     "AI_INGEST_CONFLICT", 409, "동일 ingestKey의 요청 내용이 다릅니다."
                 )
             return AcceptedResponse(ingest_key=request.ingest_key)
-        if _active >= get_settings().MAX_CONCURRENT_ANALYSES or len(_jobs) >= 1000:
+        if _active >= get_settings().MAX_CONCURRENT_ANALYSES or not _jobs.has_room():
             raise AiError("AI_VISION_BUSY", 503, "개발 분석 용량이 가득 찼습니다.")
         # r2면 키만 검사하고, 내려받기는 백그라운드(run_job)에서 한다
         if use_r2:
@@ -216,7 +258,7 @@ def submit(request: VisionAnalysisRequest, background: BackgroundTasks):
             path = None
         else:
             path = local_file(media.object_key)
-        _jobs[request.ingest_key] = {"fingerprint": fingerprint, "state": "accepted"}
+        _jobs.add(request.ingest_key, fingerprint)
         _active += 1
     background.add_task(run_job, request, path)
     return AcceptedResponse(ingest_key=request.ingest_key)

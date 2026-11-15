@@ -14,7 +14,7 @@ export const typography = {
   /** 본문 중 강조 */
   bodyStrong: { fontSize: 15, fontWeight: '600', lineHeight: 22 },
   /** 설명·날짜·단위처럼 작은 글씨 */
-  caption: { fontSize: 12, fontWeight: '400', lineHeight: 18 },
+  caption: { fontSize: 13, fontWeight: '400', lineHeight: 19 },
   /** 숫자를 크게 보여 줄 때 (포인트·거리·시간) */
   figure: { fontSize: 32, fontWeight: '700', lineHeight: 40 },
 };

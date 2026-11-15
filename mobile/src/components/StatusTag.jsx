@@ -12,11 +12,11 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme';
 
 const TONES = {
-  neutral: { background: '#F1F3F7', label: colors.textSub },
-  primary: { background: '#EBF1FF', label: colors.primary },
-  success: { background: '#E9FBF0', label: '#15803D' },
-  warning: { background: '#FEF6E7', label: '#B45309' },
-  danger: { background: '#FEF2F2', label: colors.danger },
+  neutral: { background: colors.neutralSoft, label: colors.textSub },
+  primary: { background: colors.primarySoft, label: colors.primary },
+  success: { background: colors.successSoft, label: colors.successText },
+  warning: { background: colors.warningSoft, label: colors.warningText },
+  danger: { background: colors.dangerSoft, label: colors.danger },
 };
 
 /** 미션·회차 상태값을 어떤 색으로 보여 줄지 정해 둔 표. */

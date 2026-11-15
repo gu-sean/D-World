@@ -9,7 +9,7 @@
 // 운동을 고르면 목표 단위와 허용 범위가 그 운동의 것으로 바뀌고,
 // 범위를 벗어난 값은 보내기 전에 걸러 낸다.
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import {
   format,
@@ -23,7 +23,15 @@ import {
   useUpdateMission,
   validators,
 } from '../../client';
-import { Button, DateField, ErrorBanner, OptionRow, Screen, TextField } from '../../components';
+import {
+  FormScrollView,
+  Button,
+  DateField,
+  ErrorBanner,
+  OptionRow,
+  Screen,
+  TextField,
+} from '../../components';
 import { colors, spacing, typography } from '../../theme';
 
 export default function MissionFormScreen({ navigation, route }) {
@@ -178,7 +186,7 @@ export default function MissionFormScreen({ navigation, route }) {
       title={editing ? '미션 수정' : '미션 만들기'}
       onBack={() => navigation.goBack()}
       padded={false}>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <FormScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <ErrorBanner error={mutation.error} />
 
         <TextField
@@ -300,7 +308,7 @@ export default function MissionFormScreen({ navigation, route }) {
             </Text>
           )}
         </View>
-      </ScrollView>
+      </FormScrollView>
     </Screen>
   );
 }

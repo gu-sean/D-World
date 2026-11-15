@@ -2,20 +2,26 @@
 //
 // 인증에 성공하면서 새 업적을 얻었을 때 위에 떠서 알려 준다.
 // 보여 줄 내용은 보상 응답에 담겨 온 배지 목록이라 따로 조회하지 않는다.
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { labels } from '../../client';
-import { Button, Icon } from '../../components';
+import { haptics, labels } from '../../client';
+import { Button, Icon, Pop } from '../../components';
 import { colors, radius, spacing, typography } from '../../theme';
 
 export default function AchievementEarnedModal({ navigation, route }) {
   const badges = route.params?.badges ?? [];
 
+  useEffect(() => {
+    haptics.light();
+  }, []);
+
   return (
     <View style={styles.backdrop}>
-      <View style={styles.card}>
-        <Icon name="trophy" size={40} color={colors.warning} />
+      <Pop kind="rise" style={styles.card}>
+        <Pop kind="pop" delay={250}>
+          <Icon name="trophy" size={40} color={colors.warning} />
+        </Pop>
         <Text style={styles.heading}>
           {badges.length > 1 ? `업적 ${badges.length}개를 얻었어요!` : '새 업적을 얻었어요!'}
         </Text>
@@ -33,7 +39,7 @@ export default function AchievementEarnedModal({ navigation, route }) {
         </View>
 
         <Button title="확인" onPress={() => navigation.goBack()} full />
-      </View>
+      </Pop>
     </View>
   );
 }
@@ -41,7 +47,7 @@ export default function AchievementEarnedModal({ navigation, route }) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(17, 20, 28, 0.5)',
+    backgroundColor: colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,

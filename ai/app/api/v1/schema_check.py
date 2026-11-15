@@ -1,10 +1,9 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from app.core.auth import require_internal_token
-from app.core.settings import get_settings
 from app.schemas.contracts import (
     GoalPlanRequest,
     PlanAdjustmentRequest,

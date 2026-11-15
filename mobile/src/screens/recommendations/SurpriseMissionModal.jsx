@@ -98,7 +98,7 @@ export default function SurpriseMissionModal({ navigation }) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(17, 20, 28, 0.5)',
+    backgroundColor: colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,

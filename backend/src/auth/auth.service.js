@@ -126,13 +126,14 @@ export class AuthService {
     await this.phoneVerification.send(phone, purpose);
   }
 
-  async createUser(tx, { nickname }) {
+  async createUser(tx, { nickname, age, heightCm, weightKg }) {
     const userId = newId();
     await tx.query('INSERT INTO users (id) VALUES ($1)', [userId]);
-    await tx.query('INSERT INTO profiles (user_id, nickname) VALUES ($1, $2)', [
-      userId,
-      nickname,
-    ]);
+    await tx.query(
+      `INSERT INTO profiles (user_id, nickname, age, height_cm, weight_kg)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, nickname, age ?? null, heightCm ?? null, weightKg ?? null],
+    );
     return userId;
   }
 
@@ -161,6 +162,9 @@ export class AuthService {
     challengeId,
     password,
     nickname,
+    age,
+    heightCm,
+    weightKg,
     consents,
     current: given,
   }) {
@@ -172,7 +176,12 @@ export class AuthService {
       const { userId, session } = await this.database.withTransaction(
         async (tx) => {
           await this.phoneVerification.consume(tx, challengeId);
-          const id = await this.createUser(tx, { nickname });
+          const id = await this.createUser(tx, {
+            nickname,
+            age,
+            heightCm,
+            weightKg,
+          });
           await tx.query(
             `INSERT INTO phone_credentials
                     (user_id, phone_e164, password_hash, verified_at, password_changed_at)
@@ -324,14 +333,27 @@ export class AuthService {
   }
 
   /** 검증된 소셜 신원으로 가입 */
-  async completeSocialSignup({ provider, identity, nickname, consents }) {
+  async completeSocialSignup({
+    provider,
+    identity,
+    nickname,
+    age,
+    heightCm,
+    weightKg,
+    consents,
+  }) {
     const current = await this.consents.currentVersions();
     this.consents.assertSignupConsents(current, consents);
 
     try {
       const { userId, session } = await this.database.withTransaction(
         async (tx) => {
-          const id = await this.createUser(tx, { nickname });
+          const id = await this.createUser(tx, {
+            nickname,
+            age,
+            heightCm,
+            weightKg,
+          });
           await tx.query(
             `INSERT INTO user_identities (id, user_id, provider, provider_subject, email)
              VALUES ($1, $2, $3, $4, $5)`,

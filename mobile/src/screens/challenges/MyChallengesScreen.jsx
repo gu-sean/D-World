@@ -53,11 +53,15 @@ export default function MyChallengesScreen({ navigation }) {
         <OptionRow options={TABS} value={status} onChange={setStatus} />
       </View>
 
-      <QueryState
+      <QueryState skeleton="card"
         query={mine}
         isEmpty={(mine.data ?? []).length === 0}
         emptyTitle="해당하는 챌린지가 없어요"
-        emptyText="챌린지 둘러보기에서 마음에 드는 챌린지를 찾아 보세요.">
+        emptyText="챌린지 둘러보기에서 마음에 드는 챌린지를 찾아 보세요."
+        emptyIcon="trophy"
+        emptyAction={
+          <Button title="챌린지 둘러보기" onPress={() => navigation.navigate(Routes.CHALLENGE_HOME)} />
+        }>
         {(list) => (
           <FlatList
             data={list}
@@ -89,8 +93,7 @@ export default function MyChallengesScreen({ navigation }) {
                   </View>
 
                   <Text style={styles.meta}>
-                    성공 {participation?.successfulDays ?? 0}일 /{' '}
-                    {challenge.requiredSuccessDays}일 필요
+                    {challenge.requiredSuccessDays}일 중 {participation?.successfulDays ?? 0}일 성공
                     {status === 'enrolled' ? ` · ${daysLeft}일 남음` : ''}
                   </Text>
 

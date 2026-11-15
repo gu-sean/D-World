@@ -7,8 +7,8 @@
 import React, { useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { useRecord } from '../../client';
-import { Button, Icon, QueryState, RewardSummary, Screen } from '../../components';
+import { haptics, useRecord } from '../../client';
+import { Button, Icon, Pop, QueryState, RewardSummary, Screen } from '../../components';
 import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
 
@@ -19,11 +19,19 @@ export default function MissionCompleteScreen({ navigation, route }) {
   const rewards = record.data?.rewards;
   const newBadges = rewards?.newBadges ?? [];
 
+  // 보상이 화면에 나타나는 순간 가볍게 한 번 진동한다.
+  const arrived = !!rewards;
+  useEffect(() => {
+    if (arrived) haptics.light();
+  }, [arrived]);
+
   // 새 업적이 있으면 축하 모달을 한 번 띄운다.
   useEffect(() => {
     if (newBadges.length > 0) {
       navigation.navigate(Routes.ACHIEVEMENT_EARNED_MODAL, { badges: newBadges });
     }
+    // 업적 개수가 달라질 때만 다시 띄운다. 목록 객체는 다시 불러올 때마다 새로 만들어져서
+    // 의존 목록에 넣으면 같은 업적 모달이 계속 반복된다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newBadges.length]);
 
@@ -34,7 +42,9 @@ export default function MissionCompleteScreen({ navigation, route }) {
           <>
             <ScrollView contentContainerStyle={styles.body}>
               <View style={styles.hero}>
-                <Icon name="trophy" size={56} color={colors.warning} />
+                <Pop kind="pop">
+                  <Icon name="trophy" size={56} color={colors.warning} />
+                </Pop>
                 <Text style={styles.heading}>미션을 해냈어요</Text>
                 <Text style={styles.description}>
                   오늘의 기록이 남았어요. 이 기세로 하나 더 해볼까요?

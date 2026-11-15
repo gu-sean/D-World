@@ -46,11 +46,19 @@ export default function MonthlyCalendarScreen({ navigation, route }) {
   return (
     <Screen title="월별 기록" onBack={() => navigation.goBack()} padded={false}>
       <View style={styles.monthBar}>
-        <TouchableOpacity onPress={() => setMonth(shiftMonth(month, -1))} hitSlop={8}>
+        <TouchableOpacity
+          onPress={() => setMonth(shiftMonth(month, -1))}
+          accessibilityRole="button"
+          accessibilityLabel="이전 달"
+          hitSlop={8}>
           <Icon name="chevronLeft" size={22} color={colors.textSub} />
         </TouchableOpacity>
         <Text style={styles.month}>{month.replace('-', '년 ')}월</Text>
-        <TouchableOpacity onPress={() => setMonth(shiftMonth(month, 1))} hitSlop={8}>
+        <TouchableOpacity
+          onPress={() => setMonth(shiftMonth(month, 1))}
+          accessibilityRole="button"
+          accessibilityLabel="다음 달"
+          hitSlop={8}>
           <Icon name="chevronRight" size={22} color={colors.textSub} />
         </TouchableOpacity>
       </View>
@@ -79,15 +87,15 @@ export default function MonthlyCalendarScreen({ navigation, route }) {
                       key={day.date}
                       style={styles.cell}
                       onPress={() => setPicked(selected ? null : day.date)}
-                      accessibilityRole="button">
+                      accessibilityRole="button"
+                      accessibilityLabel={`${Number(day.date.slice(8))}일`}
+                      accessibilityState={{ selected }}>
                       <View style={[styles.dayBox, selected && styles.dayBoxSelected]}>
                         <Text style={[styles.dayNumber, selected && styles.dayNumberSelected]}>
                           {Number(day.date.slice(8))}
                         </Text>
                       </View>
-                      <View
-                        style={[styles.dot, { backgroundColor: STATUS_COLOR[day.status] }]}
-                      />
+                      <View style={[styles.dot, { backgroundColor: STATUS_COLOR[day.status] }]} />
                     </TouchableOpacity>
                   );
                 })}
@@ -145,7 +153,12 @@ const styles = StyleSheet.create({
   month: { ...typography.bodyStrong, color: colors.text },
   body: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
   weekdays: { flexDirection: 'row', marginBottom: spacing.sm },
-  weekday: { ...typography.caption, color: colors.textSub, width: `${100 / 7}%`, textAlign: 'center' },
+  weekday: {
+    ...typography.caption,
+    color: colors.textSub,
+    width: `${100 / 7}%`,
+    textAlign: 'center',
+  },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: `${100 / 7}%`, alignItems: 'center', paddingVertical: spacing.xs, gap: 3 },
   dayBox: {
@@ -157,7 +170,7 @@ const styles = StyleSheet.create({
   },
   dayBoxSelected: { backgroundColor: colors.primary },
   dayNumber: { ...typography.caption, color: colors.text },
-  dayNumberSelected: { color: '#FFFFFF', fontWeight: '600' },
+  dayNumberSelected: { color: colors.onPrimary, fontWeight: '600' },
   dot: { width: 6, height: 6, borderRadius: radius.full },
   legend: {
     flexDirection: 'row',

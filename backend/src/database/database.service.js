@@ -96,6 +96,13 @@ export class DatabaseService {
     for (let attempt = 0; ; attempt++) {
       const client = await this.pool.connect();
       let destroy = false;
+      // 빌려 쓰는 동안 연결이 끊기면 'error'가 처리 없이 올라와 프로세스가 종료될 수 있으므로
+      // 여기서 받아 기록하고, 끊긴 연결은 풀에 돌려주지 않고 폐기한다.
+      const onClientError = (error) => {
+        destroy = true;
+        this.logger.error(`트랜잭션 연결 오류: ${error.message}`);
+      };
+      client.on('error', onClientError);
       try {
         await client.query(`BEGIN ISOLATION LEVEL ${isolation}`);
         const result = await fn(client);
@@ -118,6 +125,7 @@ export class DatabaseService {
         }
         throw error;
       } finally {
+        client.removeListener('error', onClientError);
         client.release(destroy);
       }
     }

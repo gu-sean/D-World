@@ -13,7 +13,9 @@ import { Public } from '../common/auth/public.decorator.js';
 import {
   array,
   boolean,
+  integer,
   nickname,
+  number,
   object,
   oneOf,
   password,
@@ -72,6 +74,9 @@ export class MobileAuthController {
         socialSignupToken: token({ optional: true }),
         password: string({ min: 10, max: 64, optional: true }),
         nickname: nickname(),
+        age: integer({ min: 13, max: 100 }),
+        heightCm: number({ min: 100, max: 250 }),
+        weightKg: number({ min: 30, max: 300 }),
         consents: consents(),
       }),
     );

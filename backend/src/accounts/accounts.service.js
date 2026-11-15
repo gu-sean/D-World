@@ -3,6 +3,8 @@ import { DatabaseService } from '../database/database.service.js';
 import { AppException } from '../common/errors/app-exception.js';
 import { rethrowConstraint } from '../common/errors/constraint.js';
 import { firstLevelUpXp } from '../experience-pets/experience-ledger.js';
+import { OBJECT_STORAGE } from '../media/storage/object-storage.js';
+import { presignGetCached } from '../media/storage/presign-cache.js';
 import { ConsentService } from './consent.service.js';
 import { RestrictionService } from './restriction.service.js';
 
@@ -19,10 +21,16 @@ export function maskPhone(e164) {
 }
 
 @Injectable()
-@Dependencies(DatabaseService, ConsentService, RestrictionService)
+@Dependencies(
+  DatabaseService,
+  ConsentService,
+  RestrictionService,
+  OBJECT_STORAGE,
+)
 export class AccountsService {
-  constructor(database, consents, restrictions) {
+  constructor(database, consents, restrictions, storage) {
     this.database = database;
+    this.storage = storage;
     this.consents = consents;
     this.restrictions = restrictions;
   }
@@ -39,8 +47,11 @@ export class AccountsService {
     const [account, phone, identities, restriction, pending, extras] =
       await Promise.all([
         this.database.query(
-          `SELECT u.id, u.status, p.nickname, p.notification_enabled, u.created_at
+          `SELECT u.id, u.status, p.nickname, p.notification_enabled, u.created_at,
+                  p.age, p.height_cm, p.weight_kg, p.difficulty_reason,
+                  p.difficulty_reviewed_at, dl.code AS recommended_difficulty_code
            FROM users u JOIN profiles p ON p.user_id = u.id
+           LEFT JOIN difficulty_levels dl ON dl.id = p.recommended_difficulty_id
           WHERE u.id = $1`,
           [userId],
         ),
@@ -69,6 +80,12 @@ export class AccountsService {
       status: row.status,
       nickname: row.nickname,
       notificationEnabled: row.notification_enabled,
+      age: row.age,
+      heightCm: row.height_cm === null ? null : Number(row.height_cm),
+      weightKg: row.weight_kg === null ? null : Number(row.weight_kg),
+      recommendedDifficultyCode: row.recommended_difficulty_code,
+      difficultyReason: row.difficulty_reason,
+      difficultyReviewedAt: row.difficulty_reviewed_at,
       createdAt: row.created_at,
       phone: phone.rows[0] ? maskPhone(phone.rows[0].phone_e164) : null,
       identities: identities.rows.map((r) => r.provider),
@@ -109,11 +126,12 @@ export class AccountsService {
         [userId],
       ),
       this.database.query(
-        `SELECT p.id, p.nickname, sv.stage_code
+        `SELECT p.id, p.nickname, sv.stage_code, i.r2_object_key AS image_key
            FROM profiles pr
            JOIN user_pets p ON p.id = pr.representative_pet_id
            JOIN pet_stage_versions sv
              ON sv.species_version_id = p.species_version_id AND sv.stage_no = p.stage_no
+           LEFT JOIN pet_stage_images i ON i.id = sv.image_id
           WHERE pr.user_id = $1`,
         [userId],
       ),
@@ -147,7 +165,21 @@ export class AccountsService {
             id: representativePet.id,
             nickname: representativePet.nickname,
             stageCode: representativePet.stage_code,
-            imageUrl: null,
+            imageUrl: representativePet.image_key
+              ? await presignGetCached(this.storage, {
+                  key: representativePet.image_key,
+                  expiresInSec: 3600,
+                })
+              : null,
+            stillUrl: representativePet.image_key
+              ? await presignGetCached(this.storage, {
+                  key: representativePet.image_key.replace(
+                    /\.gif$/,
+                    '.still.png',
+                  ),
+                  expiresInSec: 3600,
+                })
+              : null,
           }
         : null,
       representativeBadge: representativeBadge
@@ -161,8 +193,17 @@ export class AccountsService {
     };
   }
 
-  async updateProfile(userId, { nickname, notificationEnabled }) {
-    if (nickname === undefined && notificationEnabled === undefined) {
+  async updateProfile(
+    userId,
+    { nickname, notificationEnabled, age, heightCm, weightKg },
+  ) {
+    if (
+      nickname === undefined &&
+      notificationEnabled === undefined &&
+      age === undefined &&
+      heightCm === undefined &&
+      weightKg === undefined
+    ) {
       throw new AppException(
         HttpStatus.BAD_REQUEST,
         'bad_request',
@@ -174,9 +215,19 @@ export class AccountsService {
         `UPDATE profiles
             SET nickname = COALESCE($2, nickname),
                 notification_enabled = COALESCE($3, notification_enabled),
+                age = COALESCE($4, age),
+                height_cm = COALESCE($5, height_cm),
+                weight_kg = COALESCE($6, weight_kg),
                 updated_at = now()
           WHERE user_id = $1`,
-        [userId, nickname ?? null, notificationEnabled ?? null],
+        [
+          userId,
+          nickname ?? null,
+          notificationEnabled ?? null,
+          age ?? null,
+          heightCm ?? null,
+          weightKg ?? null,
+        ],
       );
     } catch (error) {
       rethrowConstraint(error, { profiles_nickname_ci_uq: nicknameTaken });

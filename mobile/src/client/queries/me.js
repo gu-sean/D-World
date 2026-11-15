@@ -22,6 +22,14 @@ export function useUpdateProfile() {
   });
 }
 
+/** 프로필 분석 → 수행 기록 분석 → 안전 검토 에이전트를 거치는 난이도 추천. */
+export function useDifficultyRecommendation() {
+  return useAppMutation({
+    mutationFn: meApi.recommendDifficulty,
+    onDone: afterProfileChanged,
+  });
+}
+
 /** A13 약관 재동의. 입력 `{consents: ConsentInput[]}` */
 export function useSubmitConsents() {
   return useAppMutation({
@@ -45,4 +53,10 @@ export function useRequestWithdrawal() {
   });
 }
 
-export default { useMe, useUpdateProfile, useSubmitConsents, useRequestWithdrawal };
+export default {
+  useMe,
+  useUpdateProfile,
+  useDifficultyRecommendation,
+  useSubmitConsents,
+  useRequestWithdrawal,
+};

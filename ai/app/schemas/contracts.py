@@ -260,6 +260,37 @@ class GoalPlanResponse(ApiModel):
 
 
 # ───────────────────────────────
+# 목표·난이도 다중 에이전트 추천
+# ───────────────────────────────
+
+class DifficultyAgentRequest(ApiModel):
+    ingest_key: str
+    profile: dict
+    performance: dict
+    request: dict
+    rule_recommendation: dict
+
+
+class SuggestedGoal(ApiModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=1000)
+    category_code: str = Field(min_length=1, max_length=50)
+    difficulty_code: Literal["easy", "normal", "hard"]
+    duration_days: int = Field(ge=7, le=365)
+    target_frequency: int = Field(ge=1, le=7)
+    daily_available_minutes: int = Field(ge=5, le=240)
+
+
+class DifficultyAgentResponse(ApiModel):
+    ingest_key: str
+    engine_version: str
+    recommended_difficulty_code: Literal["easy", "normal", "hard"]
+    reason: str = Field(min_length=1, max_length=1000)
+    suggested_goal: SuggestedGoal
+    agent_trace: list[dict]
+
+
+# ───────────────────────────────
 # I04: Gemini 상황별 추천
 # ───────────────────────────────
 

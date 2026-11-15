@@ -11,6 +11,11 @@ import { colors, spacing, typography } from '../../theme';
 
 export default function SignupCompleteScreen({ navigation }) {
   const { profile } = useSession();
+  const difficultyLabel = {
+    easy: '쉬움',
+    normal: '보통',
+    hard: '어려움',
+  }[profile?.recommendedDifficultyCode];
 
   return (
     <Screen>
@@ -20,6 +25,12 @@ export default function SignupCompleteScreen({ navigation }) {
         <Text style={styles.description}>
           {profile?.nickname ? `${profile.nickname}님, ` : ''}목표를 하나 만들어 볼까요?
         </Text>
+        {!!difficultyLabel && (
+          <View style={styles.recommendation}>
+            <Text style={styles.recommendationTitle}>AI 시작 난이도 · {difficultyLabel}</Text>
+            <Text style={styles.recommendationText}>{profile.difficultyReason}</Text>
+          </View>
+        )}
       </View>
 
       <Button title="시작하기" onPress={() => navigation.goBack()} full />
@@ -32,5 +43,14 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   heading: { ...typography.title, color: colors.text },
   description: { ...typography.body, color: colors.textSub, textAlign: 'center' },
+  recommendation: {
+    padding: spacing.md,
+    borderRadius: 12,
+    backgroundColor: '#F5F8FF',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  recommendationTitle: { ...typography.bodyStrong, color: colors.primary },
+  recommendationText: { ...typography.caption, color: colors.textSub, textAlign: 'center' },
   bottomSpace: { height: spacing.xl },
 });

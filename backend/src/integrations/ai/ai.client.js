@@ -114,7 +114,7 @@ export class AiClient {
 
   get callbackBaseUrl() {
     return String(
-      this.config.get('BACKEND_PUBLIC_URL') ??
+      this.config.get('BACKEND_PUBLIC_URL') ||
         `http://localhost:${this.config.get('PORT')}`,
     ).replace(/\/+$/, '');
   }

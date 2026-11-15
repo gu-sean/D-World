@@ -11,13 +11,14 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
 
-export default function Card({ onPress, style, children }) {
+export default function Card({ onPress, style, children, accessibilityLabel }) {
   if (onPress) {
     return (
       <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.8}
         accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
         style={[styles.card, style]}>
         {children}
       </TouchableOpacity>

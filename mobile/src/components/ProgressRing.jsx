@@ -6,7 +6,7 @@
  *
  * @param {{
  *   rate: number, size?: number, thickness?: number,
- *   color?: string, children?: React.ReactNode
+ *   color?: string, accessibilityLabel?: string, children?: React.ReactNode
  * }} props
  */
 import React from 'react';
@@ -20,14 +20,22 @@ export default function ProgressRing({
   size = 92,
   thickness = 9,
   color = colors.primary,
+  accessibilityLabel,
   children,
 }) {
   const clamped = Math.max(0, Math.min(1, Number(rate) || 0));
   const radius = (size - thickness) / 2;
   const circumference = 2 * Math.PI * radius;
 
+  const percent = Math.round(clamped * 100);
+
   return (
-    <View style={{ width: size, height: size }}>
+    <View
+      style={{ width: size, height: size }}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={accessibilityLabel ?? `진행률 ${percent}퍼센트`}
+      accessibilityValue={{ min: 0, max: 100, now: percent }}>
       <Svg width={size} height={size}>
         <Circle
           cx={size / 2}

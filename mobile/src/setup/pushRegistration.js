@@ -20,11 +20,10 @@ import { parseLinkScreen } from '../client/links.js';
 /** 마지막으로 등록한 토큰. 로그아웃 때 이 값으로 해제한다. */
 let currentToken = null;
 
-/** Firebase가 들어와 있으면 messaging 모듈을, 아니면 `null`을 준다. */
+/** Firebase가 들어와 있으면 messaging 모듈(모듈식 API)을, 아니면 `null`을 준다. */
 async function loadMessaging() {
   try {
-    const module = await import('@react-native-firebase/messaging');
-    return module.default ?? module;
+    return await import('@react-native-firebase/messaging');
   } catch {
     return null;
   }
@@ -35,15 +34,16 @@ async function loadMessaging() {
  * @returns {Promise<boolean>} 등록했으면 true, 건너뛰었으면 false
  */
 export async function registerPushDevice() {
-  const messaging = await loadMessaging();
-  if (!messaging) return false;
+  const fm = await loadMessaging();
+  if (!fm) return false;
 
   try {
-    const authStatus = await messaging().requestPermission();
+    const messaging = fm.getMessaging();
+    const authStatus = await fm.requestPermission(messaging);
     // 1 = AUTHORIZED, 2 = PROVISIONAL
     if (authStatus !== 1 && authStatus !== 2) return false;
 
-    const token = await messaging().getToken();
+    const token = await fm.getToken(messaging);
     if (!token) return false;
 
     await apiRegister({ platform: Platform.OS === 'ios' ? 'ios' : 'android', token });
@@ -78,21 +78,22 @@ export async function unregisterPushDevice() {
  * @returns {Promise<() => void>} 구독 해제
  */
 export async function onNotificationOpened(handler) {
-  const messaging = await loadMessaging();
-  if (!messaging) return () => {};
+  const fm = await loadMessaging();
+  if (!fm) return () => {};
+  const messaging = fm.getMessaging();
 
   const toTarget = (message) => parseLinkScreen(message?.data?.linkScreen);
 
   // 앱이 꺼져 있다가 알림으로 열린 경우
   try {
-    const initial = await messaging().getInitialNotification();
+    const initial = await fm.getInitialNotification(messaging);
     if (initial) handler(toTarget(initial));
   } catch {
     // 초기 알림을 못 읽어도 아래 구독은 건다.
   }
 
   try {
-    return messaging().onNotificationOpenedApp((message) => handler(toTarget(message)));
+    return fm.onNotificationOpenedApp(messaging, (message) => handler(toTarget(message)));
   } catch {
     return () => {};
   }

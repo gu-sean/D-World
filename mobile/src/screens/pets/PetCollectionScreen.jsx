@@ -59,21 +59,29 @@ export default function PetCollectionScreen({ navigation }) {
         <OptionRow options={options} value={categoryCode} onChange={setCategoryCode} />
       </View>
 
-      <QueryState query={species} emptyTitle="보여 줄 펫이 없어요">
+      <QueryState skeleton="grid" query={species} emptyTitle="보여 줄 펫이 없어요">
         {(items) => (
           <FlatList
-            data={items}
+            data={items.length % 2 === 1 ? [...items, { id: '__spacer', spacer: true }] : items}
             keyExtractor={(item) => item.id}
             numColumns={2}
             columnWrapperStyle={styles.row}
             contentContainerStyle={styles.list}
-            renderItem={({ item }) => (
+            renderItem={({ item }) =>
+              item.spacer ? (
+                <View style={styles.spacer} />
+              ) : (
               <Card
                 onPress={() => navigation.navigate(Routes.PET_DETAIL, { speciesId: item.id })}
                 style={[styles.card, !item.isUnlocked && styles.locked]}>
                 <PetAvatar
-                  pet={{ imageUrl: item.stages?.[1]?.imageUrl ?? null, stageCode: 'baby' }}
+                  pet={{
+                    imageUrl: item.stages?.[2]?.imageUrl ?? null,
+                    stillUrl: item.stages?.[2]?.stillUrl ?? null,
+                    stageCode: 'adult',
+                  }}
                   size={72}
+                  animated={false}
                 />
                 <Text style={styles.name} numberOfLines={1}>
                   {item.name}
@@ -90,7 +98,8 @@ export default function PetCollectionScreen({ navigation }) {
                   </Text>
                 )}
               </Card>
-            )}
+              )
+            }
           />
         )}
       </QueryState>
@@ -104,6 +113,7 @@ const styles = StyleSheet.create({
   row: { gap: spacing.sm },
   card: { flex: 1, alignItems: 'center', gap: spacing.xs, padding: spacing.md },
   locked: { opacity: 0.55 },
+  spacer: { flex: 1 },
   name: { ...typography.bodyStrong, color: colors.text },
   unlock: { ...typography.caption, color: colors.textSub, textAlign: 'center' },
 });

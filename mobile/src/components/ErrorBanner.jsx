@@ -20,7 +20,11 @@ export default function ErrorBanner({ error, onClose }) {
       <Icon name="alert" size={18} color={colors.danger} />
       <Text style={styles.message}>{error.message ?? '잠시 후 다시 시도해 주세요.'}</Text>
       {!!onClose && (
-        <TouchableOpacity onPress={onClose} accessibilityRole="button" hitSlop={8}>
+        <TouchableOpacity
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="오류 알림 닫기"
+          hitSlop={8}>
           <Icon name="close" size={16} color={colors.danger} />
         </TouchableOpacity>
       )}
@@ -33,9 +37,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: colors.dangerSoft,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: colors.dangerBorder,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,

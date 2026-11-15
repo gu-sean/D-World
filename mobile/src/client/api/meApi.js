@@ -20,6 +20,15 @@ export function updateProfile(input) {
   return request({ method: 'PATCH', path: '/me/profile', body: input });
 }
 
+/** 신체정보·최근 수행률을 세 에이전트가 차례로 검토해 난이도를 추천한다. */
+export function recommendDifficulty(input) {
+  return request({
+    method: 'POST',
+    path: '/me/difficulty-recommendations',
+    body: input,
+  });
+}
+
 /**
  * A13 약관 재동의.
  * @param {{consents: Array<{documentVersionId: string, granted: boolean}>}} input
@@ -65,6 +74,7 @@ export function unregisterPushDevice(token) {
 export default {
   getMe,
   updateProfile,
+  recommendDifficulty,
   submitConsents,
   requestWithdrawal,
   registerPushDevice,
