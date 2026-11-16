@@ -206,12 +206,18 @@ export class ProposalsService {
       // 분야는 생략하면 목표의 값, 난이도는 AI·사용자 값이 아니라 미션 내용으로 규칙 판정 (보상은 미션마다)
       const resolved = [];
       const checkedPairs = new Set();
+      // 난이도는 3종뿐이라 코드별로 한 번만 조회 (미션마다 조회하면 왕복이 미션 수만큼 늘어난다)
+      const difficultyIds = new Map();
       for (const { mission, stepIndex } of entries) {
         const categoryId = mission.categoryId ?? goal.category_id;
-        const difficultyId = await this.missions.difficultyIdOf(
-          tx,
-          assessDifficulty(mission).difficultyCode,
-        );
+        const difficultyCode = assessDifficulty(mission).difficultyCode;
+        if (!difficultyIds.has(difficultyCode)) {
+          difficultyIds.set(
+            difficultyCode,
+            await this.missions.difficultyIdOf(tx, difficultyCode),
+          );
+        }
+        const difficultyId = difficultyIds.get(difficultyCode);
         if (
           (mission.targetValue === undefined) !==
           (mission.targetUnit === undefined)
@@ -284,7 +290,7 @@ export class ProposalsService {
 
       // 보상은 (카테고리, 난이도) 조합마다 한 번만 구해 복사
       const rewardCache = new Map();
-      const createdMissions = [];
+      const missionRows = [];
       for (const { mission, stepIndex, categoryId, difficultyId } of resolved) {
         const pair = `${categoryId}:${difficultyId}`;
         if (!rewardCache.has(pair)) {
@@ -293,29 +299,33 @@ export class ProposalsService {
             await this.rewards.resolve(tx, { categoryId, difficultyId }),
           );
         }
-        createdMissions.push(
-          await this.missions.insertMissionRow(tx, userId, {
-            goalId,
-            stepId: stepIndex === null ? null : createdSteps[stepIndex].id,
-            sourceType: 'ai',
-            sourceProposalId: proposalId,
-            title: mission.title,
-            description: mission.description || null,
-            categoryId,
-            difficultyId,
-            targetValue: mission.targetValue,
-            targetUnit: mission.targetUnit,
-            estimatedDurationSeconds: mission.estimatedDurationSeconds,
-            verificationMethod: mission.verificationMethod,
-            exerciseCode: mission.exerciseCode ?? null,
-            scheduledDate: mission.scheduledDate,
-            dueAt: mission.dueAt ?? defaultDueAt(mission.scheduledDate),
-            isRequired: mission.isRequired ?? true,
-            memo: mission.memo || null,
-            reward: rewardCache.get(pair),
-          }),
-        );
+        missionRows.push({
+          goalId,
+          stepId: stepIndex === null ? null : createdSteps[stepIndex].id,
+          sourceType: 'ai',
+          sourceProposalId: proposalId,
+          title: mission.title,
+          description: mission.description || null,
+          categoryId,
+          difficultyId,
+          targetValue: mission.targetValue,
+          targetUnit: mission.targetUnit,
+          estimatedDurationSeconds: mission.estimatedDurationSeconds,
+          verificationMethod: mission.verificationMethod,
+          exerciseCode: mission.exerciseCode ?? null,
+          scheduledDate: mission.scheduledDate,
+          dueAt: mission.dueAt ?? defaultDueAt(mission.scheduledDate),
+          isRequired: mission.isRequired ?? true,
+          memo: mission.memo || null,
+          reward: rewardCache.get(pair),
+        });
       }
+      // 미션 전체를 한 번의 INSERT로 (한 건씩 넣으면 왕복이 미션 수만큼 늘어난다)
+      const createdMissions = await this.missions.insertMissionRows(
+        tx,
+        userId,
+        missionRows,
+      );
 
       // 새 단계, 그리고 미션을 잃은 이전 단계의 자동 완료 조건을 다시 평가
       const affected = new Set([

@@ -9,11 +9,9 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import { AppException } from '../common/errors/app-exception.js';
 import { rethrowConstraint } from '../common/errors/constraint.js';
 import { DatabaseService } from '../database/database.service.js';
+import { LoginFailureTracker } from './login-failure-tracker.js';
 import { PhoneVerificationService } from './phone-verification.service.js';
 import { SocialVerifierService } from './social/social-verifier.service.js';
-
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCK_MINUTES = 5;
 
 const conflict = (code, message) => () =>
   new AppException(HttpStatus.CONFLICT, code, message);
@@ -81,6 +79,8 @@ export class AuthService {
     this.phoneVerification = phoneVerification;
     this.consents = consents;
     this.socialVerifier = socialVerifier;
+    // 로그인 실패는 (계정, IP)별로 센다: 번호만 아는 제3자가 주인의 로그인을 막지 못하게 한다
+    this.loginFailures = new LoginFailureTracker();
   }
 
   async tokenResponse(userId, session) {
@@ -206,15 +206,14 @@ export class AuthService {
 
   /**
    * 번호·비밀번호 로그인
-   * 같은 계정 5회 연속 실패 시 5분 잠금, 실패 횟수는 오류를 던지기 전에 커밋
+   * 같은 계정을 같은 IP에서 5회 연속 틀리면 그 IP만 5분 잠그고(주인의 다른 IP 로그인은 막지 않음),
+   * 여러 IP에서 15분에 30회 넘게 틀리면 계정을 5분 잠근다 (login-failure-tracker.js)
+   * @param {{phone: string, password: string, ip?: string}} input `ip`는 요청 출처(없으면 한 출처로 묶음)
    */
-  async loginPhone({ phone, password }) {
+  async loginPhone({ phone, password, ip }) {
     const outcome = await this.database.withTransaction(async (tx) => {
       const { rows } = await tx.query(
-        `SELECT pc.user_id, pc.password_hash, pc.failed_attempt_count,
-                pc.locked_until IS NOT NULL AND pc.locked_until > now() AS locked,
-                GREATEST(CEIL(EXTRACT(EPOCH FROM (pc.locked_until - now()))), 1) AS lock_seconds,
-                u.status
+        `SELECT pc.user_id, pc.password_hash, u.status
            FROM phone_credentials pc
            JOIN users u ON u.id = pc.user_id
           WHERE pc.phone_e164 = $1
@@ -223,40 +222,19 @@ export class AuthService {
       );
       const account = rows[0];
       if (!account) return { kind: 'unknown' };
-      if (account.locked) {
-        return { kind: 'locked', retryAfter: Number(account.lock_seconds) };
+      // 잠긴 출처는 비밀번호를 검사하지 않고 돌려보낸다 (맞는 비밀번호인지 알려 주지 않는다)
+      const gate = this.loginFailures.check(account.user_id, ip);
+      if (gate.locked) {
+        return { kind: 'locked', retryAfter: gate.retryAfterSeconds };
       }
 
       const matches = await this.passwords.verify(
         account.password_hash,
         password,
       );
-      if (!matches) {
-        // 잠금이 풀린 뒤의 첫 실패는 1회부터 다시 셈
-        const base =
-          account.failed_attempt_count >= MAX_FAILED_ATTEMPTS
-            ? 0
-            : account.failed_attempt_count;
-        const failures = base + 1;
-        const lock = failures >= MAX_FAILED_ATTEMPTS;
-        await tx.query(
-          `UPDATE phone_credentials
-              SET failed_attempt_count = $2,
-                  locked_until = CASE WHEN $3 THEN now() + make_interval(mins => $4) END
-            WHERE user_id = $1`,
-          [account.user_id, failures, lock, LOCK_MINUTES],
-        );
-        return lock
-          ? { kind: 'locked', retryAfter: LOCK_MINUTES * 60 }
-          : { kind: 'wrong' };
-      }
+      if (!matches) return { kind: 'wrong', userId: account.user_id };
 
-      await tx.query(
-        `UPDATE phone_credentials
-            SET failed_attempt_count = 0, locked_until = NULL
-          WHERE user_id = $1`,
-        [account.user_id],
-      );
+      this.loginFailures.recordSuccess(account.user_id, ip);
       if (account.status !== 'active') return { kind: 'unavailable' };
       return {
         kind: 'ok',
@@ -270,6 +248,11 @@ export class AuthService {
     });
 
     switch (outcome.kind) {
+      case 'wrong': {
+        const lock = this.loginFailures.recordFailure(outcome.userId, ip);
+        if (lock.locked) throw accountLocked(lock.retryAfterSeconds);
+        throw invalidCredentials();
+      }
       case 'ok':
         return {
           userId: outcome.userId,
@@ -419,6 +402,7 @@ export class AuthService {
   /** 확인이 끝난 인증번호(challenge)로 비밀번호를 바꾸고 기존 세션을 폐기 */
   async completePasswordReset({ phone, challengeId, newPassword }) {
     const passwordHash = await this.passwords.hash(newPassword);
+    let resetUserId = null;
 
     await this.database.withTransaction(async (tx) => {
       await this.phoneVerification.consume(tx, challengeId);
@@ -440,7 +424,10 @@ export class AuthService {
         );
       }
       await this.sessions.revokeAll(tx, SessionKind.User, rows[0].user_id);
+      resetUserId = rows[0].user_id;
     });
+    // 재설정을 마쳤으니 이 계정의 로그인 실패 기록을 비운다
+    if (resetUserId) this.loginFailures.clearAccount(resetUserId);
   }
 
   /** 소셜 가입 사용자가 로그인 후 휴대폰 수단을 연결 */

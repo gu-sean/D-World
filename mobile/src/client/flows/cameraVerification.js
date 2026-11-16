@@ -19,6 +19,8 @@ import { getMission } from '../api/missionsApi.js';
 import { captureVideo, capturePhoto, VIDEO_DURATION_LIMIT_SECONDS } from '../device/camera.js';
 import { compressVideo, sha256OfFile, statFile, removeFile } from '../device/files.js';
 import { uploadEvidence } from './uploadEvidence.js';
+import { submissionQueue } from './submissionQueue.js';
+import { isTransientFailure } from './submissionQueueCore.js';
 import { waitForDecision, POLL_INTERVAL_MS, DECISION_TIMEOUT_MS } from './waitForDecision.js';
 import { afterVerificationDecided } from '../queries/invalidate.js';
 
@@ -29,7 +31,7 @@ export const MEDIA_LIMITS = {
   sensor_raw: 5 * 1024 * 1024,
 };
 
-const IDLE_STATE = { phase: 'idle', progress: 0, record: null, result: null, error: null };
+const IDLE_STATE = { phase: 'idle', progress: 0, record: null, result: null, error: null, queued: false };
 
 /**
  * 결과를 기다리는 간격·한계. 기본값은 parts/mobile-client §6 그대로이고,
@@ -129,24 +131,44 @@ function createEngine(missionId) {
 
   /** 업로드 → 제출 → 결과 기다리기. `retryUpload()`도 여기로 들어온다. */
   async function uploadSubmitWait(recordId) {
-    set({ phase: 'uploading', progress: 0, error: null });
-    await uploadEvidence(recordId, prepared, {
-      idempotencyKey: keys.upload,
-      onProgress: (progress) => set({ progress }),
-    });
+    set({ phase: 'uploading', progress: 0, error: null, queued: false });
+    try {
+      // 이미 올라간 단계는 건너뛴다 (재시도해도 같은 파일을 두 번 올리지 않는다)
+      if (!prepared.uploaded) {
+        await uploadEvidence(recordId, prepared, {
+          idempotencyKey: keys.upload,
+          onProgress: (progress) => set({ progress }),
+        });
+        prepared.uploaded = true;
+        await submissionQueue.markUploaded(recordId);
+      }
 
-    set({ phase: 'submitting', progress: 1 });
-    const clientMetrics = { appVersion: config.APP_VERSION };
-    if (prepared.durationSeconds !== null && prepared.durationSeconds !== undefined) {
-      clientMetrics.videoDurationSeconds = prepared.durationSeconds;
+      if (!prepared.submitted) {
+        set({ phase: 'submitting', progress: 1 });
+        const clientMetrics = { appVersion: config.APP_VERSION };
+        if (prepared.durationSeconds !== null && prepared.durationSeconds !== undefined) {
+          clientMetrics.videoDurationSeconds = prepared.durationSeconds;
+        }
+        const submitted = await submitRecord({
+          recordId,
+          evidenceKind: 'camera_media',
+          clientMetrics,
+          idempotencyKey: keys.submit,
+        });
+        prepared.submitted = true;
+        set({ record: submitted });
+        // 제출까지 끝났다: 기기의 영상은 바로 지운다 (서버가 보관한다)
+        await submissionQueue.complete(recordId);
+      }
+    } catch (error) {
+      // 신호가 약해서 끊긴 경우: 영상은 보관 폴더에 있으니 대기열이 연결되면 이어서 올린다.
+      if (isTransientFailure(error) && !prepared.submitted) {
+        await submissionQueue.release(recordId);
+        set({ phase: 'pending', queued: true, error: null });
+        return;
+      }
+      throw error;
     }
-    const submitted = await submitRecord({
-      recordId,
-      evidenceKind: 'camera_media',
-      clientMetrics,
-      idempotencyKey: keys.submit,
-    });
-    set({ record: submitted });
 
     set({ phase: 'waiting' });
     const { record, timedOut } = await waitForDecision(recordId, {
@@ -162,10 +184,6 @@ function createEngine(missionId) {
     set({ phase: 'done', record, result, error: null });
     for (const listener of [...decidedListeners]) listener(record);
 
-    // 승인·거절이면 임시 파일을 지운다 (§6 done 칸).
-    if (record?.status === 'approved' || record?.status === 'rejected') {
-      await removeFile(prepared?.path);
-    }
   }
 
   return {
@@ -210,6 +228,16 @@ function createEngine(missionId) {
           throw error;
         }
 
+        // 올리기 전에 앱 전용 폴더에 보관한다: 업로드 중 앱이 꺼져도 영상이 남아 이어서 올라간다.
+        const kept = await submissionQueue.add({
+          recordId: record.id,
+          missionId,
+          file: prepared,
+          keys: { upload: keys.upload, submit: keys.submit },
+          appVersion: config.APP_VERSION,
+        });
+        prepared = { ...prepared, path: kept.file.path };
+
         await uploadSubmitWait(record.id);
       });
     },
@@ -229,6 +257,7 @@ function createEngine(missionId) {
       return run(async () => {
         const recordId = state.record?.id;
         if (recordId) await abortRecord(recordId).catch(() => {});
+        if (recordId) await submissionQueue.discard(recordId);
         await removeFile(prepared?.path);
         prepared = null;
         set({ ...IDLE_STATE });

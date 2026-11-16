@@ -16,7 +16,10 @@ const ISOLATION_LEVELS = new Set([
 const RETRYABLE_SQLSTATES = new Set(['40001', '40P01']);
 const UNIQUE_VIOLATION = '23505';
 const CONNECTION_TIMEOUT_MS = 5_000;
-const IDLE_TIMEOUT_MS = 30_000;
+// 유휴 연결을 오래 유지한다: 짧으면(예전 30초) 쉬었다 오는 첫 요청이 연결을 새로 맺느라 150~200ms 더 걸린다
+// 반쯤 끊긴 연결을 일찍 알아채도록 TCP keep-alive를 함께 켠다
+const IDLE_TIMEOUT_MS = 300_000;
+const KEEP_ALIVE_DELAY_MS = 10_000;
 
 // date를 JS Date로 변환하면 서버 시간대에 따라 KST 날짜가 밀림, 문자열 유지
 const PG_DATE_OID = 1082;
@@ -62,6 +65,8 @@ export class DatabaseService {
       ),
       connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
       idleTimeoutMillis: IDLE_TIMEOUT_MS,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: KEEP_ALIVE_DELAY_MS,
       application_name: 'd-world-backend',
       statement_timeout: config.get('DATABASE_STATEMENT_TIMEOUT_MS'),
       idle_in_transaction_session_timeout: config.get(

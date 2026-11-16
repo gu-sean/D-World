@@ -10,12 +10,11 @@
  *  1. `npm i @react-native-firebase/app @react-native-firebase/messaging`
  *  2. `android/app/google-services.json` 넣기 (**커밋하지 않는다**)
  *  3. `App.jsx`에서 로그인 직후 `registerPushDevice()`, 로그아웃 직전 `unregisterPushDevice()`
- *  4. 알림을 눌렀을 때 `onNotificationOpened(handler)`로 받아 `parseLinkScreen`으로 화면 이동
+ *  4. 알림을 눌렀을 때 `onNotificationOpened(handler)`로 받아 `navigation/linking`의 `openLink`로 화면 이동
  */
 import { Platform } from 'react-native';
 
 import { registerPushDevice as apiRegister, unregisterPushDevice as apiUnregister } from '../client/api/meApi.js';
-import { parseLinkScreen } from '../client/links.js';
 
 /** 마지막으로 등록한 토큰. 로그아웃 때 이 값으로 해제한다. */
 let currentToken = null;
@@ -56,6 +55,29 @@ export async function registerPushDevice() {
 }
 
 /**
+ * FCM이 기기 토큰을 새로 바꿔 주면 바로 서버에 다시 등록한다 (A15).
+ * 로그인된 동안만 구독한다. 로그아웃 때 해제할 토큰도 새 것으로 바뀐다.
+ * @returns {Promise<() => void>} 구독 해제
+ */
+export async function onPushTokenRefresh() {
+  const fm = await loadMessaging();
+  if (!fm) return () => {};
+  try {
+    return fm.onTokenRefresh(fm.getMessaging(), async (token) => {
+      if (!token || token === currentToken) return;
+      try {
+        await apiRegister({ platform: Platform.OS === 'ios' ? 'ios' : 'android', token });
+        currentToken = token;
+      } catch {
+        // 등록에 실패해도 다음 로그인·앱 실행 때 `registerPushDevice`가 다시 등록한다.
+      }
+    });
+  } catch {
+    return () => {};
+  }
+}
+
+/**
  * 토큰을 해제한다 (A16). **로그아웃하기 직전**에 부른다 — 토큰이 아직 살아 있어야 한다.
  * @returns {Promise<void>}
  */
@@ -72,9 +94,9 @@ export async function unregisterPushDevice() {
 
 /**
  * 알림을 눌러 앱이 열렸을 때 갈 화면을 알려 준다.
- * 화면 쪽(`navigation/`)이 `handler({name, params})`를 받아 이동한다.
+ * 화면 쪽(`App.jsx`)이 `handler(linkScreen)`을 받아 `openLink`로 이동한다. 없으면 `null`(홈).
  *
- * @param {(target: {name: string, params: Record<string, string>}) => void} handler
+ * @param {(linkScreen: string|null) => void} handler
  * @returns {Promise<() => void>} 구독 해제
  */
 export async function onNotificationOpened(handler) {
@@ -82,7 +104,7 @@ export async function onNotificationOpened(handler) {
   if (!fm) return () => {};
   const messaging = fm.getMessaging();
 
-  const toTarget = (message) => parseLinkScreen(message?.data?.linkScreen);
+  const toTarget = (message) => message?.data?.linkScreen ?? null;
 
   // 앱이 꺼져 있다가 알림으로 열린 경우
   try {
@@ -99,4 +121,33 @@ export async function onNotificationOpened(handler) {
   }
 }
 
-export default { registerPushDevice, unregisterPushDevice, onNotificationOpened };
+/**
+ * 앱을 보고 있는 동안 도착한 푸시를 받는다.
+ * Android는 이때 알림창에 띄우지 않고 앱에 넘기므로, 앱이 직접 보여 줘야 한다(`InAppNotice`).
+ *
+ * @param {(message: {title: string, body: string, linkScreen: string|null}) => void} handler
+ * @returns {Promise<() => void>} 구독 해제
+ */
+export async function onForegroundMessage(handler) {
+  const fm = await loadMessaging();
+  if (!fm) return () => {};
+  try {
+    return fm.onMessage(fm.getMessaging(), (message) => {
+      handler({
+        title: message?.notification?.title ?? '',
+        body: message?.notification?.body ?? '',
+        linkScreen: message?.data?.linkScreen ?? null,
+      });
+    });
+  } catch {
+    return () => {};
+  }
+}
+
+export default {
+  registerPushDevice,
+  unregisterPushDevice,
+  onNotificationOpened,
+  onForegroundMessage,
+  onPushTokenRefresh,
+};

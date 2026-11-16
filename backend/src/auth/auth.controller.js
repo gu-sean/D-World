@@ -82,11 +82,12 @@ export class AuthController {
   @Throttle(STRICT)
   @Post('auth/login/phone')
   @HttpCode(200)
-  @Bind(Body())
-  loginPhone(body) {
-    return this.auth.loginPhone(
-      validateBody(body, { phone: phone(), password: string({ max: 200 }) }),
-    );
+  @Bind(Req(), Body())
+  loginPhone(request, body) {
+    return this.auth.loginPhone({
+      ...validateBody(body, { phone: phone(), password: string({ max: 200 }) }),
+      ip: request.ip,
+    });
   }
 
   @Public()

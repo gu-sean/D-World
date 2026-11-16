@@ -321,23 +321,22 @@ export class MissionsService {
         difficultyId: spec.difficultyId,
       });
 
-      const created = [];
-      for (const date of dates) {
-        created.push(
-          await this.insertMissionRow(tx, userId, {
-            goalId: input.goalId ?? null,
-            stepId: input.stepId ?? null,
-            definitionId: definition?.id ?? null,
-            sourceType: definition ? 'template' : 'user',
-            ...spec,
-            scheduledDate: date,
-            dueAt: input.dueAt ?? defaultDueAt(date),
-            isRequired: input.isRequired ?? true,
-            memo: input.memo || null,
-            reward,
-          }),
-        );
-      }
+      const created = await this.insertMissionRows(
+        tx,
+        userId,
+        dates.map((date) => ({
+          goalId: input.goalId ?? null,
+          stepId: input.stepId ?? null,
+          definitionId: definition?.id ?? null,
+          sourceType: definition ? 'template' : 'user',
+          ...spec,
+          scheduledDate: date,
+          dueAt: input.dueAt ?? defaultDueAt(date),
+          isRequired: input.isRequired ?? true,
+          memo: input.memo || null,
+          reward,
+        })),
+      );
 
       // 완료된 단계에 필수 미션이 추가되면 다시 열림
       if (input.stepId) await this.goals.reevaluateStep(tx, input.stepId);
@@ -390,17 +389,21 @@ export class MissionsService {
    * sourceProposalId는 AI 미션일 때만, 그 제안은 같은 트랜잭션에서 먼저 accepted여야 함
    */
   async insertMissionRow(tx, userId, m) {
-    const { rows } = await tx.query(
-      `INSERT INTO missions
-              (id, user_id, goal_id, goal_step_id, definition_id, source_type,
-               source_proposal_id, title, description, category_id, difficulty_id,
-               target_value, target_unit, estimated_duration_seconds, verification_method,
-               scheduled_date, due_at, is_required, memo, reward_points,
-               reward_rate_version_id, reward_user_xp, reward_pet_xp, exercise_code)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
-       RETURNING ${COLUMNS}`,
-      [
-        newId(),
+    return (await this.insertMissionRows(tx, userId, [m]))[0];
+  }
+
+  /**
+   * 미션 여러 건을 한 번의 INSERT로 삽입하고 입력 순서대로 돌려준다
+   * (한 건씩 넣으면 DB 왕복이 미션 수만큼 늘어난다: 계획 수락은 미션이 수십 개)
+   * missions의 INSERT 트리거는 같은 표의 다른 행을 읽지 않으므로 한 문장으로 넣어도 결과가 같다
+   */
+  async insertMissionRows(tx, userId, list) {
+    if (list.length === 0) return [];
+    const ids = list.map(() => newId());
+    const values = [];
+    const tuples = list.map((m, i) => {
+      const row = [
+        ids[i],
         userId,
         m.goalId ?? null,
         m.stepId ?? null,
@@ -424,9 +427,25 @@ export class MissionsService {
         m.reward.userXp,
         m.reward.petXp,
         m.exerciseCode ?? null,
-      ],
+      ];
+      const base = values.length;
+      values.push(...row);
+      return `(${row.map((_, j) => `$${base + j + 1}`).join(',')})`;
+    });
+    const { rows } = await tx.query(
+      `INSERT INTO missions
+              (id, user_id, goal_id, goal_step_id, definition_id, source_type,
+               source_proposal_id, title, description, category_id, difficulty_id,
+               target_value, target_unit, estimated_duration_seconds, verification_method,
+               scheduled_date, due_at, is_required, memo, reward_points,
+               reward_rate_version_id, reward_user_xp, reward_pet_xp, exercise_code)
+       VALUES ${tuples.join(',')}
+       RETURNING ${COLUMNS}`,
+      values,
     );
-    return this.toView(rows[0]);
+    // RETURNING 순서에 기대지 않고 미리 만든 id로 입력 순서를 맞춘다
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return ids.map((id) => this.toView(byId.get(id)));
   }
 
   /** 특정 AI 제안으로 만든 미션(취소 이력 포함), 이미 수락한 제안의 결과를 다시 보여 줄 때 사용 */

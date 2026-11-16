@@ -55,6 +55,18 @@ export function getAccessToken() {
   return state.tokens?.accessToken ?? null;
 }
 
+/**
+ * 회원·토큰과 상관없이 잠깐 실패한 것인가 (인터넷 끊김·시간 초과·서버 5xx·요청 과다).
+ * 이런 실패로는 로그인을 풀지 않는다.
+ * @param {any} error
+ */
+export function isTransientError(error) {
+  if (!error) return false;
+  if (error.isNetwork) return true;
+  const status = error.status ?? 0;
+  return status >= 500 || status === 408 || status === 429;
+}
+
 /** 캐시를 비우기 위해 `ClientProvider`가 넘겨 준다. */
 let queryClient = null;
 export function attachQueryClient(client) {
@@ -105,6 +117,8 @@ let refreshInFlight = null;
 
 /**
  * A09 토큰 갱신.
+ * 리프레시 토큰이 무효면 false(부르는 쪽이 로그아웃), 인터넷·서버 문제로 잠깐 실패하면
+ * 그 오류를 그대로 던진다 — 로그인은 유지하고 화면에는 "연결 오류"가 보인다.
  * @returns {Promise<boolean>} 새 토큰을 받았으면 true
  */
 export function refresh() {
@@ -120,9 +134,10 @@ export function refresh() {
       state.tokens = session.tokens;
       if (session.profile) state.profile = session.profile;
       return true;
-    } catch {
-      // AUTH_REFRESH_INVALID도, 네트워크 오류도 "갱신 못 함"이다.
-      // 로그인 화면으로 보낼지는 부르는 쪽(httpClient)이 정한다.
+    } catch (error) {
+      // 잠깐 실패한 것이면 토큰을 그대로 두고 오류만 알린다(다음 요청 때 다시 갱신한다).
+      if (isTransientError(error)) throw error;
+      // AUTH_REFRESH_INVALID 등 토큰 자체가 무효 → 로그인 화면으로 보낼지는 httpClient가 정한다.
       return false;
     }
   })();
@@ -136,9 +151,10 @@ export function refresh() {
 /**
  * 앱 시작 때 한 번. 키체인의 토큰으로 세션을 되살린다 (§3.4).
  *
- * 인터넷이 없어서 `/me`를 못 부른 경우는 로그아웃시키지 않고 토큰을 믿는다.
+ * 인터넷이 없거나 서버가 잠깐 오류(5xx 등)를 내서 `/me`를 못 부른 경우는
+ * 로그아웃시키지 않고 토큰을 믿는다. 토큰이 무효(401)이거나 계정이 없을 때만 로그아웃한다.
  * (문서가 정한 것은 "성공 → signedIn", "갱신 실패 → signedOut"까지다.
- *  오프라인으로 30일짜리 리프레시 토큰을 버리면 손해만 크다.)
+ *  일시 오류로 30일짜리 리프레시 토큰을 버리면 손해만 크다.)
  *
  * @returns {Promise<SessionStatus>}
  */
@@ -163,7 +179,7 @@ export async function restore() {
     state.profile = { id: me.id, nickname: me.nickname };
     state.status = 'signedIn';
   } catch (error) {
-    if (error?.isNetwork) {
+    if (isTransientError(error)) {
       state.status = 'signedIn';
     } else {
       await clearTokens();

@@ -16,7 +16,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import Routes from './routes';
-import navigationRef from './navigationRef';
+import navigationRef, { flushPendingNavigation } from './navigationRef';
 import { useSession } from '../client';
 import SplashScreen from '../screens/common/SplashScreen';
 import SignupCompleteScreen from '../screens/auth/SignupCompleteScreen';
@@ -62,7 +62,11 @@ export default function RootNavigator() {
   const { status } = useSession();
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={flushPendingNavigation}
+      onStateChange={flushPendingNavigation}
+    >
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {status === 'restoring' && (
           <Stack.Screen name={Routes.SPLASH} component={SplashScreen} />

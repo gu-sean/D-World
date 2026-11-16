@@ -15,7 +15,7 @@
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { useCameraVerification } from '../../client';
+import { useCameraVerification, useMe } from '../../client';
 import { Button, ErrorBanner, Icon, ProgressRing, Screen } from '../../components';
 import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
@@ -32,7 +32,12 @@ const MESSAGES = {
 export default function VerifyAnalyzingScreen({ navigation, route }) {
   const { missionId } = route.params ?? {};
   const verification = useCameraVerification(missionId);
-  const { phase, progress, record, error } = verification.state;
+  const { phase, progress, record, error, queued } = verification.state;
+  // 알림을 끈 회원에게는 "알림으로 알려 드려요" 대신 켜는 방법을 안내한다 (모르면 켜진 것으로 본다)
+  const notifyOn = useMe().data?.notificationEnabled !== false;
+  const notifyText = notifyOn
+    ? '결과는 알림으로도 알려 드려요.'
+    : '설정에서 알림을 켜면 결과를 알려 드려요.';
 
   useEffect(() => {
     if (phase === 'done' && record?.id) {
@@ -48,9 +53,17 @@ export default function VerifyAnalyzingScreen({ navigation, route }) {
       <Screen title="확인 중">
         <View style={styles.wrap}>
           <Icon name="clock" size={48} color={colors.warning} />
-          <Text style={styles.heading}>결과가 조금 늦어지고 있어요</Text>
+          <Text style={styles.heading}>
+            {queued ? '연결되면 자동으로 보낼게요' : '결과가 조금 늦어지고 있어요'}
+          </Text>
           <Text style={styles.description}>
-            확인이 끝나면 알림으로 알려 드릴게요. 앱을 닫아도 괜찮아요.
+            {queued
+              ? `인터넷이 불안정해서 영상을 아직 올리지 못했어요. 연결되면 자동으로 올리고, ${
+                  notifyOn ? '결과는 알림으로 알려 드릴게요.' : '결과는 알림함에서 볼 수 있어요.'
+                } 앱을 닫아도 괜찮아요.`
+              : notifyOn
+                ? '확인이 끝나면 알림으로 알려 드릴게요. 앱을 닫아도 괜찮아요.'
+                : '확인이 끝나면 알림함에서 결과를 볼 수 있어요. 앱을 닫아도 괜찮아요.'}
           </Text>
         </View>
         <View style={styles.footer}>
@@ -100,7 +113,7 @@ export default function VerifyAnalyzingScreen({ navigation, route }) {
         )}
 
         <Text style={styles.description}>
-          화면을 닫아도 업로드는 계속돼요. 결과는 알림으로도 알려 드려요.
+          화면을 닫아도 업로드는 계속돼요. {notifyText}
         </Text>
       </View>
     </Screen>

@@ -319,7 +319,7 @@ export class DecisionService {
       [recordId, RECORD_STATUS_BY_DECISION[decision], decision],
     );
 
-    await this.notifyVerdict(tx, mission, resultId, decision);
+    await this.notifyVerdict(tx, mission, recordId, resultId, decision);
 
     const isValid = await this.hasValidApproval(tx, mission.id);
     const result = {
@@ -381,14 +381,15 @@ export class DecisionService {
    * 회원에게 판정 결과 알림(알림함, 알림을 켠 회원은 푸시 대기)
    * 보류(review_required)는 회원에게 알리지 않는 판정이라 제외(notified_at도 비어 있음)
    * 판정마다 한 번: event_key = verification_result:{판정 id}
+   * 알림(푸시·알림함)을 누르면 그 인증의 결과 화면으로 간다: link_screen = records/{기록 id}
    */
-  async notifyVerdict(tx, mission, resultId, decision) {
+  async notifyVerdict(tx, mission, recordId, resultId, decision) {
     if (decision !== 'approved' && decision !== 'rejected') return;
     const approved = decision === 'approved';
     await tx.query(
       `INSERT INTO user_notifications
-         (id, user_id, kind, event_key, title, body, push_status)
-       SELECT $1, $2::short_id, 'system', $3, $4, $5,
+         (id, user_id, kind, event_key, title, body, link_screen, push_status)
+       SELECT $1, $2::short_id, 'system', $3, $4, $5, $6,
               CASE WHEN COALESCE(p.notification_enabled, false)
                    THEN 'pending' ELSE 'none' END
          FROM users u LEFT JOIN profiles p ON p.user_id = u.id
@@ -402,6 +403,7 @@ export class DecisionService {
         approved
           ? `「${mission.title}」 미션 인증이 승인됐어요.`
           : `「${mission.title}」 미션 인증이 반려됐어요. 사유를 확인해 주세요.`,
+        `records/${recordId}`,
       ],
     );
   }

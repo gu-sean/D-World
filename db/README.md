@@ -2,17 +2,16 @@
 
 ## 개요
 - 엔진: PostgreSQL 14+ (개발 compose는 16)
-- 규모(020 기준, 공유 DB 실측 2026-11-15): 테이블 94(+`schema_migrations`), 뷰 1, 함수 83, 트리거 95, FK 204, CHECK 466, 인덱스 329, 카테고리는 `exercise` 1개
-- 스키마: `public` 단일, 마이그레이션 `001~020`를 번호 순서로 적용 (019는 두 파일이 같은 번호, 아래 "마이그레이션 정책" 참고)
+- 규모(022 기준, 공유 DB 실측 2026-11-16): 테이블 96(+`schema_migrations`), 뷰 1, 함수 84, FK 207, CHECK 474, 인덱스 335, 카테고리는 `exercise` 1개
+- 스키마: `public` 단일, 마이그레이션 `001~022`를 번호 순서로 적용 (019는 두 파일이 같은 번호, 아래 "마이그레이션 정책" 참고)
 - 시간 기준: 저장은 `timestamptz`, 일·월 집계(월간 한도, 스트릭)는 `Asia/Seoul`
 - 식별자: 전 테이블 `short_id` PK (8자 영숫자, 대소문자 구분, `varchar(8) COLLATE "C"` 도메인). 앱이 생성(`backend/src/common/ids.js`), DB 쪽은 `new_short_id()`
   - 충돌 확률: 62^8 ≈ 218조, 표 하나에 100만 행이어도 약 0.2%. 겹치면 PK 중복으로 거부되고 `withTransaction`이 새 ID로 자동 재시도
 
 ```
 db/
-  migrations/   001~020 (기능별 파일, 번호 = 적용 순서, 019는 두 개)
+  migrations/   001~022 (기능별 파일, 번호 = 적용 순서, 019는 두 개)
   seeds/dev/    개발용 시드 (001 기준 데이터, 002 콘텐츠·개발 사용자·공개 챌린지, assets)
-  (시연용 가상 데이터는 SQL이 아니라 `backend/scripts/seed-demo.mjs`, 아래 "시연 데이터" 참고)
   scripts/      verify.sh (Docker 없이), verify-docker.sh (Docker)
   ops/          운영 기준·계정 분리·백업·복구 리허설·모니터링·마이그레이션 적용 절차 ([ops/README.md](ops/README.md))
   (줄바꿈 LF 고정은 저장소 루트 .gitattributes)
@@ -68,7 +67,9 @@ db/
 | 019 | 난이도 추천(`019_fitness_difficulty_agents`): `profiles`에 나이·키·몸무게·추천 난이도·추천 이유·검토 시각 컬럼 추가, 추천을 한 번 할 때마다 남기는 `difficulty_recommendation_runs` 표(세 에이전트 판단 JSON) | 1 | |
 | 019 | 펫 이미지 GIF 허용(`019_pet_image_gif`): `pet_stage_images`·`admin_asset_uploads`의 형식 검사에 `image/gif` 추가(업적 배지 이미지는 그대로 PNG·JPEG·WebP만). 구조·데이터 변경 없음 | 0 | |
 | 020 | `difficulty_recommendation_runs`의 행 수준 보안(RLS) 켜기(다른 표와 같게, 정책 없음), 019가 추가한 표·컬럼에 설명(COMMENT) 추가. 구조·데이터 변경 없음 | 0 | |
-| 합계 | | 94 | |
+| 021 | 회원 알림(푸시) 기본값을 켜짐으로 변경하고, 꺼져 있던 회원도 켠다. 구조 변경 없음(기본값·데이터만) | 0 | |
+| 022 | 펫 경험치 지갑(`pet_xp_wallets`, `pet_xp_wallet_transactions`)과 성장 규칙 변경(알→아기 세부 미션 3개, 아기→성체 먹인 XP 450, 펫 분야 선택 사항화), 새 미션 보상표 | 2 | |
+| 합계 | | 96 | |
 
 - 통합 이력: 보정 파일 014~017(2026-11-09)을 기능 파일 006·007·008·013에 합쳤다. 스키마는 통합 전과 동일(열·제약·인덱스·트리거·함수 2,237건 일치 확인)
 - 통합 전 파일이 적용된 DB는 `ops/rebaseline.sh`로 이력만 맞추거나 재생성한다([ops/migration-runbook.md](ops/migration-runbook.md))
@@ -112,15 +113,6 @@ createdb d_world
 for f in db/migrations/*.sql; do psql -v ON_ERROR_STOP=1 -d d_world -f "$f"; done
 for f in db/seeds/dev/*.sql;  do psql -v ON_ERROR_STOP=1 -d d_world -v admin_password_hash='<hash>' -v user_password_hash='<hash>' -f "$f"; done
 ```
-
-## 시연 데이터
-- 목적: 시연·수동 테스트용으로 사용자 1명이 앱 기능을 한 번씩 쓴 상태를 만든다 (아래는 이 데이터를 처음부터 만드는 시드 스크립트)
-- 방식: 원장·캐시·트리거 정합성을 SQL로 직접 맞추지 않고 **앱 API·서비스를 그대로 통과**시켜 생성 (`backend/scripts/seed-demo.mjs`)
-- 선행: 마이그레이션 + 개발 시드 001·002 적용, `npm run build`
-- 실행: `DEMO_USER_PASSWORD=... DATABASE_URL=... npm run db:seed:demo` (사용자가 이미 있으면 건너뜀, 다시 만들려면 DB 재생성)
-- 로그인: 휴대폰 `01000000002` / `DEMO_USER_PASSWORD`, 사용자 id `d0000000-0000-4000-8000-000000000801`
-- 만들어지는 것(각 1건): 계정(휴대폰·구글 연결·약관 동의·푸시 기기), 펫 선택·대표, 목표(활성)·단계, 미션 3개(승인·거절·대기), 인증 판정 승인(포인트·XP·스트릭 반영)·거절·이의 제기, 목표 완료로 업적 획득, 포인트 지급·상점 주문·인벤토리, 챌린지 참여, 공지 게시·알림, 문의, 시간별 날씨(서울 격자)·상황 추천, 주간 AI 리포트(가상)
-- 비어 있는 테이블: 정산·순위·회수·탈퇴·모더레이션 등 **상태 전이가 더 필요한 것**, R2 파일(`media_files`), AI 계획 제안·재조정(AI 서버 필요), 펫 진화 기록(XP 부족)
 
 ## 앱이 지켜야 할 규칙
 DB가 강제하지 않는 것만 정리

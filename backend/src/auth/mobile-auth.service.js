@@ -208,8 +208,8 @@ export class MobileAuthService {
   }
 
   /** A06 */
-  async login({ phone, password }) {
-    return this.toSession(await this.auth.loginPhone({ phone, password }));
+  async login({ phone, password, ip }) {
+    return this.toSession(await this.auth.loginPhone({ phone, password, ip }));
   }
 
   /** A07: 가입된 소셜이면 Session, 아니면 SocialSignupRequired */

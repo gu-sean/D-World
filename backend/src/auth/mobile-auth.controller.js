@@ -7,6 +7,7 @@ import {
   HttpCode,
   Param,
   Post,
+  Req,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/auth/public.decorator.js';
@@ -86,8 +87,8 @@ export class MobileAuthController {
   @Throttle(STRICT)
   @Post('auth/login')
   @HttpCode(200)
-  @Bind(Body())
-  login(body) {
+  @Bind(Req(), Body())
+  login(request, body) {
     const data = validateBody(body, {
       phoneNumber: phone(),
       password: string({ max: 200 }),
@@ -95,6 +96,7 @@ export class MobileAuthController {
     return this.mobileAuth.login({
       phone: data.phoneNumber,
       password: data.password,
+      ip: request.ip,
     });
   }
 

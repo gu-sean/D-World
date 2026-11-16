@@ -20,7 +20,8 @@ export const DEFAULT_TIMEOUT_MS = 15000;
 /**
  * @typedef {object} AuthProvider
  * @property {() => string|null} getAccessToken 지금 쓸 액세스 토큰
- * @property {() => Promise<boolean>} refresh 토큰 갱신 (동시에 불려도 요청은 1개)
+ * @property {() => Promise<boolean>} refresh 토큰 갱신 (동시에 불려도 요청은 1개).
+ *   무효면 false → 로그아웃, 인터넷·서버 일시 오류면 그 오류를 던진다 → 로그인 유지
  * @property {() => Promise<void>} endSession 갱신 실패 → 로컬 세션 정리
  */
 
@@ -120,6 +121,7 @@ async function send(opts, mayRefresh) {
 
   // 401 AUTH_TOKEN_EXPIRED → 갱신 후 같은 요청을 한 번만 더 (05 §4)
   if (mayRefresh && auth && status === 401 && error.code === 'AUTH_TOKEN_EXPIRED' && authProvider) {
+    // 갱신이 일시 오류로 실패하면 refresh()가 그 오류를 던지므로 로그아웃하지 않고 그대로 올라간다.
     const renewed = await authProvider.refresh();
     if (renewed) return send(opts, false);
     await authProvider.endSession();

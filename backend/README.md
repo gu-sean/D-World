@@ -145,7 +145,6 @@ npm run test:e2e                                          # 통합 (test/e2e), D
 - **`.env` 없이 돌려도, 불러와서 돌려도 같은 결과**: `test/config/e2e-env.cjs`가 JWT 키·내부 토큰·`JOBS_DISABLED`·날씨 설정을 테스트용 값으로 채운다.
   `.env.example`에서 복사한 빈 값(`INTERNAL_API_TOKEN=`)이나 운영용 값(`JOBS_DISABLED=false`)이 들어와도 덮어쓴다 (셸에서 명시한 값은 존중)
 - 새 e2e를 쓸 때: 시드된 DB에만 있는 데이터(레벨 정책, 분야 등)에 기대지 않는다. 필요하면 파일 안에서 만들고, 이미 있으면 건드리지 않는다
-- 시연 데이터: `DEMO_USER_PASSWORD=... npm run db:seed:demo` (개발 시드 001·002 선행, 상세는 [db/README.md](../db/README.md#시연-데이터))
 - `test/` 구성
   - `unit/`: DB 없는 계산·검증 함수
   - `e2e/`: 실제 PostgreSQL, 파일 단위 순차 실행
@@ -201,7 +200,7 @@ src/
   admin-content/       관리자 공지(M90~M94)·약관 문서(M95~M97)·추천 문구(M98~M100)
   admin-dashboard/     관리자 대시보드(M05), 결제·구독 껍데기(M110, 501)
   health/              GET /health, /health/live
-scripts/               migrate.mjs, seed.mjs(개발 시드), seed-demo.mjs(시연 데이터), create-admin.mjs, export-openapi.mjs
+scripts/               migrate.mjs, seed.mjs(개발 시드), create-admin.mjs, export-openapi.mjs, push-check.mjs(FCM 점검), weather-check.mjs(기상청 점검), seed-pet-species.mjs·apply-pet-egg.mjs·upload-pet-stills.mjs·make-pet-stills.py(펫 이미지), supabase.mjs·supabase-helpers.mjs(Supabase 연결)
 test/                  unit/(모듈별 단위), e2e/(실제 PostgreSQL, 파일명 *.e2e-spec.js), support/(앱·사용자·관리자 헬퍼), config/(jest 설정)
 ```
 

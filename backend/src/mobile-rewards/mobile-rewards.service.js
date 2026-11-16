@@ -5,6 +5,12 @@ import { DatabaseService } from '../database/database.service.js';
 
 const num = (value) => Number(value);
 
+/** 완료한 미션 수로 진행도를 세는 업적 조건 (achievements.service.js getProgress와 같은 구분) */
+const COUNT_CONDITIONS = new Set([
+  'approved_mission_count',
+  'category_approved_mission_count',
+]);
+
 const FIXED_TITLES = {
   streak: '연속 달성 보상',
   achievement: '업적 보상',
@@ -126,6 +132,7 @@ export class MobileRewardsService {
       `SELECT ad.id, ad.code, cur.title, cur.description, cur.rarity,
               cur.condition_type, cur.target_count, cur.reward_points,
               cur.reward_user_xp, cur.reward_pet_xp,
+              cur.category_id, cur.id AS version_id,
               ua.status AS grant_status, ua.awarded_at
          FROM achievement_definitions ad
          JOIN LATERAL (
@@ -139,18 +146,46 @@ export class MobileRewardsService {
         ORDER BY cur.target_count, ad.code`,
       [userId, rarity ?? null],
     );
-    const items = [];
-    for (const row of rows) {
-      const earned = row.grant_status === 'active';
-      let progressCount = row.target_count;
-      if (!earned) {
-        const progress = await this.achievements.getProgress(
+    // 진행도는 한 번에 모아 구한다: 업적마다 쿼리를 3개씩 순서대로 보내면 업적 수에 비례해 느려진다
+    // (getProgress와 같은 결과: 지급 기록이 있으면 회수된 것도 목표를 채운 것으로 본다)
+    const countByCategory = new Map();
+    const countOf = (categoryId) => {
+      const key = categoryId ?? '';
+      if (!countByCategory.has(key)) {
+        countByCategory.set(
+          key,
+          this.achievements.qualifyingMissionCount(
+            this.database,
+            userId,
+            categoryId,
+          ),
+        );
+      }
+      return countByCategory.get(key);
+    };
+    const progressCounts = await Promise.all(
+      rows.map(async (row) => {
+        if (row.grant_status !== null) return row.target_count;
+        if (COUNT_CONDITIONS.has(row.condition_type)) {
+          return Math.min(await countOf(row.category_id), row.target_count);
+        }
+        const source = await this.achievements.checkQualification(
           this.database,
           userId,
-          row.id,
+          {
+            conditionType: row.condition_type,
+            targetCount: row.target_count,
+            categoryId: row.category_id,
+            versionId: row.version_id,
+          },
         );
-        progressCount = progress.current;
-      }
+        return source ? row.target_count : 0;
+      }),
+    );
+    const items = [];
+    for (const [index, row] of rows.entries()) {
+      const earned = row.grant_status === 'active';
+      const progressCount = progressCounts[index];
       items.push({
         id: row.id,
         code: row.code,
