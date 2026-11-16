@@ -13,6 +13,7 @@ import {
   PhoneVerificationService,
 } from './phone-verification.service.js';
 import { SocialVerifierService } from './social/social-verifier.service.js';
+import { ageFromBirth } from './social/social-verifier.service.js';
 
 const VERIFICATION_TOKEN_KIND = 'phone-verification-token';
 const SOCIAL_SIGNUP_KIND = 'social-signup';
@@ -220,6 +221,9 @@ export class MobileAuthService {
       signupRequired: true,
       provider,
       email: identity.email,
+      // 네이버가 출생연도를 주면 가입 화면 나이 칸을 미리 채운다 (구글은 null)
+      birthYear: identity.birthYear ?? null,
+      suggestedAge: ageFromBirth(identity.birthYear, identity.birthday),
       socialSignupToken: signToken(
         this.secret,
         SOCIAL_SIGNUP_KIND,

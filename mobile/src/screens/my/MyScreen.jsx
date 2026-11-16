@@ -14,7 +14,6 @@ import {
   Icon,
   ListRow,
   PetAvatar,
-  ProgressBar,
   QueryState,
   Screen,
   SectionTitle,
@@ -32,11 +31,6 @@ export default function MyScreen({ navigation }) {
     <Screen title="마이" padded={false}>
       <QueryState query={me}>
         {(data) => {
-          const levelRate =
-            data.nextLevelXp && data.nextLevelXp > 0
-              ? Math.min(data.totalXp / data.nextLevelXp, 1)
-              : 1;
-
           return (
             <ScrollView contentContainerStyle={styles.body}>
               {!!data.restriction && (
@@ -72,16 +66,11 @@ export default function MyScreen({ navigation }) {
                 <PetAvatar pet={data.representativePet} size={64} animated={false} />
                 <View style={styles.profileText}>
                   <Text style={styles.nickname}>{data.nickname}</Text>
-                  <Text style={styles.level}>
-                    Lv.{data.levelNo}
-                    {!!data.representativeBadge && ` · ${data.representativeBadge.title}`}
-                  </Text>
-                  <ProgressBar rate={levelRate} height={6} />
+                  {!!data.representativeBadge && (
+                    <Text style={styles.level}>{data.representativeBadge.title}</Text>
+                  )}
                   <Text style={styles.xp}>
-                    경험치 {format.formatNumber(data.totalXp)}
-                    {data.nextLevelXp
-                      ? ` / ${format.formatNumber(data.nextLevelXp)}`
-                      : ' (최고 레벨)'}
+                    펫에게 줄 경험치 {format.formatNumber(data.petXpBalance ?? 0)} XP
                   </Text>
                 </View>
               </Card>

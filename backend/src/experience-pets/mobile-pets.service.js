@@ -28,7 +28,10 @@ export class MobilePetsService {
       description: view.description,
       personality: view.personality,
       worldText: view.worldText,
-      categoryCode: categoryCodes.get(view.category.id) ?? null,
+      // 펫 분야는 없앴다(022)
+      categoryCode: null,
+      // 키워 본 적 없는 종류는 이름·그림을 숨김(도감 비공개)
+      hidden: view.hidden,
       unlockConditionType: UNLOCK_TYPES[view.unlock.type] ?? 'always',
       unlockTargetCount: view.unlock.targetCount ?? null,
       unlocked: view.unlock.met,
@@ -69,9 +72,7 @@ export class MobilePetsService {
       this.pets.listSpecies(userId),
       this.categoryCodes(),
     ]);
-    return views
-      .filter((view) => !categoryId || view.category.id === categoryId)
-      .map((view) => this.toSpecies(view, codes));
+    return views.map((view) => this.toSpecies(view, codes));
   }
 
   async speciesDetail(userId, speciesId) {

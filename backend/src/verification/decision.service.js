@@ -93,11 +93,11 @@ export class DecisionService {
           WHERE mission_id = $1 AND user_id = $2 AND status = 'active'`,
         [mission.id, userId],
       ),
+      // 022: 펫 XP는 지갑에 들어간 양(하루 첫 미션만 30)
       tx.query(
-        `SELECT recipient_pet_id, base_user_xp, base_pet_xp, bonus_pet_xp
-           FROM experience_awards
+        `SELECT COALESCE(sum(xp_delta), 0) AS pet_xp FROM pet_xp_wallet_transactions
           WHERE user_id = $1 AND source_type = 'mission' AND source_id = $2
-            AND status = 'active'`,
+            AND kind IN ('mission', 'reward', 'reversal')`,
         [userId, mission.id],
       ),
       tx.query(
@@ -121,17 +121,18 @@ export class DecisionService {
       ),
     ]);
     const point = points.rows[0];
-    const award = xp.rows[0];
-    const levelNo = level.rows[0]?.level_no ?? 1;
+    const petXp = Number(xp.rows[0]?.pet_xp ?? 0);
     const stageNo = pet.rows[0]?.stage_no ?? null;
     const rewards = {
       points: point ? point.paid_points : 0,
       pointsCapped: point ? point.paid_points < point.original_points : false,
-      userXp: award ? award.base_user_xp : 0,
-      petXp: award ? award.base_pet_xp + award.bonus_pet_xp : 0,
-      petId: award?.recipient_pet_id ?? null,
-      levelUp: levelNo > before.levelNo,
-      newLevelNo: levelNo > before.levelNo ? levelNo : null,
+      // 사용자 XP·레벨은 없앴다 (022). 앱 호환을 위해 칸은 0/false로 남김
+      userXp: 0,
+      petXp,
+      petId: record.reward_pet_id ?? null,
+      levelUp: false,
+      newLevelNo: null,
+      petXpLimitedToday: petXp === 0,
       petEvolved:
         stageNo !== null && before.stageNo !== null && stageNo > before.stageNo,
       streakDays: streak.rows[0]?.current_success_days ?? 0,
@@ -466,6 +467,8 @@ export class DecisionService {
     } else {
       await this.experience.reinstateExperience(tx, { awardId, resultId });
     }
+    // 완료 미션 수가 늘었으니 알 부화(세부 미션 3개) 여부를 다시 계산
+    await this.experience.syncPets(tx, userId);
 
     await this.achievements.evaluate(tx, {
       userId,
@@ -502,6 +505,8 @@ export class DecisionService {
     await this.achievements.evaluate(tx, { userId, trigger: 'revoked' });
 
     await this.setOpenStatus(tx, mission);
+    // 완료가 취소됐으니 부화 조건을 다시 계산
+    await this.experience.syncPets(tx, userId);
   }
 
   /**

@@ -15,8 +15,8 @@ export const Routes = Object.freeze({
   // 로그인·가입
   LOGIN: 'Login',
   SIGNUP_METHOD: 'SignupMethod',
-  SOCIAL_SIGNUP_CONFIRM: 'SocialSignupConfirm', // { provider, email, socialSignupToken }
-  TERMS_AGREEMENT: 'TermsAgreement',            // { purpose: 'phone'|'social', socialSignupToken? }
+  SOCIAL_SIGNUP_CONFIRM: 'SocialSignupConfirm', // { provider, email, socialSignupToken, suggestedAge? }
+  TERMS_AGREEMENT: 'TermsAgreement',            // { purpose: 'phone'|'social', socialSignupToken?, suggestedAge? }
   PHONE_NUMBER: 'PhoneNumber',                  // { purpose: 'signup'|'reset_password', consents? }
   PASSWORD_SETUP: 'PasswordSetup',              // { mode: 'signup'|'reset', verificationToken, consents? }
   NICKNAME_SETUP: 'NicknameSetup',              // { verificationToken, password, consents } 또는 { socialSignupToken, consents }

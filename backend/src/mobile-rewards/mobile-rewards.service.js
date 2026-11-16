@@ -164,7 +164,6 @@ export class MobileRewardsService {
         earnedAt: earned ? row.awarded_at : null,
         badgeImageUrl: null,
         rewardPoints: row.reward_points,
-        rewardUserXp: row.reward_user_xp,
         rewardPetXp: row.reward_pet_xp,
       });
     }

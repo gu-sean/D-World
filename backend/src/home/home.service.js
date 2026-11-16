@@ -90,7 +90,6 @@ export class HomeService {
       memo: row.memo,
       rewardPreview: {
         points: row.reward_points,
-        userXp: row.reward_user_xp,
         petXp: row.reward_pet_xp,
       },
     };

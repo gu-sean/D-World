@@ -19,6 +19,8 @@ import { startRecord, abortRecord, submitRecord } from '../api/recordsApi.js';
 import { ensure } from '../device/permissions.js';
 import { watchPositions } from '../device/location.js';
 import { isAvailable as pedometerAvailable, watchSteps } from '../device/pedometer.js';
+import { isAvailable as motionAvailable, watchMotion } from '../device/motion.js';
+import { analyzeRun } from '../running/runRules.js';
 import { activate as keepAwakeOn, deactivate as keepAwakeOff } from '../device/keepAwake.js';
 import { cacheDir, writeGzipJson, removeFile, sha256OfFile } from '../device/files.js';
 import { createDistanceTracker } from '../running/liveDistance.js';
@@ -33,6 +35,10 @@ export const READY_ACCURACY_M = 20;
 export const READY_TIMEOUT_MS = 30 * 1000;
 export const MAX_RUN_SECONDS = 7200;
 const TICK_MS = 1000;
+/** 화면용 규칙 계산 주기 (초). 2시간 기록도 버벅이지 않게 매초 하지 않는다 */
+const ANALYZE_EVERY_TICKS = 5;
+/** 화면 경로에 그릴 최대 점 수 */
+const ROUTE_MAX_POINTS = 300;
 
 /** 테스트에서만 짧게 바꾼다 (3분·30초·2시간을 실제로 기다릴 수 없으므로). */
 export const runTiming = {
@@ -50,6 +56,13 @@ const IDLE_STATE = {
   distanceMeters: 0,
   steps: 0,
   gpsAccuracyM: null,
+  // 서버와 같은 규칙(runRules)으로 계산한 실시간 값
+  excludedMeters: 0, // 탈것으로 보여 뺀 거리
+  vehicleNow: false, // 최근 30초가 탈것으로 보이는지
+  paceSecondsPerKm: null,
+  cadenceSpm: null,
+  calories: null, // 몸무게가 없으면 null
+  route: [], // [{lat, lng}] 화면 경로 그림용
   paused: false,
   progress: 0,
   record: null,
@@ -85,6 +98,10 @@ function createEngine(missionId) {
   // 기록 중인 값들
   let stopLocation = null;
   let stopSteps = null;
+  let stopMotion = null;
+  let motion = [];
+  let weightKg = null;
+  let tickCount = 0;
   let appStateSub = null;
   let ticker = null;
   let tracker = createDistanceTracker();
@@ -132,16 +149,49 @@ function createEngine(missionId) {
     const elapsedMs = nowMs() - startedAtMs;
     const activeMs = elapsedMs - pausedTotalMs;
     const elapsedSeconds = Math.floor(elapsedMs / 1000);
+    tickCount += 1;
+    if (tickCount % ANALYZE_EVERY_TICKS === 0) analyzeLive();
     set({
       elapsedSeconds,
       activeSeconds: Math.max(0, Math.floor(activeMs / 1000)),
-      distanceMeters: tracker.meters,
+      distanceMeters: Math.max(0, tracker.meters - state.excludedMeters),
     });
     if (elapsedSeconds >= runTiming.maxRunSeconds) {
       events.push({ timestampMs: nowMs(), type: 'pause', reason: 'auto_stop' });
       // 2시간이 넘으면 스스로 끝낸다 (§7.2).
       api.finish();
     }
+  }
+
+  /** 지금까지의 기록을 서버와 같은 규칙으로 계산해 화면 값을 바꾼다. */
+  function analyzeLive() {
+    const rel = (ms) => (ms - startedAtMs) / 1000;
+    const { windows, summary } = analyzeRun(
+      {
+        points: points.map((p) => ({ t: rel(p.timestampMs), lat: p.lat, lng: p.lng, acc: p.acc, mocked: p.mocked })),
+        steps: steps.map((x) => ({ t: rel(x.timestampMs), count: x.count })),
+        motion: motion.map((m) => ({ t: rel(m.timestampMs), amp: m.amp, freq: m.freq })),
+        events: events.map((e) => ({ t: rel(e.timestampMs), type: e.type })),
+      },
+      { weightKg },
+    );
+    const moving = windows.filter((w) => w.kind === 'run' || w.kind === 'vehicle');
+    const last = moving.at(-1);
+    const usable = points.filter((p) => typeof p.acc === 'number' && p.acc <= 35);
+    const step = Math.max(1, Math.ceil(usable.length / ROUTE_MAX_POINTS));
+    set({
+      excludedMeters: summary.vehicleMeters,
+      vehicleNow: last?.kind === 'vehicle',
+      paceSecondsPerKm: summary.paceSecondsPerKm,
+      cadenceSpm: last?.cadence ?? summary.avgCadenceSpm,
+      calories: summary.calories,
+      route: usable.filter((_, i) => i % step === 0 || i === usable.length - 1).map((p) => ({ lat: p.lat, lng: p.lng })),
+    });
+  }
+
+  function onMotion(summary) {
+    if (state.phase !== 'running') return;
+    motion.push(summary);
   }
 
   function startTicker() {
@@ -160,6 +210,8 @@ function createEngine(missionId) {
     stopLocation = null;
     stopSteps?.();
     stopSteps = null;
+    stopMotion?.();
+    stopMotion = null;
     appStateSub?.remove?.();
     appStateSub = null;
     stopTicker();
@@ -207,6 +259,11 @@ function createEngine(missionId) {
       return () => decidedListeners.delete(listener);
     },
     dispose: stopRecording,
+
+    /** 칼로리 계산용 몸무게 (kg). 모르면 null — 칼로리를 보여 주지 않는다. */
+    setWeightKg(value) {
+      weightKg = Number(value) > 0 ? Number(value) : null;
+    },
 
     /**
      * 권한을 확인하고 GPS를 잡는다.
@@ -270,11 +327,16 @@ function createEngine(missionId) {
         pausedAtMs = 0;
         points = [];
         steps = [];
+        motion = [];
         events = [];
+        tickCount = 0;
         tracker.reset();
 
         if (await pedometerAvailable()) {
           stopSteps = watchSteps(onSteps);
+        }
+        if (await motionAvailable()) {
+          stopMotion = watchMotion(onMotion);
         }
 
         await keepAwakeOn();
@@ -321,9 +383,10 @@ function createEngine(missionId) {
           endedAtMs,
           points,
           steps,
+          motion,
           events,
           summary: {
-            distanceMeters: tracker.meters,
+            distanceMeters: Math.max(0, tracker.meters - state.excludedMeters),
             activeSeconds,
             steps: steps.length > 0 ? steps.at(-1).count : 0,
           },
@@ -436,6 +499,7 @@ export function useRunSession(missionId) {
     finish: engine.finish,
     retryUpload: engine.retryUpload,
     cancel: engine.cancel,
+    setWeightKg: engine.setWeightKg,
   };
 }
 

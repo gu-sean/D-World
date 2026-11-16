@@ -19,7 +19,6 @@ export default function RewardSummary({ rewards }) {
   if (!rewards) return null;
 
   const extras = [];
-  if (rewards.levelUp && rewards.newLevelNo) extras.push(`레벨 ${rewards.newLevelNo} 달성`);
   if (rewards.petEvolved) extras.push('펫이 진화했어요');
   if (rewards.streakDays > 0) extras.push(`${rewards.streakDays}일 연속 달성 중`);
 
@@ -27,12 +26,17 @@ export default function RewardSummary({ rewards }) {
     <Card style={styles.card}>
       <View style={styles.row}>
         <Reward icon="coin" label="포인트" value={format.formatPoints(rewards.points)} />
-        <Reward icon="star" label="경험치" value={`${format.formatNumber(rewards.userXp)} XP`} />
         <Reward icon="paw" label="펫 경험치" value={`${format.formatNumber(rewards.petXp)} XP`} />
       </View>
 
       {rewards.pointsCapped && (
-        <Text style={styles.note}>이번 달 포인트 한도에 걸려 일부만 지급됐어요.</Text>
+        <Text style={styles.note}>하루(120P) 또는 이번 달 포인트 한도에 걸려 일부만 지급됐어요.</Text>
+      )}
+      {!rewards.petXp && (
+        <Text style={styles.note}>펫 경험치는 하루에 한 번만 받아요. 오늘은 이미 받았어요.</Text>
+      )}
+      {!!rewards.petXp && (
+        <Text style={styles.note}>펫 경험치는 펫 화면에서 "경험치 주기"로 먹일 수 있어요.</Text>
       )}
 
       {extras.map((text) => (

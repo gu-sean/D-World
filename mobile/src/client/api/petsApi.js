@@ -53,6 +53,27 @@ export function hatchPet({ idempotencyKey, ...body }) {
  * @param {string} [after] ISO datetime
  * @returns {Promise<object[]>} `PetEvolution[]`
  */
+/**
+ * 펫 경험치 지갑 (아직 펫에게 주지 않은 경험치).
+ * @returns {Promise<{balance: number, earnedToday: boolean, missionPetXp: number, feedXp: number}>}
+ */
+export function getPetXpWallet() {
+  return request({ method: 'GET', path: '/me/pet-xp' });
+}
+
+/**
+ * 경험치 주기: 지갑에서 10을 펫에게 (아기 단계만).
+ * @returns {Promise<{petId: string, fedXp: number, totalXp: number, requiredXp: number, stageNo: number, evolved: boolean, balance: number}>}
+ */
+export function feedPet({ petId, idempotencyKey }) {
+  return request({
+    method: 'POST',
+    path: `/me/pets/${encodeURIComponent(petId)}/feed`,
+    idempotent: true,
+    idempotencyKey,
+  });
+}
+
 export function getPetEvolutionEvents(petId, after) {
   return request({
     method: 'GET',

@@ -111,12 +111,10 @@ export class MissionsService {
       cancelledAt: row.cancelled_at,
       reward: {
         points: row.reward_points,
-        userXp: row.reward_user_xp,
         petXp: row.reward_pet_xp,
       },
       rewardPreview: {
         points: row.reward_points,
-        userXp: row.reward_user_xp,
         petXp: row.reward_pet_xp,
       },
       createdAt: row.created_at,

@@ -47,37 +47,21 @@ export async function computeLevel(tx, table, policyVersionId, totalXp) {
 }
 
 /**
- * 펫 단계: user_pets_guard 트리거가 계산하는 식과 동일
- * (XP 임곗값 + 알 선택 후 시작한 해당 속성 승인 미션 수)
+ * 펫 단계: user_pets_guard 트리거(022_pet_feeding)와 같은 식
+ *   알을 고른 뒤 시작해 완료한 세부 미션이 3개 미만이면 알(1),
+ *   그다음 먹인 경험치가 450 미만이면 아기(2), 이상이면 성체(3). 분야는 보지 않는다.
  */
-export async function computeStage(
-  tx,
-  { speciesVersionId, userId, selectedAt },
-  totalXp,
-) {
+export async function computeStage(tx, { userId, selectedAt }, totalXp) {
   const { rows } = await tx.query(
-    `SELECT
-       (SELECT min_total_xp FROM pet_stage_versions
-         WHERE species_version_id = $1 AND stage_no = 2) AS baby_xp,
-       (SELECT min_total_xp FROM pet_stage_versions
-         WHERE species_version_id = $1 AND stage_no = 3) AS adult_xp,
-       (SELECT hatch_mission_count FROM pet_species_versions WHERE id = $1) AS hatch_required,
-       (SELECT count(DISTINCT m.id) FROM missions m
-          JOIN mission_records mr ON mr.mission_id = m.id
-          JOIN verification_results vr ON vr.record_id = mr.id
-          JOIN pet_species_versions psv ON psv.id = $1
-         WHERE m.user_id = $2 AND m.category_id = psv.category_id
-           AND m.status = 'completed' AND mr.started_at >= $3
-           AND vr.decision = 'approved' AND vr.is_current) AS actual_count`,
-    [speciesVersionId, userId, selectedAt],
+    `SELECT count(DISTINCT m.id) AS actual_count FROM missions m
+       JOIN mission_records mr ON mr.mission_id = m.id
+       JOIN verification_results vr ON vr.record_id = mr.id
+      WHERE m.user_id = $1 AND m.status = 'completed' AND mr.started_at >= $2
+        AND vr.decision = 'approved' AND vr.is_current`,
+    [userId, selectedAt],
   );
-  const r = rows[0];
-  const babyXp = toNumber(r.baby_xp);
-  const adultXp = toNumber(r.adult_xp);
-  const hatchRequired = toNumber(r.hatch_required);
-  const actualCount = toNumber(r.actual_count);
-  if (totalXp < babyXp || actualCount < hatchRequired) return 1;
-  if (totalXp < adultXp) return 2;
+  if (toNumber(rows[0].actual_count) < 3) return 1;
+  if (totalXp < 450) return 2;
   return 3;
 }
 

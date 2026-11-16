@@ -64,6 +64,7 @@ export function deviceInfo() {
  * @property {Array<{timestampMs: number, lat: number, lng: number, acc: number|null,
  *   alt: number|null, spd: number|null, mocked: boolean}>} points 받은 순서대로, 거르지 않고 전부
  * @property {Array<{timestampMs: number, count: number}>} steps 시작 이후 누적 걸음. 센서가 없으면 `[]`
+ * @property {Array<{timestampMs: number, amp: number, freq: number}>} [motion] 1초마다 흔들림 요약. 센서가 없으면 `[]`
  * @property {Array<{timestampMs: number, type: 'pause'|'resume', reason: 'user'|'background'|'auto_stop'}>} events
  * @property {{distanceMeters: number, activeSeconds: number, steps: number}} summary 화면에 보여 준 값
  */
@@ -74,7 +75,7 @@ export function deviceInfo() {
  * @returns {object} 그대로 `JSON.stringify` → gzip 하면 되는 객체
  */
 export function buildRunFile(session) {
-  const { recordId, startedAtMs, endedAtMs, points = [], steps = [], events = [], summary } = session;
+  const { recordId, startedAtMs, endedAtMs, points = [], steps = [], motion = [], events = [], summary } = session;
 
   return {
     format: RUN_FILE_FORMAT,
@@ -95,6 +96,12 @@ export function buildRunFile(session) {
     steps: steps.map((s) => ({
       t: elapsed(s.timestampMs, startedAtMs),
       count: Math.max(0, Math.trunc(Number(s.count) || 0)),
+    })),
+    // 흔들림 요약 (run-rule 판정이 탈것을 거를 때 쓴다). 예전 앱은 이 칸이 없다
+    motion: motion.map((m) => ({
+      t: elapsed(m.timestampMs, startedAtMs),
+      amp: round(m.amp, 3),
+      freq: round(m.freq, 2),
     })),
     events: events.map((e) => ({
       t: elapsed(e.timestampMs, startedAtMs),

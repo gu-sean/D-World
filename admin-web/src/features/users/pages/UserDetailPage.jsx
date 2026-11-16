@@ -31,7 +31,6 @@ function BasicTab({ user }) {
     { key: 'email', label: '이메일', children: <MaskedText value={user.maskedEmail} /> },
     { key: 'providers', label: '로그인 방식', children: user.providers.join(', ') || '-' },
     { key: 'points', label: '보유 포인트', children: user.availablePoints.toLocaleString() },
-    { key: 'level', label: '레벨', children: user.levelNo },
     { key: 'streak', label: '연속 일수', children: user.streakDays },
     { key: 'goals', label: '목표 수', children: user.goalCount },
     { key: 'missions', label: '완료 미션 수', children: user.completedMissionCount },

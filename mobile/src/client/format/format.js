@@ -134,6 +134,17 @@ export function formatDistance(meters) {
  * @param {number} points
  * @returns {string}
  */
+/**
+ * 페이스 (1km당 시간) — 6'22"
+ * @param {number|null} secondsPerKm
+ */
+export function formatPace(secondsPerKm) {
+  const v = Number(secondsPerKm);
+  if (!Number.isFinite(v) || v <= 0 || v > 3600) return '-';
+  const total = Math.round(v);
+  return `${Math.floor(total / 60)}'${String(total % 60).padStart(2, '0')}"`;
+}
+
 export function formatPoints(points) {
   const value = Number(points);
   if (!Number.isFinite(value)) return '';
@@ -273,6 +284,7 @@ export const format = {
   formatTime,
   formatDateTime,
   formatDuration,
+  formatPace,
   formatSpokenDuration,
   formatDistance,
   formatPoints,

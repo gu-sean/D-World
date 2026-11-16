@@ -2,7 +2,6 @@ import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
 import { AppException } from '../common/errors/app-exception.js';
 import { rethrowConstraint } from '../common/errors/constraint.js';
-import { firstLevelUpXp } from '../experience-pets/experience-ledger.js';
 import { OBJECT_STORAGE } from '../media/storage/object-storage.js';
 import { presignGetCached } from '../media/storage/presign-cache.js';
 import { ConsentService } from './consent.service.js';
@@ -146,18 +145,18 @@ export class AccountsService {
         [userId],
       ),
     ]);
-    const level = xp.rows[0];
     const representativePet = pet.rows[0];
     const representativeBadge = badge.rows[0];
     return {
-      levelNo: level?.level_no ?? 1,
-      totalXp: Number(level?.total_xp ?? 0),
-      // 경험치 행이 없는(첫 XP 전) 사용자는 정책의 2레벨 기준을 준다. null이면 앱이 최고 레벨로 읽는다
-      nextLevelXp: level
-        ? level.next_level_xp === null || level.next_level_xp === undefined
-          ? null
-          : Number(level.next_level_xp)
-        : await firstLevelUpXp(this.database),
+      // 사용자 XP·레벨은 없앴다(022). 대신 펫에게 줄 수 있는 경험치(지갑)를 알려 준다
+      petXpBalance: Number(
+        (
+          await this.database.query(
+            'SELECT balance FROM pet_xp_wallets WHERE user_id = $1',
+            [userId],
+          )
+        ).rows[0]?.balance ?? 0,
+      ),
       availablePoints: Number(wallet.rows[0]?.available_points ?? 0),
       streakDays: streak.rows[0]?.current_success_days ?? 0,
       representativePet: representativePet

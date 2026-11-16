@@ -113,6 +113,8 @@ export {
   usePetSpeciesDetail,
   useSetRepresentativePet,
   useHatchPet,
+  usePetXpWallet,
+  useFeedPet,
   usePetEvolutionEvents,
 } from './queries/pets.js';
 

@@ -13,7 +13,7 @@ import { colors, spacing, typography } from '../../theme';
 const PROVIDER_NAMES = { google: '구글', naver: '네이버', apple: '애플' };
 
 export default function SocialSignupConfirmScreen({ navigation, route }) {
-  const { provider, email, socialSignupToken } = route.params ?? {};
+  const { provider, email, socialSignupToken, suggestedAge } = route.params ?? {};
   const providerName = PROVIDER_NAMES[provider] ?? provider;
 
   return (
@@ -33,7 +33,7 @@ export default function SocialSignupConfirmScreen({ navigation, route }) {
         <Button
           title="계속하기"
           onPress={() =>
-            navigation.navigate(Routes.TERMS_AGREEMENT, { purpose: 'social', socialSignupToken })
+            navigation.navigate(Routes.TERMS_AGREEMENT, { purpose: 'social', socialSignupToken, suggestedAge })
           }
           full
         />

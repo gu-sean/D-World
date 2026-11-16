@@ -98,7 +98,7 @@ export default function AchievementListScreen({ navigation }) {
                   )}
 
                   <Text style={styles.reward}>
-                    보상 {format.formatPoints(item.rewardPoints)} · {item.rewardUserXp} XP
+                    보상 {format.formatPoints(item.rewardPoints)}{item.rewardPetXp ? ` · 펫 경험치 ${item.rewardPetXp}` : ''}
                   </Text>
                 </Card>
               );

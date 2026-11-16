@@ -44,7 +44,7 @@ const versionRules = () => ({
   personality: string({ min: 1, max: 2000, optional: true }),
   worldText: string({ min: 1, max: 4000, optional: true }),
   // categoryCode는 전역 인터셉터가 categoryId(ID)로 바꿔 줌
-  categoryId: shortId(),
+  categoryId: shortId({ optional: true }), // 펫 분야는 없앴다(022), 보내지 않아도 됨
   unlockConditionType: oneOf(UNLOCK_TYPES),
   unlockTargetCount: integer({ min: 1, max: 1_000_000, optional: true }),
   unlockCategoryCode: string({ min: 1, max: 40, optional: true }),
@@ -298,7 +298,7 @@ export class AdminPetSpeciesController {
         input.description ?? null,
         input.personality ?? null,
         input.worldText ?? null,
-        input.categoryId,
+        input.categoryId ?? null,
         input.unlockConditionType,
         input.unlockTargetCount ?? null,
         unlockCategoryId,

@@ -88,6 +88,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // 네이버 지도 Client ID (mobile/.env의 NAVER_MAP_CLIENT_ID). 비어 있으면 러닝 화면이 지도 없이 경로 선만 그린다
+        manifestPlaceholders = [naverMapClientId: project.env.get("NAVER_MAP_CLIENT_ID") ?: ""]
     }
     signingConfigs {
         debug {

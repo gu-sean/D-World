@@ -1,6 +1,7 @@
 import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
+import { ADULT_XP, HATCH_MISSIONS } from './pet-xp.service.js';
 import { rethrowConstraint } from '../common/errors/constraint.js';
 import { DatabaseService } from '../database/database.service.js';
 import { OBJECT_STORAGE } from '../media/storage/object-storage.js';
@@ -67,7 +68,7 @@ export class PetsService {
             ORDER BY pv.effective_at DESC, pv.version_no DESC
             LIMIT 1
          ) v ON true
-         JOIN goal_categories gc ON gc.id = v.category_id
+         LEFT JOIN goal_categories gc ON gc.id = v.category_id
         WHERE s.status = 'public'
           AND ($1::short_id IS NULL OR s.id = $1)
           AND (SELECT count(*) FROM pet_stage_versions sv
@@ -129,11 +130,15 @@ export class PetsService {
           current: progress.total,
           met: progress.total >= target,
         };
-      case 'category_approved_mission_count': {
-        const current =
-          progress.byCategory.get(version.unlock_category_id) ?? 0;
-        return { ...base, current, met: current >= target };
-      }
+      // 펫 분야를 없앴으므로(022) 분야 조건도 전체 완료 미션 수로 센다
+      case 'category_approved_mission_count':
+        return {
+          ...base,
+          categoryId: null,
+          type: 'approved_mission_count',
+          current: progress.total,
+          met: progress.total >= target,
+        };
       case 'streak_milestone': {
         const met = progress.streakDays.has(target);
         return { ...base, current: met ? 1 : 0, met };
@@ -187,30 +192,43 @@ export class PetsService {
       ),
     );
 
-    return species.map((s) => ({
-      speciesId: s.species_id,
-      code: s.code,
-      name: s.name,
-      description: s.description,
-      personality: s.personality,
-      worldText: s.world_text,
-      category: { id: s.category_id, name: s.category_name },
-      hatchMissionCount: s.hatch_mission_count,
-      unlock: this.evaluateUnlock(s, progress),
-      ownedPetId: ownedBySpecies.get(s.species_id) ?? null,
-      stages: stages.rows
-        .filter((r) => r.species_version_id === s.version_id)
-        .map((r) => ({
-          stageNo: r.stage_no,
-          stageCode: r.stage_code,
-          minTotalXp: num(r.min_total_xp),
-          bonusBasisPoints: r.bonus_basis_points,
-          imageUrl:
-            imageUrls.get(`${r.species_version_id}:${r.stage_no}`) ?? null,
-          stillUrl:
-            stillUrls.get(`${r.species_version_id}:${r.stage_no}`) ?? null,
-        })),
-    }));
+    return species.map((s) => {
+      const ownedPetId = ownedBySpecies.get(s.species_id) ?? null;
+      // 키워 본 적 없는 종류는 무엇인지 모르게: 이름·설명·아기·성체 그림을 숨기고 알만 보여 준다
+      const hidden = !ownedPetId;
+      return {
+        speciesId: s.species_id,
+        code: hidden ? null : s.code,
+        name: hidden ? '???' : s.name,
+        description: hidden ? null : s.description,
+        personality: hidden ? null : s.personality,
+        worldText: hidden ? null : s.world_text,
+        hidden,
+        category: null,
+        hatchMissionCount: HATCH_MISSIONS,
+        unlock: this.evaluateUnlock(s, progress),
+        ownedPetId,
+        stages: stages.rows
+          .filter((r) => r.species_version_id === s.version_id)
+          .map((r) => {
+            const show = !hidden || r.stage_no === 1;
+            return {
+              stageNo: r.stage_no,
+              stageCode: r.stage_code,
+              minTotalXp: r.stage_no === 3 ? ADULT_XP : 0,
+              bonusBasisPoints: 0,
+              imageUrl: show
+                ? (imageUrls.get(`${r.species_version_id}:${r.stage_no}`) ??
+                  null)
+                : null,
+              stillUrl: show
+                ? (stillUrls.get(`${r.species_version_id}:${r.stage_no}`) ??
+                  null)
+                : null,
+            };
+          }),
+      };
+    });
   }
 
   /**
@@ -325,7 +343,7 @@ export class PetsService {
                  FROM missions m
                  JOIN mission_records mr ON mr.mission_id = m.id
                  JOIN verification_results vr ON vr.record_id = mr.id
-                WHERE m.user_id = p.user_id AND m.category_id = v.category_id
+                WHERE m.user_id = p.user_id
                   AND m.status = 'completed' AND mr.started_at >= p.selected_at
                   AND vr.decision = 'approved' AND vr.is_current) AS hatch_progress
          FROM user_pets p
@@ -356,22 +374,33 @@ export class PetsService {
       nextLevelXp: r.next_level_xp === null ? null : num(r.next_level_xp),
       stageNo: r.stage_no,
       stageCode: r.stage_code,
-      nextStageXp: r.next_stage_xp === null ? null : num(r.next_stage_xp),
+      nextStageXp: r.stage_no === 2 ? ADULT_XP : null,
       hatch: {
-        required: r.hatch_mission_count,
-        progress: num(r.hatch_progress),
+        required: HATCH_MISSIONS,
+        progress: Math.min(num(r.hatch_progress), HATCH_MISSIONS),
+      },
+      // 022 성장 규칙: 알은 세부 미션 3개로 부화, 아기는 먹인 경험치 450으로 성체
+      growth: {
+        hatchRequired: HATCH_MISSIONS,
+        hatchDone: Math.min(num(r.hatch_progress), HATCH_MISSIONS),
+        xp: Math.min(num(r.total_xp), ADULT_XP),
+        adultXp: ADULT_XP,
+        canEat: r.stage_no === 2,
       },
       representative: Boolean(r.representative),
       selectedAt: r.selected_at,
       // 모바일 클라이언트(07 Pet) 키
-      bonusRate: (r.bonus_basis_points ?? 0) / 10_000,
+      bonusRate: 0,
       isRepresentative: Boolean(r.representative),
       imageUrl: imageUrls[index],
       stillUrl: stillUrls[index],
       // 07 DTO 사전 Pet 키: 알 단계일 때만 부화 진행, 대사는 하나
       hatchProgress:
-        r.stage_code === 'egg'
-          ? { required: r.hatch_mission_count, done: num(r.hatch_progress) }
+        r.stage_no === 1
+          ? {
+              required: HATCH_MISSIONS,
+              done: Math.min(num(r.hatch_progress), HATCH_MISSIONS),
+            }
           : null,
       dialogue: (r.dialogues ?? [])[0] ?? null,
       dialogues: r.dialogues ?? [],

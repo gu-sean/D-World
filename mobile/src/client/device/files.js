@@ -6,7 +6,7 @@
  */
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { Video } from 'react-native-compressor';
-import pako from 'pako';
+import * as pako from 'pako'; // pako 3은 기본 내보내기가 없다 (gzip은 이름으로만)
 
 import AppError from '../http/AppError.js';
 

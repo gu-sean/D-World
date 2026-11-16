@@ -45,7 +45,8 @@ export function useSetRepresentativePet() {
 export function useHatchPet() {
   return useAppMutation({
     idempotent: true,
-    mutationFn: petsApi.hatchPet,
+    // 새로 고른 알은 바로 키우는 펫(대표)이 된다
+    mutationFn: (input) => petsApi.hatchPet({ makeRepresentative: true, ...input }),
     onDone: afterPetChanged,
   });
 }
@@ -63,8 +64,24 @@ export function usePetEvolutionEvents(petId, after) {
   });
 }
 
+/** 펫 경험치 지갑 */
+export function usePetXpWallet() {
+  return useQuery({ queryKey: queryKeys.petXpWallet, queryFn: petsApi.getPetXpWallet });
+}
+
+/** 경험치 주기 (10씩). 입력 `{petId}` */
+export function useFeedPet() {
+  return useAppMutation({
+    idempotent: true,
+    mutationFn: petsApi.feedPet,
+    onDone: afterPetChanged,
+  });
+}
+
 export default {
   useMyPets,
+  usePetXpWallet,
+  useFeedPet,
   usePetSpecies,
   usePetSpeciesDetail,
   useSetRepresentativePet,

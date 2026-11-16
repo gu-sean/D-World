@@ -107,8 +107,8 @@ export default function MissionDetailScreen({ navigation, route }) {
                   <View style={styles.rewardRow}>
                     <Icon name="coin" size={16} color={colors.warning} />
                     <Text style={styles.reward}>
-                      성공하면 {format.formatPoints(detail.rewardPreview.points)} ·{' '}
-                      {detail.rewardPreview.userXp} XP
+                      성공하면 {format.formatPoints(detail.rewardPreview.points)} · 펫 경험치{' '}
+                      {detail.rewardPreview.petXp}
                     </Text>
                   </View>
                 )}

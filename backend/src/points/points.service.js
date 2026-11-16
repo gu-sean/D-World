@@ -12,6 +12,9 @@ import {
   settleOutstanding,
 } from './points-ledger.js';
 
+/** 세부 미션 포인트 하루 한도 (30P × 4개) */
+export const DAILY_MISSION_POINT_LIMIT = 120;
+
 const MISSION = 'mission';
 
 // 미회수 청구가 가리키는 지급 행의 컬럼(016 마이그레이션), 쿼리에 들어가므로 고정 목록만 사용
@@ -71,7 +74,18 @@ export class PointsService {
     const usage = await lockUsage(tx, userId, month);
     const limit = await monthlyLimit(tx, month);
     const remaining = Math.max(limit - (usage.gross - usage.recovered), 0);
-    const paid = Math.min(originalPoints, remaining);
+    // 하루 한도: 세부 미션 보상은 하루(KST) 120P(30P 미션 4개)까지 (022_pet_feeding)
+    const { rows: today } = await tx.query(
+      `SELECT COALESCE(sum(paid_points), 0) AS paid FROM mission_point_awards
+        WHERE user_id = $1 AND status = 'active'
+          AND (awarded_at AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date`,
+      [userId],
+    );
+    const dailyRemaining = Math.max(
+      DAILY_MISSION_POINT_LIMIT - Number(today[0].paid),
+      0,
+    );
+    const paid = Math.min(originalPoints, remaining, dailyRemaining);
 
     await tx.query(
       `INSERT INTO mission_point_awards

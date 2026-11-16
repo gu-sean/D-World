@@ -76,6 +76,7 @@ export const queryKeys = {
 
   // 펫
   myPets: ['pets', 'mine'],
+  petXpWallet: ['pets', 'xp-wallet'],
   petSpecies: (params) => ['pets', 'species', 'list', params ?? {}],
   petSpeciesDetail: (speciesId) => ['pets', 'species', 'detail', speciesId],
   petEvolutionEvents: (petId, after) => ['pets', 'evolutions', petId, after ?? null],

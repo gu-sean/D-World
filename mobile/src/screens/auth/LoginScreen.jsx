@@ -50,6 +50,7 @@ export default function LoginScreen({ navigation }) {
               provider: result.provider,
               email: result.email,
               socialSignupToken: result.socialSignupToken,
+              suggestedAge: result.suggestedAge ?? null,
             });
           }
         },

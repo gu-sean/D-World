@@ -116,6 +116,39 @@ export class SocialVerifierService {
     if (body?.resultcode !== '00' || typeof id !== 'string' || !id) {
       throw invalidToken();
     }
-    return { subject: id, email: body.response.email ?? null };
+    return {
+      subject: id,
+      email: body.response.email ?? null,
+      // 네이버 앱 설정에서 '출생연도'(·생일)를 제공 정보로 고른 경우에만 온다
+      birthYear: parseBirthYear(body.response.birthyear),
+      birthday:
+        typeof body.response.birthday === 'string'
+          ? body.response.birthday
+          : null,
+    };
   }
+}
+
+/** '1998' → 1998, 이상한 값이면 null */
+function parseBirthYear(value) {
+  const year = Number(value);
+  const now = new Date().getFullYear();
+  return Number.isInteger(year) && year >= now - 120 && year <= now
+    ? year
+    : null;
+}
+
+/**
+ * 출생연도(·생일 'MM-DD')로 만 나이. 생일을 모르면 올해 생일이 지났다고 보지 않는다(보수적으로 한 살 적게).
+ * 가입 화면의 나이 칸을 미리 채우는 용도이고, 사용자가 고칠 수 있다.
+ */
+export function ageFromBirth(birthYear, birthday, now = new Date()) {
+  if (!birthYear) return null;
+  const kst = new Date(now.getTime() + 9 * 3600e3);
+  let age = kst.getUTCFullYear() - birthYear;
+  const md = /^(\d{2})-(\d{2})$/.exec(birthday ?? '');
+  const today = (kst.getUTCMonth() + 1) * 100 + kst.getUTCDate();
+  const passed = md ? today >= Number(md[1]) * 100 + Number(md[2]) : false;
+  if (!passed) age -= 1;
+  return age >= 0 ? age : null;
 }

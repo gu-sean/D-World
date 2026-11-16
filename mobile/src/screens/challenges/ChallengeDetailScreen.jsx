@@ -108,7 +108,6 @@ export default function ChallengeDetailScreen({ navigation, route }) {
                   <Text style={styles.cardLabel}>완주 보상</Text>
                   <Text style={styles.reward}>
                     {format.formatPoints(data.reward?.points ?? 0)}
-                    {data.reward?.userXp ? ` · 경험치 ${data.reward.userXp}` : ''}
                     {data.reward?.petXp ? ` · 펫 경험치 ${data.reward.petXp}` : ''}
                   </Text>
                   {!!data.reward?.badge && (

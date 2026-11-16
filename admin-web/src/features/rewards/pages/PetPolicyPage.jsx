@@ -109,12 +109,13 @@ function SpeciesDrawer({ target, onClose }) {
       description: values.description?.trim(),
       personality: values.personality?.trim(),
       worldText: values.worldText?.trim(),
-      categoryId: values.categoryId,
+      // 펫 분야는 없앴다(022): 분야를 보내지 않는다
       unlockConditionType: unlockType,
       unlockTargetCount: needs.count ? values.unlockTargetCount : undefined,
       unlockCategoryCode: needs.category ? values.unlockCategoryCode : undefined,
       unlockAchievementId: needs.achievement ? values.unlockAchievementId : undefined,
-      hatchMissionCount: values.hatchMissionCount,
+      // 부화 조건은 모든 펫이 '세부 미션 3개'로 같다(022)
+      hatchMissionCount: 3,
       status: values.status,
       effectiveAt: toIso(effectiveAt),
     });
@@ -141,7 +142,6 @@ function SpeciesDrawer({ target, onClose }) {
     });
   };
 
-  const categoryOptions = (categories.data ?? []).map((c) => ({ value: c.id, label: c.name }));
 
   return (
     <Drawer
@@ -187,15 +187,12 @@ function SpeciesDrawer({ target, onClose }) {
         <Form.Item name="worldText" label="세계관" rules={[{ max: 4000 }]}>
           <Input.TextArea rows={3} />
         </Form.Item>
-        <Form.Item
-          name="categoryId"
-          label="분야"
-          rules={[{ required: true, message: '분야를 선택해 주세요.' }]}
-        >
-          <Select options={categoryOptions} />
-        </Form.Item>
         <Form.Item name="unlockConditionType" label="해금 조건">
-          <Select options={conditionOptions(UNLOCK_CONDITIONS)} />
+          <Select
+            options={conditionOptions(UNLOCK_CONDITIONS).filter(
+              (o) => o.value !== 'category_approved_mission_count',
+            )}
+          />
         </Form.Item>
         {['approved_mission_count', 'category_approved_mission_count', 'streak_milestone'].includes(
           unlockType,
@@ -238,13 +235,10 @@ function SpeciesDrawer({ target, onClose }) {
             />
           </Form.Item>
         )}
-        <Form.Item
-          name="hatchMissionCount"
-          label="부화 필요 미션 수"
-          rules={[{ required: true, message: '미션 수를 입력해 주세요.' }]}
-        >
-          <InputNumber min={0} max={1_000_000} precision={0} />
-        </Form.Item>
+        <Typography.Paragraph type="secondary">
+          성장 규칙(모든 펫 공통): 세부 미션 3개를 완료하면 알에서 부화하고, 사용자가 경험치를 450
+          먹이면 성체가 돼요.
+        </Typography.Paragraph>
 
         <Typography.Title level={5}>성장 단계</Typography.Title>
         <Form.Item noStyle shouldUpdate>
@@ -316,7 +310,6 @@ function SpeciesTab() {
     { title: '버전', dataIndex: 'versionNo', render: (v) => `v${v}` },
     { title: '이름', dataIndex: 'name' },
     { title: '해금 조건', render: (_, v) => UNLOCK_CONDITIONS[v.unlockConditionType] },
-    { title: '부화 미션 수', dataIndex: 'hatchMissionCount', align: 'right' },
     {
       title: '단계',
       render: (_, v) => (

@@ -127,7 +127,6 @@ export default function RecommendationDetailScreen({ navigation, route }) {
                     <Text style={styles.reasonLabel}>성공하면</Text>
                     <Text style={styles.rewardText}>
                       {format.formatPoints(item.rewardPreview.points)}
-                      {item.rewardPreview.userXp ? ` · 경험치 ${item.rewardPreview.userXp}` : ''}
                       {item.rewardPreview.petXp ? ` · 펫 경험치 ${item.rewardPreview.petXp}` : ''}
                     </Text>
                   </Card>

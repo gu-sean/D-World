@@ -124,7 +124,7 @@ export default function ProfileEditScreen({ navigation }) {
             <Card style={styles.card}>
               <Text style={styles.cardLabel}>내 상태</Text>
               <Text style={styles.rowText}>
-                {labels.userStatus.active} · Lv.{data.levelNo}
+                {labels.userStatus.active}
               </Text>
             </Card>
 

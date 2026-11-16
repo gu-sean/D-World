@@ -4,6 +4,7 @@ import {
   Dependencies,
   Get,
   Param,
+  Post,
   Put,
   Query,
   Body,
@@ -16,13 +17,31 @@ import {
   validateBody,
 } from '../common/validation.js';
 import { MobilePetsService } from './mobile-pets.service.js';
+import { PetXpService } from './pet-xp.service.js';
+import { DatabaseService } from '../database/database.service.js';
 
 /** 모바일 클라이언트 펫 API A81~A83, A85 */
 @Controller()
-@Dependencies(MobilePetsService)
+@Dependencies(MobilePetsService, PetXpService, DatabaseService)
 export class MobilePetsController {
-  constructor(pets) {
+  constructor(pets, petXp, database) {
     this.pets = pets;
+    this.petXp = petXp;
+    this.database = database;
+  }
+
+  /** 펫 경험치 지갑: 아직 펫에게 주지 않은 경험치 (022) */
+  @Get('me/pet-xp')
+  @Bind(Req())
+  wallet(request) {
+    return this.petXp.getWallet(this.database, request.auth.userId);
+  }
+
+  /** 경험치 주기: 지갑에서 10을 빼서 펫에게 (아기 단계만) */
+  @Post('me/pets/:petId/feed')
+  @Bind(Req(), Param('petId'))
+  feed(request, petId) {
+    return this.petXp.feed(request.auth.userId, idOf(petId));
   }
 
   /** A81 PetSpecies[] (categoryCode 필터는 전역 인터셉터가 categoryId로 바꿔 줌) */

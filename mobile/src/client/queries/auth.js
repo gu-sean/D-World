@@ -11,6 +11,7 @@ import * as authApi from '../api/authApi.js';
 import session, { subscribe, getSnapshot } from '../auth/session.js';
 import { validateNickname } from '../validation/rules.js';
 import { unregisterPushDevice } from '../../setup/pushRegistration.js';
+import { getSocialCredential } from '../device/socialAuth.js';
 
 /** A03 닉네임 확인을 보내기 전에 기다리는 시간 (parts/mobile-client §4.2). */
 export const NICKNAME_DEBOUNCE_MS = 400;
@@ -93,10 +94,14 @@ export function useLogin() {
 export function useSocialLogin() {
   return useAppMutation({
     mutationFn: async ({ provider, credential }) => {
-      const value = credential
-        ?? (config.SOCIAL_LOGIN_MODE === 'mock'
+      let value = credential;
+      if (!value) {
+        value = config.SOCIAL_LOGIN_MODE === 'mock'
           ? `mock:dev-${provider}-1:dev@example.com`
-          : undefined);
+          : await getSocialCredential(provider);
+      }
+      // 사용자가 구글·네이버 창을 닫음 — 오류 없이 끝낸다
+      if (!value) return { cancelled: true };
       const result = await authApi.socialLogin({ provider, credential: value });
       if (result?.signupRequired) return result;
       await session.signIn(result);

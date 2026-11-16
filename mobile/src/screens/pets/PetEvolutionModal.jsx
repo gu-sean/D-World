@@ -42,8 +42,7 @@ export default function PetEvolutionModal({ navigation, route }) {
               {labels.petStageCode[latest.toStageCode]}
             </Text>
             <Text style={styles.bonus}>
-              보상 보너스 {Math.round(latest.bonusRateBefore * 100)}% →{' '}
-              {Math.round(latest.bonusRateAfter * 100)}%
+              {latest.toStageCode === 'adult' ? '경험치를 모두 먹고 다 자랐어요!' : '알에서 깨어났어요! 이제 경험치를 먹일 수 있어요.'}
             </Text>
 
             {(latest.newDialogues ?? []).slice(0, 1).map((line) => (

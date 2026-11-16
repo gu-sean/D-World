@@ -9,7 +9,6 @@ import { labels, usePetSpeciesDetail } from '../../client';
 import {
   Button,
   Card,
-  CategoryChip,
   PetAvatar,
   QueryState,
   Screen,
@@ -34,7 +33,6 @@ export default function PetDetailScreen({ navigation, route }) {
                   size={110}
                 />
                 <Text style={styles.name}>{data.name}</Text>
-                <CategoryChip categoryCode={data.categoryCode} size="sm" />
                 {!!data.description && <Text style={styles.description}>{data.description}</Text>}
               </Card>
 
@@ -74,7 +72,7 @@ export default function PetDetailScreen({ navigation, route }) {
                           {labels.petStageCode[stage.stageCode] ?? stage.stageCode}
                         </Text>
                         <Text style={styles.stageMeta}>
-                          {stage.minTotalXp} XP부터 · 보상 +{Math.round(stage.bonusRate * 100)}%
+                          {stage.stageNo === 1 ? '알' : stage.stageNo === 2 ? '세부 미션 3개 완료로 부화' : '경험치 450을 먹이면'}
                         </Text>
                       </View>
                     </View>
@@ -84,7 +82,7 @@ export default function PetDetailScreen({ navigation, route }) {
 
               <Card>
                 <Text style={styles.hatchText}>
-                  알에서 깨어나려면 미션 {data.hatchMissionCount}개를 인증해야 해요.
+                  세부 미션 3개를 완료하면 부화하고, 펫 화면에서 경험치를 450 먹이면 다 자라요.
                 </Text>
               </Card>
             </ScrollView>

@@ -44,7 +44,7 @@ export default function PetHatchScreen({ navigation, route }) {
     );
 
   return (
-    <Screen title="알 고르기" onBack={() => navigation.goBack()} padded={false}>
+    <Screen title="새 펫 키우기" onBack={() => navigation.goBack()} padded={false}>
       <QueryState
         query={species}
         isEmpty={choices.length === 0}
@@ -57,6 +57,9 @@ export default function PetHatchScreen({ navigation, route }) {
 
               <View>
                 <SectionTitle title="어떤 알을 고를까요?" />
+                <Text style={styles.guide}>
+                  세부 미션 3개를 완료하면 부화하고, 경험치 450을 먹이면 다 자라요. 어떤 펫인지는 깨어나야 알 수 있어요.
+                </Text>
                 <View style={styles.grid}>
                   {choices.map((item, index) => {
                     const selected = item.id === speciesId;
@@ -74,7 +77,7 @@ export default function PetHatchScreen({ navigation, route }) {
                           pet={{ imageUrl: item.stages?.[0]?.imageUrl ?? null, stageCode: 'egg' }}
                           size={64}
                         />
-                        <Text style={styles.choiceMeta}>미션 {item.hatchMissionCount}개</Text>
+                        <Text style={styles.choiceMeta}>알 {index + 1}</Text>
                       </Card>
                     );
                   })}
@@ -123,6 +126,7 @@ const styles = StyleSheet.create({
   },
   choiceSelected: { borderColor: colors.primary, borderWidth: 2 },
   choiceMeta: { ...typography.caption, color: colors.textSub },
+  guide: { ...typography.caption, color: colors.textSub, marginBottom: spacing.sm },
   footer: {
     padding: spacing.lg,
     borderTopWidth: 1,

@@ -14,7 +14,7 @@ import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
 
 export default function TermsAgreementScreen({ navigation, route }) {
-  const { purpose = 'phone', socialSignupToken } = route.params ?? {};
+  const { purpose = 'phone', socialSignupToken, suggestedAge } = route.params ?? {};
   const policies = useCurrentPolicies();
   const [granted, setGranted] = useState({});
 
@@ -38,7 +38,7 @@ export default function TermsAgreementScreen({ navigation, route }) {
     }));
 
     if (purpose === 'social') {
-      navigation.navigate(Routes.NICKNAME_SETUP, { socialSignupToken, consents });
+      navigation.navigate(Routes.NICKNAME_SETUP, { socialSignupToken, consents, suggestedAge });
     } else {
       navigation.navigate(Routes.PHONE_NUMBER, { purpose: 'signup', consents });
     }

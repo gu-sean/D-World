@@ -267,7 +267,6 @@ export class AdminMembersController {
         ...identities.rows.map((row) => row.provider),
       ],
       availablePoints: Number(user.available_points ?? 0),
-      levelNo: user.level_no ?? 1,
       streakDays: user.streak_days ?? 0,
       goalCount: Number(user.goal_count),
       completedMissionCount: Number(user.completed_mission_count),

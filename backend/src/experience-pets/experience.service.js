@@ -2,6 +2,7 @@ import { newId } from '../common/ids.js';
 import { Dependencies, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception.js';
 import { DatabaseService } from '../database/database.service.js';
+import { PetXpService } from './pet-xp.service.js';
 import {
   computeLevel,
   computeStage,
@@ -35,12 +36,13 @@ function ledgerKey(kind, awardId, recipient, resultId) {
  * 잠금 순서: 지급 대상(experience_awards) → user_experience → user_pets (03-reward-services-design.md)
  */
 @Injectable()
-@Dependencies(DatabaseService)
+@Dependencies(DatabaseService, PetXpService)
 export class ExperienceService {
   logger = new Logger(ExperienceService.name);
 
-  constructor(database) {
+  constructor(database, petXp) {
     this.database = database;
+    this.petXp = petXp;
   }
 
   /**
@@ -132,41 +134,24 @@ export class ExperienceService {
       ],
     );
 
-    let userApplied = 0;
-    if (userXp > 0) {
-      userApplied = await this.applyUserDelta(tx, {
-        awardId,
-        userId,
-        delta: userXp,
-        kind: 'award',
-      });
-    }
-
-    let petApplied = 0;
-    if (recipient) {
-      const petDelta = basePetXp + bonusPetXp;
-      if (petDelta > 0) {
-        petApplied = await this.applyPetDelta(tx, {
-          awardId,
-          petId: recipient.petId,
-          delta: petDelta,
-          kind: 'award',
-        });
-      }
-    } else {
-      await tx.query(
-        `INSERT INTO pending_pet_experience (experience_award_id, user_id, base_pet_xp, status)
-         VALUES ($1, $2, $3, 'pending')`,
-        [awardId, userId, basePetXp],
-      );
-    }
+    // 022_pet_feeding: 사용자 XP는 더 이상 주지 않는다(기록만 남김).
+    // 펫 XP는 펫에게 바로 가지 않고 지갑에 쌓인다. 미션은 하루(KST) 첫 미션만 30.
+    const petCredited =
+      sourceType === 'mission'
+        ? await this.petXp.creditMission(tx, { userId, missionId: sourceId })
+        : await this.petXp.creditReward(tx, {
+            userId,
+            sourceType,
+            sourceId,
+            amount: basePetXp + bonusPetXp,
+          });
 
     return {
       outcome: 'created',
       awardId,
-      userXp: userApplied,
-      petXp: recipient ? petApplied : 0,
-      pendingPetXp: recipient ? 0 : basePetXp,
+      userXp: 0,
+      petXp: petCredited,
+      pendingPetXp: 0,
     };
   }
 
@@ -174,6 +159,15 @@ export class ExperienceService {
   async revokeExperience(tx, { awardId, resultId }) {
     const award = await this.lockAward(tx, awardId);
     if (award.status === 'revoked') return { outcome: 'already_applied' };
+    if (await this.isWalletAward(tx, awardId)) {
+      const taken = await this.petXp.reverseSource(tx, {
+        userId: award.user_id,
+        sourceType: award.source_type,
+        sourceId: award.source_id,
+      });
+      await this.setAwardStatus(tx, awardId, 'revoked');
+      return { outcome: 'revoked', userXp: 0, petXp: -taken };
+    }
 
     let userReversed = 0;
     if (num(award.base_user_xp) > 0) {
@@ -214,6 +208,15 @@ export class ExperienceService {
   async reinstateExperience(tx, { awardId, resultId }) {
     const award = await this.lockAward(tx, awardId);
     if (award.status === 'active') return { outcome: 'already_applied' };
+    if (await this.isWalletAward(tx, awardId)) {
+      const returned = await this.petXp.restoreSource(tx, {
+        userId: award.user_id,
+        sourceType: award.source_type,
+        sourceId: award.source_id,
+      });
+      await this.setAwardStatus(tx, awardId, 'active');
+      return { outcome: 'reinstated', userXp: 0, petXp: returned };
+    }
 
     let userReturned = 0;
     if (num(award.base_user_xp) > 0) {
@@ -320,6 +323,10 @@ export class ExperienceService {
         '회수된 지급은 정정할 수 없음, 먼저 복구할 것',
       );
     }
+    // 022 이후 지급은 펫 경험치 지갑으로만 다루므로 원장 정정 대상이 아님
+    if (await this.isWalletAward(tx, awardId)) {
+      return { outcome: 'no_change', userXp: 0, petXp: 0 };
+    }
 
     const userExpected = num(award.base_user_xp);
     const userAppliedSoFar = await this.appliedAmount(tx, awardId, 'user');
@@ -359,6 +366,20 @@ export class ExperienceService {
   }
 
   /** 지급액 중 현재까지 원장에 실제로 반영된 합계(+면 지급, -면 회수) */
+  /** 미션 완료·취소 뒤 사용자의 펫 단계(부화)를 다시 맞춤, 단계가 오른 펫 id 목록 */
+  async syncPets(tx, userId) {
+    return this.petXp.syncAllPets(tx, userId);
+  }
+
+  /** 022 이후 지급(경험치 원장에 아무 거래도 없음)이면 지갑 방식 */
+  async isWalletAward(db, awardId) {
+    const { rows } = await db.query(
+      'SELECT 1 FROM experience_transactions WHERE experience_award_id = $1 LIMIT 1',
+      [awardId],
+    );
+    return !rows[0];
+  }
+
   async appliedAmount(db, awardId, recipientKind) {
     const { rows } = await db.query(
       `SELECT coalesce(sum(xp_delta), 0) AS total FROM experience_transactions
@@ -531,7 +552,8 @@ export class ExperienceService {
 
   async lockAward(tx, awardId) {
     const { rows } = await tx.query(
-      `SELECT id, user_id, status, base_user_xp, base_pet_xp, bonus_pet_xp, recipient_pet_id
+      `SELECT id, user_id, status, source_type, source_id,
+              base_user_xp, base_pet_xp, bonus_pet_xp, recipient_pet_id
          FROM experience_awards WHERE id = $1 FOR UPDATE`,
       [awardId],
     );

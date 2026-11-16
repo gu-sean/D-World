@@ -25,8 +25,15 @@ export const config = {
   APP_ENV: text(Config.APP_ENV, 'development'),
   /** 'mock'이면 소셜 로그인이 SDK를 부르지 않는다 (12 §8.4). */
   SOCIAL_LOGIN_MODE: text(Config.SOCIAL_LOGIN_MODE, 'mock'),
+  /** 구글 OAuth "웹 애플리케이션" 클라이언트 ID — ID 토큰 발급용 (서버 GOOGLE_CLIENT_IDS와 같은 값) */
+  GOOGLE_WEB_CLIENT_ID: text(Config.GOOGLE_WEB_CLIENT_ID, ''),
+  /** 네이버 개발자 센터 애플리케이션 Client ID · Secret */
+  NAVER_CLIENT_ID: text(Config.NAVER_CLIENT_ID, ''),
+  NAVER_CLIENT_SECRET: text(Config.NAVER_CLIENT_SECRET, ''),
   /** 러닝 파일 `device.appVersion`·A45 `clientMetrics.appVersion`에 넣는 값. */
   APP_VERSION: text(Config.APP_VERSION, '0.1.0'),
+  /** 네이버 지도 Client ID (네이버 클라우드 플랫폼 > Maps). 없으면 러닝 경로를 지도 없이 선으로만 그린다. */
+  NAVER_MAP_CLIENT_ID: text(Config.NAVER_MAP_CLIENT_ID, ''),
   /**
    * 비밀번호 재설정 버튼을 보일지. 인증번호 단계를 없앤 지금은 번호만으로 남의 비밀번호를
    * 바꿀 수 있어서 기본으로 숨긴다. 백엔드도 재설정 요청을 거절한다 (mobile-auth.service A01).

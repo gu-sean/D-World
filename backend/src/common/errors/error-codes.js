@@ -97,6 +97,15 @@ export const ERROR_CODES = {
   PET_NICKNAME_TAKEN: [409, '이미 쓰고 있는 별명이에요.'],
   PET_SPECIES_LOCKED: [403, '아직 만날 수 없는 펫이에요.'],
   PET_ALREADY_OWNED: [409, '이미 함께하고 있는 펫이에요.'],
+  PET_EGG_CANNOT_EAT: [
+    422,
+    '알은 아직 먹을 수 없어요. 세부 미션 3개를 완료하면 부화해요.',
+  ],
+  PET_FULLY_GROWN: [422, '이미 다 자란 펫이에요.'],
+  PET_XP_NOT_ENOUGH: [
+    422,
+    '줄 수 있는 경험치가 부족해요. 미션을 완료하면 경험치를 받아요.',
+  ],
   RECOMMENDATION_RATE_LIMITED: [429, '추천은 10분에 한 번 받을 수 있어요.'],
   RECOMMENDATION_EXPIRED: [410, '추천 시간이 지났어요.'],
   RECOMMENDATION_NOT_OPEN: [409, '이미 처리한 추천이에요.'],

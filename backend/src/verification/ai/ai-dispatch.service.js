@@ -5,6 +5,7 @@ import { MediaService } from '../../media/media.service.js';
 import { DecisionService } from '../decision.service.js';
 import { sensorResponseToDecisionInput } from './sensor-contract.js';
 import { AI_DISPATCHER } from './ai-dispatcher.js';
+import { isRuleJudged, judgeRunRecord } from '../run-rules/run-rule-judge.js';
 
 const FIRST_DELAY_MS = 30_000;
 const MAX_DELAY_MS = 60 * 60_000;
@@ -115,6 +116,33 @@ export class AiDispatchService {
     this.attempts.delete(recordId);
   }
 
+  /**
+   * 러닝(센서) 회차를 서버 규칙으로 판정해 저장 (AI 서버에 러닝 판정이 없는 동안)
+   * 걸음·흔들림 정보가 없으면 review_required로 관리자에게 넘어간다
+   */
+  async applyRunRule(candidate) {
+    const request = await this.buildRequest(candidate);
+    const { rows } = await this.database.query(
+      'SELECT weight_kg FROM profiles WHERE user_id = $1',
+      [candidate.user_id],
+    );
+    const weightKg =
+      rows[0]?.weight_kg == null ? null : Number(rows[0].weight_kg);
+    const input = await judgeRunRecord(request, { weightKg });
+    await this.database.withTransaction((tx) =>
+      this.decisions.applyDecision(tx, {
+        ...input,
+        source: 'ai',
+        allowedStatuses: ['submitted'],
+        ignoreIfNotJudgeable: true,
+      }),
+    );
+    this.attempts.delete(candidate.id);
+    this.logger.log(
+      `러닝 규칙 판정 record=${candidate.id}: ${input.decision} (${input.reason})`,
+    );
+  }
+
   next(state, now) {
     const count = (state?.count ?? 0) + 1;
     const delay = Math.min(FIRST_DELAY_MS * 2 ** (count - 1), MAX_DELAY_MS);
@@ -141,7 +169,7 @@ export class AiDispatchService {
   }
 
   async dispatchPending({ limit = 50, now = Date.now() } = {}) {
-    if (!this.dispatcher.enabled) return { skipped: true };
+    const ruleOnly = !this.dispatcher.enabled;
     const { rows } = await this.database.query(
       `SELECT r.id, r.mission_id, r.user_id, r.evidence_kind, r.submission_no, r.metrics,
               r.started_at, r.submitted_at,
@@ -172,7 +200,15 @@ export class AiDispatchService {
         continue;
       }
       if (state && state.nextAt > now) continue;
+      const byRule = isRuleJudged(candidate, this.config);
+      // AI 서버가 꺼져 있으면 규칙 판정 대상만 처리한다
+      if (ruleOnly && !byRule) continue;
       try {
+        if (byRule) {
+          await this.applyRunRule(candidate);
+          result.sent += 1;
+          continue;
+        }
         const sent = await this.dispatcher.dispatch(
           await this.buildRequest(candidate),
         );

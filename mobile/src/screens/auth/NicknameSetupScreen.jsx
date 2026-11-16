@@ -15,10 +15,11 @@ import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
 
 export default function NicknameSetupScreen({ navigation, route }) {
-  const { verificationToken, password, socialSignupToken, consents } = route.params ?? {};
+  const { verificationToken, password, socialSignupToken, consents, suggestedAge } = route.params ?? {};
 
   const [nickname, setNickname] = useState('');
-  const [age, setAge] = useState('');
+  // 네이버 출생연도로 계산한 나이가 오면 미리 채운다 (고칠 수 있음)
+  const [age, setAge] = useState(suggestedAge ? String(suggestedAge) : '');
   const [heightCm, setHeightCm] = useState('');
   const [weightKg, setWeightKg] = useState('');
   const [touched, setTouched] = useState(false);
