@@ -1,6 +1,7 @@
 import { Button, Table } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
+import { t } from '../../../i18n/index.js';
 
 // An action is "in force" when it is a restriction that has not ended and was not lifted
 // (docs/11 §3.8).
@@ -19,22 +20,22 @@ const isInForce = (action) =>
 export function AccountActionsTable({ actions, onLift }) {
   const columns = [
     {
-      title: '종류',
+      title: t('종류'),
       dataIndex: 'actionType',
       render: (value) => <StatusTag kind="accountActionType" value={value} />,
     },
-    { title: '사유', dataIndex: 'reason' },
-    { title: '시작', dataIndex: 'startsAt', render: (value) => <DateText value={value} /> },
-    { title: '종료', dataIndex: 'endsAt', render: (value) => <DateText value={value} /> },
-    { title: '해제', dataIndex: 'liftedAt', render: (value) => <DateText value={value} /> },
-    { title: '담당', dataIndex: 'adminLoginId' },
+    { title: t('사유'), dataIndex: 'reason' },
+    { title: t('시작'), dataIndex: 'startsAt', render: (value) => <DateText value={value} /> },
+    { title: t('종료'), dataIndex: 'endsAt', render: (value) => <DateText value={value} /> },
+    { title: t('해제'), dataIndex: 'liftedAt', render: (value) => <DateText value={value} /> },
+    { title: t('담당'), dataIndex: 'adminLoginId' },
     {
       title: '',
       key: 'lift',
       render: (_, action) =>
         isInForce(action) ? (
           <Button size="small" danger onClick={() => onLift(action)}>
-            해제
+            {t('해제')}
           </Button>
         ) : null,
     },

@@ -2,6 +2,7 @@ import { Descriptions, Modal, Typography } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
 import { MemberCell } from '../../../components/MemberCell.jsx';
 import { auditAction, auditResult } from '../labels.js';
+import { t } from '../../../i18n/index.js';
 
 const preStyle = {
   margin: 0,
@@ -19,7 +20,7 @@ function JsonBlock({ title, value }) {
     <div style={{ flex: 1, minWidth: 0 }}>
       <Typography.Text strong>{title}</Typography.Text>
       {value === null || value === undefined ? (
-        <div style={{ marginTop: 8, color: '#8c8c8c' }}>없음</div>
+        <div style={{ marginTop: 8, color: '#8c8c8c' }}>{t('없음')}</div>
       ) : (
         <pre style={{ ...preStyle, marginTop: 8 }}>{JSON.stringify(value, null, 2)}</pre>
       )}
@@ -36,31 +37,31 @@ function JsonBlock({ title, value }) {
  */
 export function AuditLogDetailModal({ log, onClose }) {
   return (
-    <Modal open={Boolean(log)} title="변경 내용" footer={null} width={720} onCancel={onClose}>
+    <Modal open={Boolean(log)} title={t('변경 내용')} footer={null} width={720} onCancel={onClose}>
       {log && (
         <>
           <Descriptions column={1} size="small" style={{ marginBottom: 16 }}>
-            <Descriptions.Item label="작업">
+            <Descriptions.Item label={t('작업')}>
               {auditAction[log.action] ?? log.action}
               {auditAction[log.action] && (
                 <Typography.Text type="secondary"> ({log.action})</Typography.Text>
               )}
             </Descriptions.Item>
-            <Descriptions.Item label="관리자">{log.adminLoginId}</Descriptions.Item>
-            <Descriptions.Item label="대상 회원">
+            <Descriptions.Item label={t('관리자')}>{log.adminLoginId}</Descriptions.Item>
+            <Descriptions.Item label={t('대상 회원')}>
               <MemberCell id={log.targetUserId} nickname={log.targetNickname} />
             </Descriptions.Item>
-            <Descriptions.Item label="기록 시각">
+            <Descriptions.Item label={t('기록 시각')}>
               <DateText value={log.recordedAt} format="YYYY-MM-DD HH:mm:ss" />
             </Descriptions.Item>
-            <Descriptions.Item label="결과">
+            <Descriptions.Item label={t('결과')}>
               {auditResult[log.result]?.text ?? log.result}
             </Descriptions.Item>
-            <Descriptions.Item label="사유">{log.reason ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('사유')}>{log.reason ?? '-'}</Descriptions.Item>
           </Descriptions>
           <div style={{ display: 'flex', gap: 16 }}>
-            <JsonBlock title="변경 전" value={log.beforeValue} />
-            <JsonBlock title="변경 후" value={log.afterValue} />
+            <JsonBlock title={t('변경 전')} value={log.beforeValue} />
+            <JsonBlock title={t('변경 후')} value={log.afterValue} />
           </div>
         </>
       )}

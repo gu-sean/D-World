@@ -13,13 +13,14 @@ import { useListParams } from '../../../components/useListParams.js';
 import { labels } from '../../../constants/labels.js';
 import { formatConfidence, formatTarget, METHOD_LABEL } from '../components/format.js';
 import { useAppeals, useVerifications } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 const APPEAL_FIELDS = [
   MEMBER_FIELD,
   {
     name: 'status',
     type: 'select',
-    label: '상태',
+    label: t('상태'),
     options: Object.entries(labels.verificationAppealStatus).map(([value, { text }]) => ({
       value,
       label: text,
@@ -31,7 +32,7 @@ const HOLD_FIELDS = [
   {
     name: 'method',
     type: 'select',
-    label: '인증 방식',
+    label: t('인증 방식'),
     options: Object.entries(METHOD_LABEL).map(([value, label]) => ({ value, label })),
   },
 ];
@@ -42,7 +43,7 @@ function AppealsTab({ params, setParams }) {
 
   const columns = [
     {
-      title: '접수 시각',
+      title: t('접수 시각'),
       dataIndex: 'filedAt',
       key: 'filedAt',
       sorter: true,
@@ -53,19 +54,23 @@ function AppealsTab({ params, setParams }) {
       ),
     },
     memberColumn({ idKey: 'userId', nicknameKey: 'nickname' }),
-    { title: '미션', dataIndex: 'missionTitle' },
+    { title: t('미션'), dataIndex: 'missionTitle' },
     {
-      title: '기존 판정',
+      title: t('기존 판정'),
       dataIndex: 'originalDecision',
       render: (value) => (value ? <StatusTag kind="decision" value={value} /> : '-'),
     },
-    { title: '이의 사유', dataIndex: 'reason', ellipsis: true },
+    { title: t('이의 사유'), dataIndex: 'reason', ellipsis: true },
     {
-      title: '상태',
+      title: t('상태'),
       dataIndex: 'status',
       render: (value) => <StatusTag kind="verificationAppealStatus" value={value} />,
     },
-    { title: '처리 시각', dataIndex: 'resolvedAt', render: (value) => <DateText value={value} /> },
+    {
+      title: t('처리 시각'),
+      dataIndex: 'resolvedAt',
+      render: (value) => <DateText value={value} />,
+    },
   ];
 
   return (
@@ -88,7 +93,7 @@ function HoldTab({ params, setParams }) {
 
   const columns = [
     {
-      title: '제출 시각',
+      title: t('제출 시각'),
       dataIndex: 'submittedAt',
       key: 'submittedAt',
       sorter: true,
@@ -99,14 +104,14 @@ function HoldTab({ params, setParams }) {
       ),
     },
     memberColumn({ idKey: 'userId', nicknameKey: 'nickname' }),
-    { title: '미션', render: (_, row) => row.mission.title },
+    { title: t('미션'), render: (_, row) => row.mission.title },
     {
-      title: '인증 방식',
+      title: t('인증 방식'),
       render: (_, row) => METHOD_LABEL[row.mission.verificationMethod] ?? '-',
     },
-    { title: '목표', render: (_, row) => formatTarget(row.mission) },
-    { title: 'AI 신뢰도', render: (_, row) => formatConfidence(row.ai?.confidence) },
-    { title: 'AI 사유', render: (_, row) => row.ai?.reason ?? '-' },
+    { title: t('목표'), render: (_, row) => formatTarget(row.mission) },
+    { title: t('AI 신뢰도'), render: (_, row) => formatConfidence(row.ai?.confidence) },
+    { title: t('AI 사유'), render: (_, row) => row.ai?.reason ?? '-' },
   ];
 
   return (
@@ -134,10 +139,13 @@ export default function AppealListPage() {
 
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Typography.Title level={3}>처리 대기</Typography.Title>
+      <Typography.Title level={3}>{t('처리 대기')}</Typography.Title>
       <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
-        AI가 먼저 판정하고, 관리자는 회원이 이의를 낸 건과 AI가 판정을 보류한 건만 처리해요. 모든
-        인증 결과는 <Link to="/verifications">인증 기록</Link>에 남아요.
+        {t(
+          'AI가 먼저 판정하고, 관리자는 회원이 이의를 낸 건과 AI가 판정을 보류한 건만 처리해요. 모든 인증 결과는',
+        )}{' '}
+        <Link to="/verifications">{t('인증 기록')}</Link>
+        {t('에 남아요.')}
       </Typography.Paragraph>
       <Tabs
         activeKey={tab}
@@ -147,12 +155,12 @@ export default function AppealListPage() {
         items={[
           {
             key: 'appeals',
-            label: `이의 신청${count(appealCount)}`,
+            label: t('이의 신청{0}', count(appealCount)),
             children: <AppealsTab params={params} setParams={keepTab} />,
           },
           {
             key: 'hold',
-            label: `AI 판정 보류${count(holdCount)}`,
+            label: t('AI 판정 보류{0}', count(holdCount)),
             children: <HoldTab params={params} setParams={keepTab} />,
           },
         ]}

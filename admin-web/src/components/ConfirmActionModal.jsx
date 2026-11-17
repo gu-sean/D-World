@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Input, Modal } from 'antd';
 import { newIdempotencyKey } from '../api/idempotency.js';
+import { t } from '../i18n/index.js';
 
 const REASON_MAX_LENGTH = 500; // docs/05 §5.2: `reason` is at most 500 characters
-const FALLBACK_ERROR_TEXT = '잠시 후 다시 시도해 주세요.'; // COMMON_INTERNAL, docs/05 §7
+const FALLBACK_ERROR_TEXT = t('잠시 후 다시 시도해 주세요.'); // COMMON_INTERNAL, docs/05 §7
 
 /**
  * Confirmation step of every change (docs/parts/admin-web.md §7 rule 1): shows what will happen,
@@ -62,8 +63,8 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
     <Modal
       open={open}
       title={title}
-      okText="확인"
-      cancelText="취소"
+      okText={t('확인')}
+      cancelText={t('취소')}
       okButtonProps={{ danger }}
       cancelButtonProps={{ disabled: submitting }}
       confirmLoading={submitting}
@@ -73,13 +74,13 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
       onCancel={submitting ? undefined : onCancel}
     >
       <div style={{ marginBottom: 16 }}>{summary}</div>
-      <label htmlFor="confirm-action-reason">사유 (선택)</label>
+      <label htmlFor="confirm-action-reason">{t('사유 (선택)')}</label>
       <Input.TextArea
         id="confirm-action-reason"
         rows={3}
         maxLength={REASON_MAX_LENGTH}
         showCount
-        placeholder="비워 두면 '관리자 처리'로 기록돼요."
+        placeholder={t("비워 두면 '관리자 처리'로 기록돼요.")}
         readOnly={triedOnce}
         value={reason}
         onChange={(event) => setReason(event.target.value)}

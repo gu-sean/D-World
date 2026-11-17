@@ -9,14 +9,15 @@ import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { optionsOf } from '../components/labels.js';
 import { usePointTransactions } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 const DEFAULT_SORT = 'occurredAt,desc'; // docs/09 M70
 
 const fields = [
   MEMBER_FIELD,
-  { name: 'kind', type: 'select', label: '종류', options: optionsOf('pointTransactionKind') },
-  { name: 'sourceType', type: 'select', label: '출처', options: optionsOf('pointSourceType') },
-  { name: 'period', type: 'dateRange', label: '기간' }, // writes `from` and `to`
+  { name: 'kind', type: 'select', label: t('종류'), options: optionsOf('pointTransactionKind') },
+  { name: 'sourceType', type: 'select', label: t('출처'), options: optionsOf('pointSourceType') },
+  { name: 'period', type: 'dateRange', label: t('기간') }, // writes `from` and `to`
 ];
 
 // The server's number, only with a sign for reading.
@@ -24,7 +25,7 @@ const signed = (n) => (n > 0 ? `+${n.toLocaleString()}` : n.toLocaleString());
 
 const columns = [
   {
-    title: '시각',
+    title: t('시각'),
     dataIndex: 'occurredAt',
     key: 'occurredAt',
     sorter: true,
@@ -33,31 +34,36 @@ const columns = [
   },
   memberColumn({ idKey: 'userId', nicknameKey: 'nickname' }),
   {
-    title: '종류',
+    title: t('종류'),
     dataIndex: 'kind',
     render: (value) => <StatusTag kind="pointTransactionKind" value={value} />,
   },
   {
-    title: '출처',
+    title: t('출처'),
     dataIndex: 'sourceType',
     render: (value) => <StatusTag kind="pointSourceType" value={value} />,
   },
   {
-    title: '가용 변동',
+    title: t('가용 변동'),
     dataIndex: 'availableDelta',
     align: 'right',
     render: (n) => (
       <Typography.Text type={n < 0 ? 'danger' : undefined}>{signed(n)}</Typography.Text>
     ),
   },
-  { title: '잔액', dataIndex: 'balanceAfter', align: 'right', render: (n) => n.toLocaleString() },
   {
-    title: '미회수',
+    title: t('잔액'),
+    dataIndex: 'balanceAfter',
+    align: 'right',
+    render: (n) => n.toLocaleString(),
+  },
+  {
+    title: t('미회수'),
     dataIndex: 'outstandingAfter',
     align: 'right',
     render: (n) => n.toLocaleString(),
   },
-  { title: '사유', dataIndex: 'reason', ellipsis: true, render: (reason) => reason ?? '-' },
+  { title: t('사유'), dataIndex: 'reason', ellipsis: true, render: (reason) => reason ?? '-' },
 ];
 
 export default function PointTransactionListPage() {
@@ -68,17 +74,17 @@ export default function PointTransactionListPage() {
     <div>
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
         <Typography.Title level={3} style={{ margin: 0 }}>
-          포인트 내역
+          {t('포인트 내역')}
         </Typography.Title>
         <Link to="/rewards/points/adjust">
-          <Button type="primary">포인트 수동 조정</Button>
+          <Button type="primary">{t('포인트 수동 조정')}</Button>
         </Link>
       </Space>
 
       <FilterBar fields={fields} value={params} onChange={setParams} />
       {query.data && (
         <Statistic
-          title="검수 대기 중인 보상 합계"
+          title={t('검수 대기 중인 보상 합계')}
           value={query.data.pendingPoints}
           suffix="P"
           style={{ marginBottom: 16 }}

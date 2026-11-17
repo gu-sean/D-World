@@ -13,6 +13,7 @@ import { ReplyForm } from './ReplyForm.jsx';
 import { ResolutionForm } from './ResolutionForm.jsx';
 import { TicketEvents } from './TicketEvents.jsx';
 import { TicketResolution } from './TicketResolution.jsx';
+import { t } from '../../../i18n/index.js';
 
 const sectionTitle = (text) => (
   <Typography.Title level={5} style={{ margin: '24px 0 12px' }}>
@@ -45,39 +46,39 @@ function TicketBody({ ticket, listPath }) {
   const items = [
     {
       key: 'type',
-      label: '유형',
+      label: t('유형'),
       children: <StatusTag kind="ticketType" value={ticket.ticketType} />,
     },
     {
       key: 'status',
-      label: '상태',
+      label: t('상태'),
       children: <StatusTag kind="ticketStatus" value={ticket.status} />,
     },
     {
       key: 'category',
-      label: '분류',
+      label: t('분류'),
       children: labels.ticketCategory[ticket.category]?.text ?? ticket.category,
     },
-    { key: 'subject', label: '제목', children: ticket.subject },
+    { key: 'subject', label: t('제목'), children: ticket.subject },
     {
       key: 'reporter',
-      label: '접수자',
+      label: t('접수자'),
       children: <MemberCell id={ticket.reporterUserId} nickname={ticket.reporterNickname} />,
     },
-    { key: 'assigned', label: '담당', children: ticket.assignedAdminLoginId ?? '-' },
+    { key: 'assigned', label: t('담당'), children: ticket.assignedAdminLoginId ?? '-' },
     ...(ticket.ticketType === 'report'
       ? [
-          { key: 'target', label: '대상', children: <TargetText ticket={ticket} /> },
-          { key: 'same', label: '중복 신고', children: `${ticket.sameTargetOpenCount}건` },
+          { key: 'target', label: t('대상'), children: <TargetText ticket={ticket} /> },
+          { key: 'same', label: t('중복 신고'), children: t('{0}건', ticket.sameTargetOpenCount) },
         ]
       : []),
-    { key: 'received', label: '접수일', children: <DateText value={ticket.receivedAt} /> },
+    { key: 'received', label: t('접수일'), children: <DateText value={ticket.receivedAt} /> },
   ];
 
   const handleAssign = () =>
     setConfirm({
-      title: '담당 지정',
-      summary: `${ticket.subject} · 나에게 지정해요.`,
+      title: t('담당 지정'),
+      summary: t('{0} · 나에게 지정해요.', ticket.subject),
       submit: ({ reason, idempotencyKey }) =>
         assign.mutateAsync({
           ticketId: ticket.id,
@@ -88,22 +89,22 @@ function TicketBody({ ticket, listPath }) {
 
   return (
     <>
-      <Link to={listPath}>목록으로</Link>
+      <Link to={listPath}>{t('목록으로')}</Link>
       <Descriptions bordered size="small" column={2} items={items} style={{ marginTop: 12 }} />
-      {sectionTitle('내용')}
+      {sectionTitle(t('내용'))}
       <Card size="small">
         <div style={{ whiteSpace: 'pre-wrap' }}>{ticket.body}</div>
       </Card>
-      {sectionTitle('진행 기록')}
+      {sectionTitle(t('진행 기록'))}
       <TicketEvents events={ticket.events} />
       <div style={{ marginTop: 16 }}>
         <Button disabled={isCompleted} onClick={handleAssign}>
-          나에게 지정
+          {t('나에게 지정')}
         </Button>
       </div>
-      {sectionTitle('답변·메모')}
+      {sectionTitle(t('답변·메모'))}
       <ReplyForm ticketId={ticket.id} onConfirm={setConfirm} />
-      {sectionTitle('처리')}
+      {sectionTitle(t('처리'))}
       {ticket.resolution ? (
         <TicketResolution resolution={ticket.resolution} />
       ) : (
@@ -116,7 +117,7 @@ function TicketBody({ ticket, listPath }) {
         danger={confirm?.danger}
         onSubmit={async (input) => {
           await confirm.submit(input);
-          message.success('처리했어요');
+          message.success(t('처리했어요'));
           setConfirm(null);
         }}
         onCancel={() => setConfirm(null)}

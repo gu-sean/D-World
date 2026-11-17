@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { message } from 'antd';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
+import { t } from '../../../i18n/index.js';
 
 /**
  * Every change goes through `ConfirmActionModal` (reason + Idempotency-Key) and ends with
@@ -22,7 +23,7 @@ export function useConfirmedChange() {
       danger={pending?.danger}
       onSubmit={async (input) => {
         await pending.run(input);
-        message.success('처리했어요');
+        message.success(t('처리했어요'));
         const { onDone } = pending;
         setPending(null);
         onDone?.();

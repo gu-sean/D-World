@@ -5,21 +5,28 @@ import { useConfirmedChange } from '../components/useConfirmedChange.jsx';
 import { MAX_POINTS } from '../components/labels.js';
 import { useAdjustPoints, useMember } from '../queries.js';
 import { ID_PATTERN } from '../../../api/ids.js';
+import { t } from '../../../i18n/index.js';
 
-const ACTION_TEXT = { manual_grant: '지급', manual_recovery: '회수' };
+const ACTION_TEXT = { manual_grant: t('지급'), manual_recovery: t('회수') };
 
 /** 입력한 회원 ID가 누구인지 바로 아래에 보여 준다 (잘못된 회원에게 조정하지 않게). */
 function MemberCheck({ query }) {
   if (!query.data && !query.isError) return null;
   if (query.isError) {
-    return <Alert type="error" showIcon message="이 회원 ID로 가입한 회원을 찾을 수 없어요." />;
+    return (
+      <Alert type="error" showIcon message={t('이 회원 ID로 가입한 회원을 찾을 수 없어요.')} />
+    );
   }
   const user = query.data;
   return (
     <Alert
       type="info"
       showIcon
-      message={`${user.nickname ?? '(닉네임 없음)'} · 보유 ${user.availablePoints.toLocaleString()} P`}
+      message={t(
+        '{0} · 보유 {1} P',
+        user.nickname ?? t('(닉네임 없음)'),
+        user.availablePoints.toLocaleString(),
+      )}
     />
   );
 }
@@ -38,8 +45,8 @@ export default function PointAdjustmentPage() {
   // calculated here (docs/parts/admin-web.md §7 rule 3).
   const onFinish = ({ userId, kind, amount }) =>
     ask({
-      title: '포인트를 조정할까요?',
-      summary: `${member.data?.nickname ?? '회원'} (${userId.trim()}) · ${ACTION_TEXT[kind]} · ${amount.toLocaleString()} P`,
+      title: t('포인트를 조정할까요?'),
+      summary: `${member.data?.nickname ?? t('회원')} (${userId.trim()}) · ${ACTION_TEXT[kind]} · ${amount.toLocaleString()} P`,
       danger: kind === 'manual_recovery',
       run: ({ reason, idempotencyKey }) =>
         adjust.mutateAsync({
@@ -52,9 +59,9 @@ export default function PointAdjustmentPage() {
   return (
     <div style={{ maxWidth: 560 }}>
       {modal}
-      <Typography.Title level={3}>포인트 수동 조정</Typography.Title>
+      <Typography.Title level={3}>{t('포인트 수동 조정')}</Typography.Title>
       <Typography.Paragraph type="secondary">
-        수동 지급은 월 한도에 포함되지 않아요. 회수는 가용 잔액까지만 할 수 있어요.
+        {t('수동 지급은 월 한도에 포함되지 않아요. 회수는 가용 잔액까지만 할 수 있어요.')}
       </Typography.Paragraph>
 
       <Form
@@ -65,15 +72,15 @@ export default function PointAdjustmentPage() {
       >
         <Form.Item
           name="userId"
-          label="회원 ID"
-          extra="회원 목록이나 회원 상세에서 회원 ID 옆 복사 버튼으로 복사해 붙여 넣어요."
+          label={t('회원 ID')}
+          extra={t('회원 목록이나 회원 상세에서 회원 ID 옆 복사 버튼으로 복사해 붙여 넣어요.')}
           rules={[
-            { required: true, whitespace: true, message: '회원 ID를 입력해 주세요.' },
+            { required: true, whitespace: true, message: t('회원 ID를 입력해 주세요.') },
             {
               validator: (_, v) =>
                 !v?.trim() || ID_PATTERN.test(v.trim())
                   ? Promise.resolve()
-                  : Promise.reject(new Error('회원 ID 형식을 확인해 주세요.')),
+                  : Promise.reject(new Error(t('회원 ID 형식을 확인해 주세요.'))),
             },
           ]}
         >
@@ -83,24 +90,24 @@ export default function PointAdjustmentPage() {
         <div style={{ marginTop: -8, marginBottom: 16 }}>
           <MemberCheck query={member} />
         </div>
-        <Form.Item name="kind" label="조치">
+        <Form.Item name="kind" label={t('조치')}>
           <Radio.Group>
-            <Radio.Button value="manual_grant">지급</Radio.Button>
-            <Radio.Button value="manual_recovery">회수</Radio.Button>
+            <Radio.Button value="manual_grant">{t('지급')}</Radio.Button>
+            <Radio.Button value="manual_recovery">{t('회수')}</Radio.Button>
           </Radio.Group>
         </Form.Item>
         <Form.Item
           name="amount"
-          label="포인트"
-          rules={[{ required: true, message: '포인트를 입력해 주세요.' }]}
+          label={t('포인트')}
+          rules={[{ required: true, message: t('포인트를 입력해 주세요.') }]}
         >
           <InputNumber min={1} max={MAX_POINTS} precision={0} style={{ width: 200 }} suffix="P" />
         </Form.Item>
         <Button type="primary" htmlType="submit" disabled={member.isError}>
-          조정하기
+          {t('조정하기')}
         </Button>{' '}
         <Link to={typedId ? `/rewards/points?member=${typedId}` : '/rewards/points'}>
-          <Button>내역 보기</Button>
+          <Button>{t('내역 보기')}</Button>
         </Link>
       </Form>
     </div>

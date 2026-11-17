@@ -3,13 +3,14 @@ import { Button } from 'antd';
 import { newIdempotencyKey } from '../api/idempotency.js';
 import { ConfirmActionModal } from './ConfirmActionModal.jsx';
 import { completeUpload, createUploadUrl, putToStorage } from './imageUploadApi.js';
+import { t } from '../i18n/index.js';
 
 const BADGE_TYPES = ['image/png', 'image/webp', 'image/jpeg']; // M84 `mimeType`
 const PET_TYPES = [...BADGE_TYPES, 'image/gif']; // 펫 단계 이미지는 GIF도 가능
 const MAX_BYTES = 2 * 1024 * 1024; // M84 `sizeBytes` (≤2MB)
-const WRONG_TYPE_TEXT = 'PNG, WebP, JPEG 이미지만 올릴 수 있어요.';
-const WRONG_PET_TYPE_TEXT = 'PNG, WebP, JPEG, GIF 이미지만 올릴 수 있어요.';
-const TOO_BIG_TEXT = '2MB 이하의 이미지만 올릴 수 있어요.';
+const WRONG_TYPE_TEXT = t('PNG, WebP, JPEG 이미지만 올릴 수 있어요.');
+const WRONG_PET_TYPE_TEXT = t('PNG, WebP, JPEG, GIF 이미지만 올릴 수 있어요.');
+const TOO_BIG_TEXT = t('2MB 이하의 이미지만 올릴 수 있어요.');
 
 /**
  * Image field of ADM-25 (badge) and ADM-26 (pet stage). Picking a file opens a
@@ -79,7 +80,7 @@ export function ImageUploadField({ assetKind, ownerId, value, onChange }) {
         onChange={handleFileChosen}
       />
       <Button disabled={!ownerId} onClick={() => inputRef.current?.click()}>
-        {value ? '이미지 교체' : '이미지 선택'}
+        {value ? t('이미지 교체') : t('이미지 선택')}
       </Button>
       {fileError && (
         <div role="alert" style={{ color: '#ff4d4f', marginTop: 4 }}>
@@ -88,7 +89,7 @@ export function ImageUploadField({ assetKind, ownerId, value, onChange }) {
       )}
       <ConfirmActionModal
         open={pendingFile !== null}
-        title="이미지 업로드"
+        title={t('이미지 업로드')}
         summary={pendingFile?.name}
         onSubmit={handleSubmit}
         onCancel={() => setPendingFile(null)}

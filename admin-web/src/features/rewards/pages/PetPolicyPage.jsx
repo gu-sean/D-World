@@ -40,6 +40,7 @@ import {
   usePetLevels,
   usePetSpecies,
 } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 const compact = (obj) =>
   Object.fromEntries(
@@ -50,13 +51,13 @@ const compact = (obj) =>
 function stagesError(stages = []) {
   const [first, second, third] = stages;
   if (!first || !second || !third) return null;
-  if (first.minTotalXp !== 0) return '1단계 필요 XP는 0이어야 해요.';
+  if (first.minTotalXp !== 0) return t('1단계 필요 XP는 0이어야 해요.');
   if (!(second.minTotalXp > 0) || !(third.minTotalXp > second.minTotalXp)) {
-    return '필요 XP는 단계가 오를수록 커야 해요.';
+    return t('필요 XP는 단계가 오를수록 커야 해요.');
   }
   const ids = new Set(stages.map((s) => s.imageAssetId));
   if (ids.size !== 3 && stages.every((s) => s.imageAssetId))
-    return '단계마다 다른 이미지를 써야 해요.';
+    return t('단계마다 다른 이미지를 써야 해요.');
   return null;
 }
 
@@ -126,8 +127,8 @@ function SpeciesDrawer({ target, onClose }) {
       imageAssetId,
     }));
     ask({
-      title: isNew ? '새 펫 종류를 저장할까요?' : '새 버전을 저장할까요?',
-      summary: `${body.name} · 해금 조건 ${UNLOCK_CONDITIONS[body.unlockConditionType]}`,
+      title: isNew ? t('새 펫 종류를 저장할까요?') : t('새 버전을 저장할까요?'),
+      summary: t('{0} · 해금 조건 {1}', body.name, UNLOCK_CONDITIONS[body.unlockConditionType]),
       run: ({ reason, idempotencyKey }) =>
         isNew
           ? createSpecies.mutateAsync({
@@ -142,13 +143,12 @@ function SpeciesDrawer({ target, onClose }) {
     });
   };
 
-
   return (
     <Drawer
       open
       width={640}
       onClose={onClose}
-      title={isNew ? '새 펫 종류' : `새 버전 · ${target.species.code}`}
+      title={isNew ? t('새 펫 종류') : t('새 버전 · {0}', target.species.code)}
       destroyOnHidden
     >
       {modal}
@@ -156,12 +156,12 @@ function SpeciesDrawer({ target, onClose }) {
         {isNew && (
           <Form.Item
             name="code"
-            label="코드"
+            label={t('코드')}
             rules={[
-              { required: true, message: '코드를 입력해 주세요.' },
+              { required: true, message: t('코드를 입력해 주세요.') },
               {
                 pattern: /^[a-z][a-z0-9_]{0,79}$/,
-                message: '소문자로 시작하는 소문자·숫자·밑줄만 가능해요.',
+                message: t('소문자로 시작하는 소문자·숫자·밑줄만 가능해요.'),
               },
             ]}
           >
@@ -170,24 +170,24 @@ function SpeciesDrawer({ target, onClose }) {
         )}
         <Form.Item
           name="name"
-          label="이름"
+          label={t('이름')}
           rules={[
-            { required: true, whitespace: true, message: '이름을 입력해 주세요.' },
+            { required: true, whitespace: true, message: t('이름을 입력해 주세요.') },
             { max: 80 },
           ]}
         >
           <Input />
         </Form.Item>
-        <Form.Item name="description" label="설명" rules={[{ max: 2000 }]}>
+        <Form.Item name="description" label={t('설명')} rules={[{ max: 2000 }]}>
           <Input.TextArea rows={2} />
         </Form.Item>
-        <Form.Item name="personality" label="성격" rules={[{ max: 2000 }]}>
+        <Form.Item name="personality" label={t('성격')} rules={[{ max: 2000 }]}>
           <Input.TextArea rows={2} />
         </Form.Item>
-        <Form.Item name="worldText" label="세계관" rules={[{ max: 4000 }]}>
+        <Form.Item name="worldText" label={t('세계관')} rules={[{ max: 4000 }]}>
           <Input.TextArea rows={3} />
         </Form.Item>
-        <Form.Item name="unlockConditionType" label="해금 조건">
+        <Form.Item name="unlockConditionType" label={t('해금 조건')}>
           <Select
             options={conditionOptions(UNLOCK_CONDITIONS).filter(
               (o) => o.value !== 'category_approved_mission_count',
@@ -199,14 +199,14 @@ function SpeciesDrawer({ target, onClose }) {
         ) && (
           <Form.Item
             name="unlockTargetCount"
-            label="해금 목표 횟수"
+            label={t('해금 목표 횟수')}
             rules={[
-              { required: true, message: '목표 횟수를 입력해 주세요.' },
+              { required: true, message: t('목표 횟수를 입력해 주세요.') },
               () => ({
                 validator: (_, v) =>
                   unlockType !== 'streak_milestone' || STREAK_TARGET_DAYS.includes(v)
                     ? Promise.resolve()
-                    : Promise.reject(new Error('7, 30, 100 중 하나여야 해요.')),
+                    : Promise.reject(new Error(t('7, 30, 100 중 하나여야 해요.'))),
               }),
             ]}
           >
@@ -216,8 +216,8 @@ function SpeciesDrawer({ target, onClose }) {
         {unlockType === 'category_approved_mission_count' && (
           <Form.Item
             name="unlockCategoryCode"
-            label="해금 분야"
-            rules={[{ required: true, message: '분야를 선택해 주세요.' }]}
+            label={t('해금 분야')}
+            rules={[{ required: true, message: t('분야를 선택해 주세요.') }]}
           >
             <Select
               options={(categories.data ?? []).map((c) => ({ value: c.code, label: c.name }))}
@@ -227,8 +227,8 @@ function SpeciesDrawer({ target, onClose }) {
         {unlockType === 'achievement_earned' && (
           <Form.Item
             name="unlockAchievementId"
-            label="해금 업적"
-            rules={[{ required: true, message: '업적을 선택해 주세요.' }]}
+            label={t('해금 업적')}
+            rules={[{ required: true, message: t('업적을 선택해 주세요.') }]}
           >
             <Select
               options={(achievements.data ?? []).map((a) => ({ value: a.id, label: a.code }))}
@@ -236,11 +236,12 @@ function SpeciesDrawer({ target, onClose }) {
           </Form.Item>
         )}
         <Typography.Paragraph type="secondary">
-          성장 규칙(모든 펫 공통): 세부 미션 3개를 완료하면 알에서 부화하고, 사용자가 경험치를 450
-          먹이면 성체가 돼요.
+          {t(
+            '성장 규칙(모든 펫 공통): 세부 미션 3개를 완료하면 알에서 부화하고, 사용자가 경험치를 450 먹이면 성체가 돼요.',
+          )}
         </Typography.Paragraph>
 
-        <Typography.Title level={5}>성장 단계</Typography.Title>
+        <Typography.Title level={5}>{t('성장 단계')}</Typography.Title>
         <Form.Item noStyle shouldUpdate>
           {({ getFieldValue }) => {
             const message = stagesError(getFieldValue('stages'));
@@ -257,7 +258,7 @@ function SpeciesDrawer({ target, onClose }) {
               <Card
                 key={field.key}
                 size="small"
-                title={`${index + 1}단계 · ${stageText(index + 1)}`}
+                title={t('{0}단계 · {1}', index + 1, stageText(index + 1))}
                 style={{ marginBottom: 12 }}
               >
                 <Form.Item name={[field.name, 'stageNo']} hidden>
@@ -265,23 +266,23 @@ function SpeciesDrawer({ target, onClose }) {
                 </Form.Item>
                 <Form.Item
                   name={[field.name, 'minTotalXp']}
-                  label="필요 누적 XP"
-                  rules={[{ required: true, message: '필요 XP를 입력해 주세요.' }]}
+                  label={t('필요 누적 XP')}
+                  rules={[{ required: true, message: t('필요 XP를 입력해 주세요.') }]}
                 >
                   <InputNumber min={0} precision={0} disabled={index === 0} />
                 </Form.Item>
                 <Form.Item
                   name={[field.name, 'bonusBasisPoints']}
-                  label="보너스 (1/100 %)"
+                  label={t('보너스 (1/100 %)')}
                   extra="0 ~ 2000"
-                  rules={[{ required: true, message: '보너스를 입력해 주세요.' }]}
+                  rules={[{ required: true, message: t('보너스를 입력해 주세요.') }]}
                 >
                   <InputNumber min={0} max={2000} precision={0} />
                 </Form.Item>
                 <Form.Item
                   name={[field.name, 'imageAssetId']}
-                  label="이미지"
-                  rules={[{ required: true, message: '이미지를 올려 주세요.' }]}
+                  label={t('이미지')}
+                  rules={[{ required: true, message: t('이미지를 올려 주세요.') }]}
                 >
                   <ImageUploadField assetKind="pet_stage" ownerId={ownerId} />
                 </Form.Item>
@@ -290,12 +291,12 @@ function SpeciesDrawer({ target, onClose }) {
           }
         </Form.List>
 
-        <Form.Item name="status" label="공개 상태">
+        <Form.Item name="status" label={t('공개 상태')}>
           <Select options={optionsOf('missionDefinitionPublicationStatus', ['draft', 'public'])} />
         </Form.Item>
         <EffectiveAtItem required />
         <Button type="primary" htmlType="submit">
-          저장
+          {t('저장')}
         </Button>
       </Form>
     </Drawer>
@@ -307,11 +308,11 @@ function SpeciesTab() {
   const [target, setTarget] = useState(null);
 
   const versionColumns = [
-    { title: '버전', dataIndex: 'versionNo', render: (v) => `v${v}` },
-    { title: '이름', dataIndex: 'name' },
-    { title: '해금 조건', render: (_, v) => UNLOCK_CONDITIONS[v.unlockConditionType] },
+    { title: t('버전'), dataIndex: 'versionNo', render: (v) => `v${v}` },
+    { title: t('이름'), dataIndex: 'name' },
+    { title: t('해금 조건'), render: (_, v) => UNLOCK_CONDITIONS[v.unlockConditionType] },
     {
-      title: '단계',
+      title: t('단계'),
       render: (_, v) => (
         <Image.PreviewGroup>
           {v.stages.map((s) =>
@@ -323,7 +324,7 @@ function SpeciesTab() {
       ),
     },
     {
-      title: '시행 시각',
+      title: t('시행 시각'),
       dataIndex: 'effectiveAt',
       render: (value) => <DateText value={value} />,
     },
@@ -333,7 +334,7 @@ function SpeciesTab() {
     <>
       <div style={{ textAlign: 'right', marginBottom: 16 }}>
         <Button type="primary" onClick={() => setTarget({ mode: 'create' })}>
-          새 펫 종류
+          {t('새 펫 종류')}
         </Button>
       </div>
       <QueryBoundary query={list}>
@@ -357,20 +358,20 @@ function SpeciesTab() {
                 ),
               }}
               columns={[
-                { title: '코드', dataIndex: 'code' },
+                { title: t('코드'), dataIndex: 'code' },
                 {
-                  title: '현재 이름',
+                  title: t('현재 이름'),
                   render: (_, row) =>
                     row.versions.find((v) => v.versionNo === row.currentVersionNo)?.name ??
-                    '(시행 전)',
+                    t('(시행 전)'),
                 },
                 {
-                  title: '현재 버전',
+                  title: t('현재 버전'),
                   dataIndex: 'currentVersionNo',
                   render: (v) => (v ? `v${v}` : '-'),
                 },
                 {
-                  title: '상태',
+                  title: t('상태'),
                   dataIndex: 'status',
                   render: (value) => (
                     <StatusTag kind="missionDefinitionPublicationStatus" value={value} />
@@ -383,7 +384,7 @@ function SpeciesTab() {
                       disabled={row.status === 'hidden'}
                       onClick={() => setTarget({ mode: 'version', species: row })}
                     >
-                      새 버전
+                      {t('새 버전')}
                     </Button>
                   ),
                 },
@@ -407,8 +408,8 @@ function LevelsTab() {
   // makes the Idempotency-Key, so the reason typed there is not sent.
   const onFinish = ({ thresholds, effectiveAt }) =>
     ask({
-      title: '새 레벨 기준을 저장할까요?',
-      summary: `${thresholds.length}개 레벨 기준`,
+      title: t('새 레벨 기준을 저장할까요?'),
+      summary: t('{0}개 레벨 기준', thresholds.length),
       run: ({ idempotencyKey }) =>
         create.mutateAsync({
           payload: { thresholds, effectiveAt: toIso(effectiveAt) },
@@ -431,24 +432,28 @@ function LevelsTab() {
               pagination={false}
               dataSource={items}
               columns={[
-                { title: '버전', dataIndex: 'versionNo', render: (v) => `v${v}` },
+                { title: t('버전'), dataIndex: 'versionNo', render: (v) => `v${v}` },
                 {
-                  title: '시행 시각',
+                  title: t('시행 시각'),
                   dataIndex: 'effectiveAt',
                   render: (value) => <DateText value={value} />,
                 },
                 {
-                  title: '레벨별 필요 XP',
+                  title: t('레벨별 필요 XP'),
                   dataIndex: 'thresholds',
-                  render: (t) =>
-                    t
+                  render: (thresholds) =>
+                    thresholds
                       .map((x) => `Lv${x.levelNo}: ${Number(x.minTotalXp).toLocaleString()}`)
                       .join(' · '),
                 },
                 {
-                  title: '상태',
+                  title: t('상태'),
                   render: (_, row) =>
-                    row.id === current?.id ? <Tag color="green">적용 중</Tag> : <Tag>이력</Tag>,
+                    row.id === current?.id ? (
+                      <Tag color="green">{t('적용 중')}</Tag>
+                    ) : (
+                      <Tag>{t('이력')}</Tag>
+                    ),
                 },
               ]}
             />
@@ -456,7 +461,7 @@ function LevelsTab() {
         }}
       </QueryBoundary>
       <Typography.Title level={5} style={{ marginTop: 24 }}>
-        새 레벨 기준 추가
+        {t('새 레벨 기준 추가')}
       </Typography.Title>
       <Form
         form={form}
@@ -472,20 +477,20 @@ function LevelsTab() {
                 <div key={field.key} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
                   <Form.Item
                     name={[field.name, 'levelNo']}
-                    label="레벨"
-                    rules={[{ required: true, message: '레벨을 입력해 주세요.' }]}
+                    label={t('레벨')}
+                    rules={[{ required: true, message: t('레벨을 입력해 주세요.') }]}
                   >
                     <InputNumber min={1} max={100} precision={0} />
                   </Form.Item>
                   <Form.Item
                     name={[field.name, 'minTotalXp']}
-                    label="필요 누적 XP"
-                    rules={[{ required: true, message: '필요 XP를 입력해 주세요.' }]}
+                    label={t('필요 누적 XP')}
+                    rules={[{ required: true, message: t('필요 XP를 입력해 주세요.') }]}
                   >
                     <InputNumber min={0} precision={0} />
                   </Form.Item>
                   <Button onClick={() => remove(field.name)} disabled={fields.length === 1}>
-                    삭제
+                    {t('삭제')}
                   </Button>
                 </div>
               ))}
@@ -494,14 +499,14 @@ function LevelsTab() {
                 style={{ marginBottom: 16 }}
                 disabled={fields.length >= 100}
               >
-                레벨 추가
+                {t('레벨 추가')}
               </Button>
             </>
           )}
         </Form.List>
         <EffectiveAtItem />
         <Button type="primary" htmlType="submit">
-          새 버전 저장
+          {t('새 버전 저장')}
         </Button>
       </Form>
     </>
@@ -511,14 +516,14 @@ function LevelsTab() {
 export default function PetPolicyPage() {
   return (
     <div>
-      <Typography.Title level={3}>펫과 진화 단계</Typography.Title>
+      <Typography.Title level={3}>{t('펫과 진화 단계')}</Typography.Title>
       <Typography.Paragraph type="secondary">
-        정책은 수정하지 않고 새 버전을 추가해요. 이미 키우는 펫은 자기 버전을 유지해요.
+        {t('정책은 수정하지 않고 새 버전을 추가해요. 이미 키우는 펫은 자기 버전을 유지해요.')}
       </Typography.Paragraph>
       <Tabs
         items={[
-          { key: 'species', label: '펫 종류', children: <SpeciesTab /> },
-          { key: 'levels', label: '펫 레벨 기준', children: <LevelsTab /> },
+          { key: 'species', label: t('펫 종류'), children: <SpeciesTab /> },
+          { key: 'levels', label: t('펫 레벨 기준'), children: <LevelsTab /> },
         ]}
       />
     </div>

@@ -24,20 +24,21 @@ import {
   useCreateAchievementVersion,
 } from '../queries.js';
 import dayjs from 'dayjs';
+import { t } from '../../../i18n/index.js';
 
 /** Same rules as the server, so the admin sees them next to the field. */
 function conditionError(values) {
   const { conditionType, targetCount, categoryId, rewardPoints, rewardPetXp } = values;
   if (conditionType === 'first_goal_completed' && targetCount !== 1) {
-    return '첫 목표 완료는 목표 횟수가 1이어야 해요.';
+    return t('첫 목표 완료는 목표 횟수가 1이어야 해요.');
   }
   if (conditionType === 'category_approved_mission_count' && !categoryId) {
-    return '분야별 조건에는 분야를 선택해야 해요.';
+    return t('분야별 조건에는 분야를 선택해야 해요.');
   }
   if (conditionType === 'streak_milestone') {
     if (!STREAK_TARGET_DAYS.includes(targetCount))
-      return '목표 횟수는 7, 30, 100 중 하나여야 해요.';
-    if (rewardPoints || rewardPetXp) return '스트릭 마일스톤 업적은 보상이 0이어야 해요.';
+      return t('목표 횟수는 7, 30, 100 중 하나여야 해요.');
+    if (rewardPoints || rewardPetXp) return t('스트릭 마일스톤 업적은 보상이 0이어야 해요.');
   }
   return null;
 }
@@ -82,7 +83,7 @@ function AchievementDrawer({ target, onClose }) {
       ...(conditionType === 'category_approved_mission_count' ? { categoryId } : {}),
     };
     ask({
-      title: isNew ? '새 업적을 저장할까요?' : '새 버전을 저장할까요?',
+      title: isNew ? t('새 업적을 저장할까요?') : t('새 버전을 저장할까요?'),
       summary: `${body.title} · ${ACHIEVEMENT_CONDITIONS[body.conditionType]} ${body.targetCount}`,
       run: ({ reason, idempotencyKey }) =>
         isNew
@@ -103,7 +104,7 @@ function AchievementDrawer({ target, onClose }) {
       open
       width={560}
       onClose={onClose}
-      title={isNew ? '새 업적' : `새 버전 · ${target.achievement.code}`}
+      title={isNew ? t('새 업적') : t('새 버전 · {0}', target.achievement.code)}
       destroyOnHidden
     >
       {modal}
@@ -111,12 +112,12 @@ function AchievementDrawer({ target, onClose }) {
         {isNew && (
           <Form.Item
             name="code"
-            label="코드"
+            label={t('코드')}
             rules={[
-              { required: true, message: '코드를 입력해 주세요.' },
+              { required: true, message: t('코드를 입력해 주세요.') },
               {
                 pattern: /^[a-z][a-z0-9_]{0,79}$/,
-                message: '소문자로 시작하는 소문자·숫자·밑줄만 가능해요.',
+                message: t('소문자로 시작하는 소문자·숫자·밑줄만 가능해요.'),
               },
             ]}
           >
@@ -125,9 +126,9 @@ function AchievementDrawer({ target, onClose }) {
         )}
         <Form.Item
           name="title"
-          label="이름"
+          label={t('이름')}
           rules={[
-            { required: true, whitespace: true, message: '이름을 입력해 주세요.' },
+            { required: true, whitespace: true, message: t('이름을 입력해 주세요.') },
             { max: 160 },
           ]}
         >
@@ -135,26 +136,26 @@ function AchievementDrawer({ target, onClose }) {
         </Form.Item>
         <Form.Item
           name="description"
-          label="설명"
+          label={t('설명')}
           rules={[
-            { required: true, whitespace: true, message: '설명을 입력해 주세요.' },
+            { required: true, whitespace: true, message: t('설명을 입력해 주세요.') },
             { max: 2000 },
           ]}
         >
           <Input.TextArea rows={3} />
         </Form.Item>
-        <Form.Item name="rarity" label="희귀도">
+        <Form.Item name="rarity" label={t('희귀도')}>
           <Select options={optionsOf('achievementRarity')} />
         </Form.Item>
-        <Form.Item name="conditionType" label="달성 조건">
+        <Form.Item name="conditionType" label={t('달성 조건')}>
           <Select options={conditionOptions(ACHIEVEMENT_CONDITIONS)} />
         </Form.Item>
         <Form.Item
           name="targetCount"
-          label="목표 횟수"
+          label={t('목표 횟수')}
           dependencies={['conditionType', 'categoryId', 'rewardPoints', 'rewardPetXp']}
           rules={[
-            { required: true, message: '목표 횟수를 입력해 주세요.' },
+            { required: true, message: t('목표 횟수를 입력해 주세요.') },
             ({ getFieldsValue }) => ({
               validator: () => {
                 const message = conditionError(getFieldsValue());
@@ -168,8 +169,8 @@ function AchievementDrawer({ target, onClose }) {
         {conditionType === 'category_approved_mission_count' && (
           <Form.Item
             name="categoryId"
-            label="분야"
-            rules={[{ required: true, message: '분야를 선택해 주세요.' }]}
+            label={t('분야')}
+            rules={[{ required: true, message: t('분야를 선택해 주세요.') }]}
           >
             <Select
               options={(categories.data ?? []).map((c) => ({ value: c.id, label: c.name }))}
@@ -177,35 +178,35 @@ function AchievementDrawer({ target, onClose }) {
           </Form.Item>
         )}
         {[
-          ['rewardPoints', '보상 포인트'],
-          ['rewardPetXp', '보상 펫 XP'],
+          ['rewardPoints', t('보상 포인트')],
+          ['rewardPetXp', t('보상 펫 XP')],
         ].map(([name, label]) => (
           <Form.Item
             key={name}
             name={name}
             label={label}
-            rules={[{ required: true, message: `${label}를 입력해 주세요.` }]}
+            rules={[{ required: true, message: t('{0}를 입력해 주세요.', label) }]}
           >
             <InputNumber min={0} max={MAX_POINTS} precision={0} />
           </Form.Item>
         ))}
         <Form.Item
           name="badgeAssetId"
-          label="배지 이미지"
-          rules={[{ required: true, message: '배지 이미지를 올려 주세요.' }]}
+          label={t('배지 이미지')}
+          rules={[{ required: true, message: t('배지 이미지를 올려 주세요.') }]}
         >
           <ImageUploadField assetKind="badge" ownerId={ownerId} />
         </Form.Item>
         <Form.Item
           name="status"
-          label="공개 상태"
-          extra="공개로 저장하면 과거 활동도 소급해서 평가해요."
+          label={t('공개 상태')}
+          extra={t('공개로 저장하면 과거 활동도 소급해서 평가해요.')}
         >
           <Select options={optionsOf('missionDefinitionPublicationStatus', ['draft', 'public'])} />
         </Form.Item>
         <EffectiveAtItem required />
         <Button type="primary" htmlType="submit">
-          저장
+          {t('저장')}
         </Button>
       </Form>
     </Drawer>
@@ -217,23 +218,23 @@ export default function AchievementPolicyPage() {
   const [target, setTarget] = useState(null);
 
   const versionColumns = [
-    { title: '버전', dataIndex: 'versionNo', render: (v) => `v${v}` },
-    { title: '이름', dataIndex: 'title' },
+    { title: t('버전'), dataIndex: 'versionNo', render: (v) => `v${v}` },
+    { title: t('이름'), dataIndex: 'title' },
     {
-      title: '조건',
+      title: t('조건'),
       render: (_, v) => `${ACHIEVEMENT_CONDITIONS[v.conditionType]} · ${v.targetCount}`,
     },
     {
-      title: '보상',
-      render: (_, v) => `${v.rewardPoints}P / 펫 ${v.rewardPetXp}XP`,
+      title: t('보상'),
+      render: (_, v) => t('{0}P / 펫 {1}XP', v.rewardPoints, v.rewardPetXp),
     },
     {
-      title: '희귀도',
+      title: t('희귀도'),
       dataIndex: 'rarity',
       render: (value) => <StatusTag kind="achievementRarity" value={value} />,
     },
     {
-      title: '시행 시각',
+      title: t('시행 시각'),
       dataIndex: 'effectiveAt',
       render: (value) => <DateText value={value} />,
     },
@@ -241,7 +242,7 @@ export default function AchievementPolicyPage() {
 
   const columns = [
     {
-      title: '배지',
+      title: t('배지'),
       width: 72,
       render: (_, row) => {
         const cur =
@@ -249,15 +250,15 @@ export default function AchievementPolicyPage() {
         return cur?.badgeImageUrl ? <Image src={cur.badgeImageUrl} width={40} /> : null;
       },
     },
-    { title: '코드', dataIndex: 'code' },
+    { title: t('코드'), dataIndex: 'code' },
     {
-      title: '현재 이름',
+      title: t('현재 이름'),
       render: (_, row) =>
-        row.versions.find((v) => v.versionNo === row.currentVersionNo)?.title ?? '(시행 전)',
+        row.versions.find((v) => v.versionNo === row.currentVersionNo)?.title ?? t('(시행 전)'),
     },
-    { title: '현재 버전', dataIndex: 'currentVersionNo', render: (v) => (v ? `v${v}` : '-') },
+    { title: t('현재 버전'), dataIndex: 'currentVersionNo', render: (v) => (v ? `v${v}` : '-') },
     {
-      title: '상태',
+      title: t('상태'),
       dataIndex: 'status',
       render: (value) => <StatusTag kind="missionDefinitionPublicationStatus" value={value} />,
     },
@@ -268,7 +269,7 @@ export default function AchievementPolicyPage() {
           disabled={row.status === 'hidden'}
           onClick={() => setTarget({ mode: 'version', achievement: row })}
         >
-          새 버전
+          {t('새 버전')}
         </Button>
       ),
     },
@@ -278,10 +279,10 @@ export default function AchievementPolicyPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Typography.Title level={3} style={{ margin: 0 }}>
-          업적 조건과 보상
+          {t('업적 조건과 보상')}
         </Typography.Title>
         <Button type="primary" onClick={() => setTarget({ mode: 'create' })}>
-          새 업적
+          {t('새 업적')}
         </Button>
       </div>
       <QueryBoundary query={list}>

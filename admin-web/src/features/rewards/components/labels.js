@@ -1,4 +1,5 @@
 import { labels } from '../../../constants/labels.js';
+import { t } from '../../../i18n/index.js';
 
 // Status texts and colors come from constants/labels.js (<StatusTag kind=... />). This file only
 // keeps what that table does not have.
@@ -10,18 +11,18 @@ export const optionsOf = (kind, values) =>
     .map(([value, { text }]) => ({ value, label: text }));
 
 export const ACHIEVEMENT_CONDITIONS = {
-  first_goal_completed: '첫 목표 완료',
-  approved_mission_count: '승인된 미션 수',
-  category_approved_mission_count: '분야별 승인된 미션 수',
-  streak_milestone: '스트릭 마일스톤',
+  first_goal_completed: t('첫 목표 완료'),
+  approved_mission_count: t('승인된 미션 수'),
+  category_approved_mission_count: t('분야별 승인된 미션 수'),
+  streak_milestone: t('스트릭 마일스톤'),
 };
 
 export const UNLOCK_CONDITIONS = {
-  none: '조건 없음',
-  approved_mission_count: '승인된 미션 수',
-  category_approved_mission_count: '분야별 승인된 미션 수',
-  streak_milestone: '스트릭 마일스톤',
-  achievement_earned: '업적 달성',
+  none: t('조건 없음'),
+  approved_mission_count: t('승인된 미션 수'),
+  category_approved_mission_count: t('분야별 승인된 미션 수'),
+  streak_milestone: t('스트릭 마일스톤'),
+  achievement_earned: t('업적 달성'),
 };
 
 export const conditionOptions = (texts) =>

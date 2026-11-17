@@ -3,6 +3,8 @@ import { Button, Card, Form, Input, Typography } from 'antd';
 import { Navigate, useSearchParams } from 'react-router';
 import { getAccessToken } from '../../../api/session.js';
 import { useLogin } from '../queries.js';
+import LanguageSwitch from '../../../components/LanguageSwitch.jsx';
+import { t } from '../../../i18n/index.js';
 
 // `next` is where RequireAuth sent the admin from. Only paths inside this site are accepted
 // (no "//host" or "/\host"), so a crafted link cannot send the admin to another site.
@@ -21,21 +23,24 @@ export default function LoginPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
       <Card style={{ width: 360 }}>
+        <div style={{ textAlign: 'right', marginBottom: 8 }}>
+          <LanguageSwitch />
+        </div>
         <Typography.Title level={3} style={{ textAlign: 'center' }}>
-          D-World 관리자
+          {t('D-World 관리자')}
         </Typography.Title>
         <Form layout="vertical" onFinish={(values) => login.mutate(values)}>
           <Form.Item
-            label="아이디"
+            label={t('아이디')}
             name="loginId"
-            rules={[{ required: true, message: '아이디를 입력해 주세요.' }]}
+            rules={[{ required: true, message: t('아이디를 입력해 주세요.') }]}
           >
             <Input autoComplete="username" autoFocus />
           </Form.Item>
           <Form.Item
-            label="비밀번호"
+            label={t('비밀번호')}
             name="password"
-            rules={[{ required: true, message: '비밀번호를 입력해 주세요.' }]}
+            rules={[{ required: true, message: t('비밀번호를 입력해 주세요.') }]}
           >
             <Input.Password autoComplete="current-password" />
           </Form.Item>
@@ -43,7 +48,7 @@ export default function LoginPage() {
             <Typography.Paragraph type="danger">{login.error.message}</Typography.Paragraph>
           )}
           <Button type="primary" htmlType="submit" block loading={login.isPending}>
-            로그인
+            {t('로그인')}
           </Button>
         </Form>
       </Card>

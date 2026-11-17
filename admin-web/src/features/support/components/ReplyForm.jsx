@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Alert, Button, Input, Radio } from 'antd';
 import { useAddTicketEvent } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 const BODY_MAX_LENGTH = 2000; // docs/09 M23
-const BODY_REQUIRED_TEXT = '내용을 입력해 주세요.';
+const BODY_REQUIRED_TEXT = t('내용을 입력해 주세요.');
 
 const NOTES = {
-  reply: '답변은 접수한 회원에게 알림으로 가요.',
-  note: '메모는 관리자만 볼 수 있어요.',
+  reply: t('답변은 접수한 회원에게 알림으로 가요.'),
+  note: t('메모는 관리자만 볼 수 있어요.'),
 };
 
 /**
@@ -31,7 +32,7 @@ export function ReplyForm({ ticketId, onConfirm }) {
     }
     setError(null);
     onConfirm({
-      title: eventType === 'reply' ? '답변 보내기' : '메모 남기기',
+      title: eventType === 'reply' ? t('답변 보내기') : t('메모 남기기'),
       summary: NOTES[eventType],
       submit: async ({ reason, idempotencyKey }) => {
         await add.mutateAsync({ ticketId, body: { eventType, body, reason }, idempotencyKey });
@@ -46,15 +47,15 @@ export function ReplyForm({ ticketId, onConfirm }) {
         value={eventType}
         onChange={(event) => setEventType(event.target.value)}
         options={[
-          { value: 'reply', label: '답변' },
-          { value: 'note', label: '메모' },
+          { value: 'reply', label: t('답변') },
+          { value: 'note', label: t('메모') },
         ]}
       />
       <Input.TextArea
         rows={4}
         maxLength={BODY_MAX_LENGTH}
         showCount
-        aria-label="내용"
+        aria-label={t('내용')}
         placeholder={NOTES[eventType]}
         value={text}
         onChange={(event) => {
@@ -65,7 +66,7 @@ export function ReplyForm({ ticketId, onConfirm }) {
       {error && <Alert type="warning" showIcon title={error} />}
       <div>
         <Button type="primary" onClick={handleSend}>
-          보내기
+          {t('보내기')}
         </Button>
       </div>
     </div>

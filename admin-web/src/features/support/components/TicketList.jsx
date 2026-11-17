@@ -9,6 +9,7 @@ import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { labels } from '../../../constants/labels.js';
 import { useTickets } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 const DEFAULT_SORT = 'receivedAt,asc'; // docs/09 M20: the oldest ticket waits the longest
 
@@ -18,22 +19,22 @@ const optionsOf = (kind) =>
 const STATUS_FIELD = {
   name: 'status',
   type: 'select',
-  label: '상태',
+  label: t('상태'),
   options: optionsOf('ticketStatus'),
 };
 const ASSIGNED_FIELD = {
   name: 'assigned',
   type: 'select',
-  label: '담당',
+  label: t('담당'),
   options: [
-    { value: 'me', label: '내가 담당' },
-    { value: 'none', label: '담당자 없음' },
+    { value: 'me', label: t('내가 담당') },
+    { value: 'none', label: t('담당자 없음') },
   ],
 };
 const TARGET_KIND_FIELD = {
   name: 'targetKind',
   type: 'select',
-  label: '대상',
+  label: t('대상'),
   options: optionsOf('ticketTargetKind'),
 };
 
@@ -58,23 +59,23 @@ export function TicketList({ ticketType, basePath, title }) {
 
   const columns = [
     {
-      title: '접수일',
+      title: t('접수일'),
       dataIndex: 'receivedAt',
       key: 'receivedAt',
       sorter: true,
       render: (value) => <DateText value={value} />,
     },
     {
-      title: '분류',
+      title: t('분류'),
       dataIndex: 'category',
       render: (value) => labels.ticketCategory[value]?.text ?? value,
     },
-    { title: '제목', dataIndex: 'subject' },
-    memberColumn({ title: '접수자', idKey: 'reporterUserId', nicknameKey: 'reporterNickname' }),
+    { title: t('제목'), dataIndex: 'subject' },
+    memberColumn({ title: t('접수자'), idKey: 'reporterUserId', nicknameKey: 'reporterNickname' }),
     ...(isReport
       ? [
           {
-            title: '대상',
+            title: t('대상'),
             key: 'target',
             width: 300,
             render: (_, ticket) => {
@@ -93,18 +94,18 @@ export function TicketList({ ticketType, basePath, title }) {
             },
           },
           {
-            title: '중복 신고',
+            title: t('중복 신고'),
             dataIndex: 'sameTargetOpenCount',
-            render: (count) => `${count}건`,
+            render: (count) => t('{0}건', count),
           },
         ]
       : []),
     {
-      title: '상태',
+      title: t('상태'),
       dataIndex: 'status',
       render: (value) => <StatusTag kind="ticketStatus" value={value} />,
     },
-    { title: '담당', dataIndex: 'assignedAdminLoginId', render: (value) => value ?? '-' },
+    { title: t('담당'), dataIndex: 'assignedAdminLoginId', render: (value) => value ?? '-' },
   ];
 
   return (

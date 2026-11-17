@@ -1,16 +1,17 @@
 import { Button, Empty, Result, Spin } from 'antd';
+import { t } from '../i18n/index.js';
 
 // Texts of the COMMON-01 states. Where docs/05 §7 has a message for the situation it is used as
 // it is (VALIDATION_FAILED, INTERNAL, FORBIDDEN, NOT_FOUND); 'done' is the text of
 // docs/parts/admin-web.md §7 rule 1. 'loading' and 'empty' have no text in the docs.
 const TEXTS = {
-  loading: '불러오는 중이에요.',
-  empty: '결과가 없어요.',
-  invalid: '입력한 내용을 다시 확인해 주세요.',
-  saveFailed: '잠시 후 다시 시도해 주세요.',
-  forbidden: '권한이 없어요.',
-  done: '처리했어요',
-  notFound: '찾을 수 없어요.',
+  loading: t('불러오는 중이에요.'),
+  empty: t('결과가 없어요.'),
+  invalid: t('입력한 내용을 다시 확인해 주세요.'),
+  saveFailed: t('잠시 후 다시 시도해 주세요.'),
+  forbidden: t('권한이 없어요.'),
+  done: t('처리했어요'),
+  notFound: t('찾을 수 없어요.'),
 };
 
 // antd <Result> status for each type that is shown as a result page.
@@ -22,7 +23,7 @@ const RESULT_STATUS = {
   notFound: '404',
 };
 
-const RETRY_TEXT = '다시 시도';
+const RETRY_TEXT = t('다시 시도');
 
 /**
  * COMMON-01 state screen.

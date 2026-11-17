@@ -1,4 +1,5 @@
 import { StatePanel } from './StatePanel.jsx';
+import { t } from '../i18n/index.js';
 
 /**
  * Wraps content with the COMMON-01 state screens of `StatePanel`, for pages that pass the
@@ -18,7 +19,7 @@ export default function QueryState({
   loading = false,
   error = null,
   empty = false,
-  emptyText = '조건에 맞는 결과가 없습니다.',
+  emptyText = t('조건에 맞는 결과가 없습니다.'),
   onRetry,
   children,
 }) {

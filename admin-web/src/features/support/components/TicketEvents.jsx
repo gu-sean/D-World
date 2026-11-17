@@ -1,13 +1,14 @@
 import { Tag } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
+import { t } from '../../../i18n/index.js';
 
 // `AdminTicketDetail.events[].eventType` (docs/07). The docs give the values, not the texts.
 const EVENT_TEXTS = {
-  received: '접수',
-  assigned: '담당 지정',
-  status_changed: '상태 변경',
-  reply: '답변',
-  note: '메모',
+  received: t('접수'),
+  assigned: t('담당 지정'),
+  status_changed: t('상태 변경'),
+  reply: t('답변'),
+  note: t('메모'),
 };
 
 /**
@@ -24,7 +25,7 @@ export function TicketEvents({ events }) {
             <DateText value={entry.createdAt} />
             <Tag>{EVENT_TEXTS[entry.eventType] ?? entry.eventType}</Tag>
             <Tag color={entry.visibility === 'user' ? 'blue' : 'default'}>
-              {entry.visibility === 'user' ? '회원에게 보임' : '내부 기록'}
+              {entry.visibility === 'user' ? t('회원에게 보임') : t('내부 기록')}
             </Tag>
             <span>{entry.adminLoginId ?? '-'}</span>
           </div>
