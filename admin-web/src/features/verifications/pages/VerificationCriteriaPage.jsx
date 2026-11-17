@@ -10,6 +10,7 @@ import { useListParams } from '../../../components/useListParams.js';
 import CriteriaVersionList from '../components/CriteriaVersionList.jsx';
 import { METHOD_LABEL } from '../components/format.js';
 import { useCategories, useCreateCriteria, useCriteria } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL).map(([value, label]) => ({ value, label }));
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -31,8 +32,8 @@ export default function VerificationCriteriaPage() {
   const categoryOptions = (categories.data ?? []).map((c) => ({ value: c.id, label: c.name }));
   const categoryName = (id) => categoryOptions.find((o) => o.value === id)?.label ?? id;
   const filterFields = [
-    { name: 'categoryId', type: 'select', label: '분야', options: categoryOptions },
-    { name: 'method', type: 'select', label: '인증 방식', options: METHOD_OPTIONS },
+    { name: 'categoryId', type: 'select', label: t('분야'), options: categoryOptions },
+    { name: 'method', type: 'select', label: t('인증 방식'), options: METHOD_OPTIONS },
   ];
 
   const closeForm = () => {
@@ -45,17 +46,17 @@ export default function VerificationCriteriaPage() {
 
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Typography.Title level={3}>판정 기준</Typography.Title>
+      <Typography.Title level={3}>{t('판정 기준')}</Typography.Title>
       <Space wrap>
         <FilterBar fields={filterFields} value={params} onChange={setParams} />
         <Button type="primary" style={{ marginBottom: 16 }} onClick={() => setFormOpen(true)}>
-          새 버전 추가
+          {t('새 버전 추가')}
         </Button>
       </Space>
       <QueryBoundary query={criteria}>
         {(versions) =>
           versions.length === 0 ? (
-            <Typography.Text type="secondary">등록된 판정 기준이 없어요.</Typography.Text>
+            <Typography.Text type="secondary">{t('등록된 판정 기준이 없어요.')}</Typography.Text>
           ) : (
             <CriteriaVersionList versions={versions} categoryName={categoryName} />
           )
@@ -63,31 +64,31 @@ export default function VerificationCriteriaPage() {
       </QueryBoundary>
 
       <Modal
-        title="판정 기준 새 버전"
+        title={t('판정 기준 새 버전')}
         open={formOpen}
         onCancel={closeForm}
         onOk={() => form.submit()}
-        okText="저장"
-        cancelText="취소"
+        okText={t('저장')}
+        cancelText={t('취소')}
         okButtonProps={{ disabled: !isObject(rules) }}
         destroyOnHidden
       >
         <Form form={form} layout="vertical" onFinish={(values) => setDraft(values)}>
           <Form.Item
-            label="분야"
+            label={t('분야')}
             name="categoryId"
-            rules={[{ required: true, message: '분야를 선택해 주세요.' }]}
+            rules={[{ required: true, message: t('분야를 선택해 주세요.') }]}
           >
             <Select options={categoryOptions} />
           </Form.Item>
           <Form.Item
-            label="인증 방식"
+            label={t('인증 방식')}
             name="verificationMethod"
-            rules={[{ required: true, message: '인증 방식을 선택해 주세요.' }]}
+            rules={[{ required: true, message: t('인증 방식을 선택해 주세요.') }]}
           >
             <Select options={METHOD_OPTIONS} />
           </Form.Item>
-          <Form.Item label="기준 (JSON 객체)" required>
+          <Form.Item label={t('기준 (JSON 객체)')} required>
             <JsonEditor
               value={rulesText}
               onChange={(text, parsed) => {
@@ -96,7 +97,7 @@ export default function VerificationCriteriaPage() {
               }}
             />
           </Form.Item>
-          <Form.Item label="시행 시각 (비우면 즉시)" name="effectiveAt">
+          <Form.Item label={t('시행 시각 (비우면 즉시)')} name="effectiveAt">
             <DatePicker
               showTime
               disabledDate={(date) => date.isBefore(dayjs(), 'day')}
@@ -108,8 +109,8 @@ export default function VerificationCriteriaPage() {
 
       <ConfirmActionModal
         open={draft !== null}
-        title="새 판정 기준 버전을 추가할까요?"
-        summary="기준은 수정하지 않고 새 버전으로 추가돼요. 이미 내린 판정은 바뀌지 않아요."
+        title={t('새 판정 기준 버전을 추가할까요?')}
+        summary={t('기준은 수정하지 않고 새 버전으로 추가돼요. 이미 내린 판정은 바뀌지 않아요.')}
         onCancel={() => setDraft(null)}
         onSubmit={async ({ reason, idempotencyKey }) => {
           await create.mutateAsync({
@@ -120,7 +121,7 @@ export default function VerificationCriteriaPage() {
             reason,
             idempotencyKey,
           });
-          message.success('처리했어요');
+          message.success(t('처리했어요'));
           closeForm();
         }}
       />

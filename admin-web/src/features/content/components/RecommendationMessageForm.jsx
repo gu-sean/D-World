@@ -5,6 +5,7 @@ import { useCreateRecommendationMessage, useUpdateRecommendationMessage } from '
 import { fromInputValue, toInputValue } from '../time.js';
 import { Field } from './Field.jsx';
 import { formStyle } from './formStyle.js';
+import { t } from '../../../i18n/index.js';
 
 const MESSAGE_MAX_LENGTH = 200; // docs/07 RecommendationMessageAdmin
 const conditionOptions = Object.entries(labels.recommendationConditionType).map(
@@ -30,23 +31,23 @@ function initialState(item) {
 const isHour = (value) => Number.isInteger(value) && value >= 0 && value <= 23;
 
 function validate(form) {
-  if (!form.message.trim()) return '문구를 입력해 주세요.';
+  if (!form.message.trim()) return t('문구를 입력해 주세요.');
   if (form.conditionType === 'inactive_days') {
     if (!Number.isInteger(form.days) || form.days < 1 || form.days > 365) {
-      return '미접속 일수를 1~365 사이의 정수로 입력해 주세요.';
+      return t('미접속 일수를 1~365 사이의 정수로 입력해 주세요.');
     }
   }
   if (form.conditionType === 'time_slot') {
     if (!isHour(form.startHour) || !isHour(form.endHour)) {
-      return '시작·종료 시각을 0~23 사이의 정수로 입력해 주세요.';
+      return t('시작·종료 시각을 0~23 사이의 정수로 입력해 주세요.');
     }
-    if (form.startHour === form.endHour) return '시작 시각과 종료 시각은 같을 수 없어요.';
+    if (form.startHour === form.endHour) return t('시작 시각과 종료 시각은 같을 수 없어요.');
   }
   if (!Number.isInteger(form.priority) || form.priority < 0 || form.priority > 100) {
-    return '우선순위를 0~100 사이의 정수로 입력해 주세요.';
+    return t('우선순위를 0~100 사이의 정수로 입력해 주세요.');
   }
   if (form.startsAt && form.endsAt && form.endsAt <= form.startsAt) {
-    return '종료 시각은 시작 시각 이후여야 해요.';
+    return t('종료 시각은 시작 시각 이후여야 해요.');
   }
   return null;
 }
@@ -95,7 +96,7 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
       isActive: form.isActive,
     };
     onConfirm({
-      title: item ? '추천 문구 수정' : '추천 문구 저장',
+      title: item ? t('추천 문구 수정') : t('추천 문구 저장'),
       summary: input.message,
       submit: async ({ reason, idempotencyKey }) => {
         const body = { ...input, reason };
@@ -107,11 +108,11 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
   };
 
   return (
-    <Card title={item ? '추천 문구 수정' : '추천 문구 만들기'}>
+    <Card title={item ? t('추천 문구 수정') : t('추천 문구 만들기')}>
       <div style={formStyle}>
-        <Field label="문구">
+        <Field label={t('문구')}>
           <Input.TextArea
-            aria-label="문구"
+            aria-label={t('문구')}
             rows={3}
             maxLength={MESSAGE_MAX_LENGTH}
             showCount
@@ -119,7 +120,7 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
             onChange={(event) => set({ message: event.target.value })}
           />
         </Field>
-        <Field label="보여줄 조건">
+        <Field label={t('보여줄 조건')}>
           <Radio.Group
             value={form.conditionType}
             onChange={(event) => set({ conditionType: event.target.value })}
@@ -127,9 +128,9 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
           />
         </Field>
         {form.conditionType === 'inactive_days' && (
-          <Field label="미접속 일수 (1~365)">
+          <Field label={t('미접속 일수 (1~365)')}>
             <InputNumber
-              aria-label="미접속 일수"
+              aria-label={t('미접속 일수')}
               min={1}
               max={365}
               precision={0}
@@ -139,10 +140,10 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
           </Field>
         )}
         {form.conditionType === 'time_slot' && (
-          <Field label="시간대 (0~23시, 한국 시간)">
+          <Field label={t('시간대 (0~23시, 한국 시간)')}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <InputNumber
-                aria-label="시작 시각"
+                aria-label={t('시작 시각')}
                 min={0}
                 max={23}
                 precision={0}
@@ -151,7 +152,7 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
               />
               <span>~</span>
               <InputNumber
-                aria-label="종료 시각"
+                aria-label={t('종료 시각')}
                 min={0}
                 max={23}
                 precision={0}
@@ -161,17 +162,17 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
             </div>
           </Field>
         )}
-        <Field label="분야 코드 (선택)">
+        <Field label={t('분야 코드 (선택)')}>
           <Input
-            aria-label="분야 코드"
+            aria-label={t('분야 코드')}
             style={{ maxWidth: 240 }}
             value={form.categoryCode}
             onChange={(event) => set({ categoryCode: event.target.value })}
           />
         </Field>
-        <Field label="우선순위 (0~100)" hint="숫자가 클수록 먼저 보여줘요.">
+        <Field label={t('우선순위 (0~100)')} hint={t('숫자가 클수록 먼저 보여줘요.')}>
           <InputNumber
-            aria-label="우선순위"
+            aria-label={t('우선순위')}
             min={0}
             max={100}
             precision={0}
@@ -179,27 +180,27 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
             onChange={(value) => set({ priority: value })}
           />
         </Field>
-        <Field label="시작 시각 (선택, 한국 시간)">
+        <Field label={t('시작 시각 (선택, 한국 시간)')}>
           <Input
             type="datetime-local"
-            aria-label="시작 시각 (기간)"
+            aria-label={t('시작 시각 (기간)')}
             style={{ maxWidth: 240 }}
             value={form.startsAt}
             onChange={(event) => set({ startsAt: event.target.value })}
           />
         </Field>
-        <Field label="종료 시각 (선택, 한국 시간)">
+        <Field label={t('종료 시각 (선택, 한국 시간)')}>
           <Input
             type="datetime-local"
-            aria-label="종료 시각 (기간)"
+            aria-label={t('종료 시각 (기간)')}
             style={{ maxWidth: 240 }}
             value={form.endsAt}
             onChange={(event) => set({ endsAt: event.target.value })}
           />
         </Field>
-        <Field label="사용">
+        <Field label={t('사용')}>
           <Switch
-            aria-label="사용"
+            aria-label={t('사용')}
             checked={form.isActive}
             onChange={(checked) => set({ isActive: checked })}
           />
@@ -207,9 +208,9 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
         {error && <Alert type="warning" showIcon title={error} />}
         <div style={{ display: 'flex', gap: 8 }}>
           <Button type="primary" onClick={handleSave}>
-            저장
+            {t('저장')}
           </Button>
-          <Button onClick={onClose}>닫기</Button>
+          <Button onClick={onClose}>{t('닫기')}</Button>
         </div>
       </div>
     </Card>

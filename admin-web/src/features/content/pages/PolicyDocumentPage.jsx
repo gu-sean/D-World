@@ -7,6 +7,7 @@ import { PolicyDocumentForm } from '../components/PolicyDocumentForm.jsx';
 import { policyDocumentType } from '../labels.js';
 import { usePolicyDocuments, usePublishPolicyDocument } from '../queries.js';
 import { useConfirm } from '../useConfirm.jsx';
+import { t } from '../../../i18n/index.js';
 
 /** ADM-34 약관·정책 (M95~M97): a version is added, never edited, and fixed once published. */
 export default function PolicyDocumentPage() {
@@ -19,13 +20,13 @@ export default function PolicyDocumentPage() {
 
   const askPublish = (item) =>
     ask({
-      title: '약관 게시',
+      title: t('약관 게시'),
       danger: true,
       summary: (
         <>
           {policyDocumentType[item.documentType]} {item.version}
           <br />
-          게시하면 수정할 수 없어요.
+          {t('게시하면 수정할 수 없어요.')}
         </>
       ),
       submit: ({ reason, idempotencyKey }) =>
@@ -34,28 +35,32 @@ export default function PolicyDocumentPage() {
 
   const columns = [
     {
-      title: '문서 종류',
+      title: t('문서 종류'),
       dataIndex: 'documentType',
       render: (value) => policyDocumentType[value] ?? value,
     },
-    { title: '버전', dataIndex: 'version' },
-    { title: '시행 시각', dataIndex: 'effectiveAt', render: (value) => <DateText value={value} /> },
+    { title: t('버전'), dataIndex: 'version' },
     {
-      title: '다시 동의',
-      dataIndex: 'requiresReconsent',
-      render: (value) => (value ? '필요' : '-'),
+      title: t('시행 시각'),
+      dataIndex: 'effectiveAt',
+      render: (value) => <DateText value={value} />,
     },
     {
-      title: '게시',
+      title: t('다시 동의'),
+      dataIndex: 'requiresReconsent',
+      render: (value) => (value ? t('필요') : '-'),
+    },
+    {
+      title: t('게시'),
       dataIndex: 'publishedAt',
       render: (value) =>
         value ? (
           <Space>
-            <Tag color="success">게시됨</Tag>
+            <Tag color="success">{t('게시됨')}</Tag>
             <DateText value={value} />
           </Space>
         ) : (
-          <Tag>미게시</Tag>
+          <Tag>{t('미게시')}</Tag>
         ),
     },
     {
@@ -64,11 +69,11 @@ export default function PolicyDocumentPage() {
       render: (_, item) => (
         <Space>
           <Button size="small" onClick={() => setViewing(item)}>
-            본문 보기
+            {t('본문 보기')}
           </Button>
           {!item.publishedAt && (
             <Button size="small" type="primary" onClick={() => askPublish(item)}>
-              게시
+              {t('게시')}
             </Button>
           )}
         </Space>
@@ -79,10 +84,10 @@ export default function PolicyDocumentPage() {
   return (
     <>
       <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-        <Typography.Title level={3}>약관·정책</Typography.Title>
+        <Typography.Title level={3}>{t('약관·정책')}</Typography.Title>
         {!creating && (
           <Button type="primary" onClick={() => setCreating(true)}>
-            새 버전 만들기
+            {t('새 버전 만들기')}
           </Button>
         )}
       </Space>

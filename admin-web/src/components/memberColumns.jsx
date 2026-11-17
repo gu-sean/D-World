@@ -1,10 +1,11 @@
 import { MemberCell } from './MemberCell.jsx';
+import { t } from '../i18n/index.js';
 
 /**
  * 회원 열. 목록마다 키 이름이 달라서 키를 받는다.
  * @param {{ title?: string, idKey: string, nicknameKey: string, width?: number }} options
  */
-export const memberColumn = ({ title = '회원', idKey, nicknameKey, width = 300 }) => ({
+export const memberColumn = ({ title = t('회원'), idKey, nicknameKey, width = 300 }) => ({
   title,
   key: `member-${idKey}`,
   width,
@@ -15,6 +16,6 @@ export const memberColumn = ({ title = '회원', idKey, nicknameKey, width = 300
 export const MEMBER_FIELD = {
   name: 'member',
   type: 'text',
-  label: '닉네임 또는 회원 ID',
+  label: t('닉네임 또는 회원 ID'),
   width: 320,
 };

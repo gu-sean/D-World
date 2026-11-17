@@ -2,6 +2,7 @@ import { Table } from 'antd';
 import { QueryBoundary } from './QueryBoundary.jsx';
 import { StatePanel } from './StatePanel.jsx';
 import { useListParams } from './useListParams.js';
+import { t } from '../i18n/index.js';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]; // docs/05 §6: size is at most 100
 
@@ -78,7 +79,7 @@ export function DataTable({ columns, query, rowKey = 'id', onRowClick, defaultSo
             total: data.totalCount,
             showSizeChanger: true,
             pageSizeOptions: PAGE_SIZE_OPTIONS,
-            showTotal: (total) => `총 ${total}건`,
+            showTotal: (total) => t('총 {0}건', total),
           }}
           onChange={handleChange}
           onRow={

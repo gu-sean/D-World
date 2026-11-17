@@ -7,12 +7,13 @@ import { useListParams } from '../../../components/useListParams.js';
 import { RecommendationMessageForm } from '../components/RecommendationMessageForm.jsx';
 import { useRecommendationMessages } from '../queries.js';
 import { useConfirm } from '../useConfirm.jsx';
+import { t } from '../../../i18n/index.js';
 
 // "6~9시" or "3일" next to the name of the condition.
 function paramsText(item) {
   const { conditionType, conditionParams: params } = item;
-  if (conditionType === 'inactive_days') return `${params.days}일`;
-  if (conditionType === 'time_slot') return `${params.startHour}~${params.endHour}시`;
+  if (conditionType === 'inactive_days') return t('{0}일', params.days);
+  if (conditionType === 'time_slot') return t('{0}~{1}시', params.startHour, params.endHour);
   return null;
 }
 
@@ -24,9 +25,9 @@ export default function RecommendationMessagePage() {
   const [editing, setEditing] = useState(null); // null: closed, {}: new, {item}: edit
 
   const columns = [
-    { title: '문구', dataIndex: 'message' },
+    { title: t('문구'), dataIndex: 'message' },
     {
-      title: '조건',
+      title: t('조건'),
       key: 'condition',
       render: (_, item) => (
         <Space>
@@ -35,10 +36,10 @@ export default function RecommendationMessagePage() {
         </Space>
       ),
     },
-    { title: '분야', dataIndex: 'categoryCode', render: (value) => value ?? '-' },
-    { title: '우선순위', dataIndex: 'priority' },
+    { title: t('분야'), dataIndex: 'categoryCode', render: (value) => value ?? '-' },
+    { title: t('우선순위'), dataIndex: 'priority' },
     {
-      title: '기간',
+      title: t('기간'),
       key: 'period',
       render: (_, item) =>
         item.startsAt || item.endsAt ? (
@@ -46,20 +47,20 @@ export default function RecommendationMessagePage() {
             <DateText value={item.startsAt} /> ~ <DateText value={item.endsAt} />
           </>
         ) : (
-          '항상'
+          t('항상')
         ),
     },
     {
-      title: '사용',
+      title: t('사용'),
       dataIndex: 'isActive',
-      render: (value) => (value ? <Tag color="success">사용</Tag> : <Tag>중지</Tag>),
+      render: (value) => (value ? <Tag color="success">{t('사용')}</Tag> : <Tag>{t('중지')}</Tag>),
     },
     {
       title: '',
       key: 'actions',
       render: (_, item) => (
         <Button size="small" onClick={() => setEditing({ item })}>
-          수정
+          {t('수정')}
         </Button>
       ),
     },
@@ -68,10 +69,10 @@ export default function RecommendationMessagePage() {
   return (
     <>
       <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-        <Typography.Title level={3}>추천 문구</Typography.Title>
+        <Typography.Title level={3}>{t('추천 문구')}</Typography.Title>
         {!editing && (
           <Button type="primary" onClick={() => setEditing({})}>
-            추천 문구 만들기
+            {t('추천 문구 만들기')}
           </Button>
         )}
       </Space>

@@ -10,22 +10,23 @@ import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { EXERCISE_OPTIONS, labelOf } from '../constants.js';
 import { useDefinitions, useReviewDefinition } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 const DECISIONS = {
-  approved: { text: '승인', title: '미션 공개 승인' },
-  rejected: { text: '반려', title: '미션 반려', danger: true },
-  hidden: { text: '숨김', title: '미션 숨김', danger: true },
+  approved: { text: t('승인'), title: t('미션 공개 승인') },
+  rejected: { text: t('반려'), title: t('미션 반려'), danger: true },
+  hidden: { text: t('숨김'), title: t('미션 숨김'), danger: true },
 };
 
 const STATUS_OPTIONS = [
-  { value: 'review_pending', label: '검수 대기' },
-  { value: 'public', label: '공개' },
-  { value: 'rejected', label: '반려' },
-  { value: 'hidden', label: '숨김' },
+  { value: 'review_pending', label: t('검수 대기') },
+  { value: 'public', label: t('공개') },
+  { value: 'rejected', label: t('반려') },
+  { value: 'hidden', label: t('숨김') },
 ];
 
 const fields = [
-  { name: 'publicationStatus', type: 'select', label: '상태', options: STATUS_OPTIONS },
+  { name: 'publicationStatus', type: 'select', label: t('상태'), options: STATUS_OPTIONS },
 ];
 
 export default function UserMissionReviewPage() {
@@ -38,28 +39,28 @@ export default function UserMissionReviewPage() {
   const [target, setTarget] = useState(null); // {row, decision}
 
   const columns = [
-    { title: '제목', dataIndex: 'title' },
-    memberColumn({ title: '작성자', idKey: 'authorId', nicknameKey: 'authorNickname' }),
+    { title: t('제목'), dataIndex: 'title' },
+    memberColumn({ title: t('작성자'), idKey: 'authorId', nicknameKey: 'authorNickname' }),
     {
-      title: '운동',
+      title: t('운동'),
       dataIndex: 'exerciseCode',
       render: (value) => labelOf(EXERCISE_OPTIONS, value),
     },
-    { title: '설명', dataIndex: 'description', ellipsis: true },
+    { title: t('설명'), dataIndex: 'description', ellipsis: true },
     {
-      title: '제출 시각',
+      title: t('제출 시각'),
       dataIndex: 'submittedAt',
       key: 'createdAt',
       sorter: true,
       render: (value) => <DateText value={value} />,
     },
     {
-      title: '상태',
+      title: t('상태'),
       dataIndex: 'publicationStatus',
       render: (value) => <StatusTag kind="missionDefinitionPublicationStatus" value={value} />,
     },
     {
-      title: '처리',
+      title: t('처리'),
       key: 'actions',
       render: (_, row) =>
         row.publicationStatus === 'review_pending' ? (
@@ -69,15 +70,15 @@ export default function UserMissionReviewPage() {
               type="primary"
               onClick={() => setTarget({ row, decision: 'approved' })}
             >
-              승인
+              {t('승인')}
             </Button>
             <Button size="small" danger onClick={() => setTarget({ row, decision: 'rejected' })}>
-              반려
+              {t('반려')}
             </Button>
           </Space>
         ) : row.publicationStatus === 'public' ? (
           <Button size="small" danger onClick={() => setTarget({ row, decision: 'hidden' })}>
-            숨김
+            {t('숨김')}
           </Button>
         ) : null,
     },
@@ -87,7 +88,7 @@ export default function UserMissionReviewPage() {
 
   return (
     <div>
-      <Typography.Title level={4}>사용자 미션 검수</Typography.Title>
+      <Typography.Title level={4}>{t('사용자 미션 검수')}</Typography.Title>
       <FilterBar fields={fields} value={params} onChange={setParams} />
       <DataTable query={query} columns={columns} defaultSort="createdAt,asc" />
       <ConfirmActionModal
@@ -101,7 +102,7 @@ export default function UserMissionReviewPage() {
             body: { decision: target.decision, reason },
             idempotencyKey,
           });
-          message.success('처리했어요');
+          message.success(t('처리했어요'));
           setTarget(null);
         }}
         onCancel={() => setTarget(null)}

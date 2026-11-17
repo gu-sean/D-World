@@ -16,6 +16,7 @@ import {
   useRetryPayments,
   useSettlementRun,
 } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 export default function ChallengeSettlementPage() {
   const { challengeId } = useParams();
@@ -35,14 +36,14 @@ export default function ChallengeSettlementPage() {
   const corrected = challenge.data?.settlementStatus === 'confirmed';
 
   const TITLES = {
-    create: corrected ? '정정 정산 초안 만들기' : '정산 초안 만들기',
-    confirm: '정산 확정',
-    retry: '실패한 지급 다시 시도',
+    create: corrected ? t('정정 정산 초안 만들기') : t('정산 초안 만들기'),
+    confirm: t('정산 확정'),
+    retry: t('실패한 지급 다시 시도'),
   };
   const SUMMARIES = {
-    create: '기존 초안이 있으면 새 초안으로 대체돼요.',
-    confirm: '확정하면 완주자에게 보상이 지급돼요. 되돌릴 수 없어요.',
-    retry: '지급에 실패한 건만 다시 처리해요.',
+    create: t('기존 초안이 있으면 새 초안으로 대체돼요.'),
+    confirm: t('확정하면 완주자에게 보상이 지급돼요. 되돌릴 수 없어요.'),
+    retry: t('지급에 실패한 건만 다시 처리해요.'),
   };
 
   const submit = async ({ reason, idempotencyKey }) => {
@@ -56,26 +57,26 @@ export default function ChallengeSettlementPage() {
       await retry.mutateAsync({ runId, reason, idempotencyKey });
       await run.refetch();
     }
-    message.success('처리했어요');
+    message.success(t('처리했어요'));
     setAction(null);
   };
 
   return (
     <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
       <Typography.Title level={4} style={{ margin: 0 }}>
-        챌린지 정산과 보상
+        {t('챌린지 정산과 보상')}
       </Typography.Title>
       <QueryBoundary query={challenge}>
         {(data) => (
           <Descriptions bordered size="small" column={2}>
-            <Descriptions.Item label="챌린지">{data.title}</Descriptions.Item>
-            <Descriptions.Item label="기간">
+            <Descriptions.Item label={t('챌린지')}>{data.title}</Descriptions.Item>
+            <Descriptions.Item label={t('기간')}>
               {data.startDate} ~ {data.endDate}
             </Descriptions.Item>
-            <Descriptions.Item label="정산 상태">
+            <Descriptions.Item label={t('정산 상태')}>
               <StatusTag kind="challengeSettlementStatus" value={data.settlementStatus} />
             </Descriptions.Item>
-            <Descriptions.Item label="참가자">{data.participantCount}</Descriptions.Item>
+            <Descriptions.Item label={t('참가자')}>{data.participantCount}</Descriptions.Item>
           </Descriptions>
         )}
       </QueryBoundary>
@@ -90,24 +91,28 @@ export default function ChallengeSettlementPage() {
             onClick={() => setAction('confirm')}
             disabled={blockers ? !blockers.ready : false}
           >
-            정산 확정
+            {t('정산 확정')}
           </Button>
         )}
         {hasFailedPayments && (
-          <Button onClick={() => setAction('retry')}>지급 실패 다시 시도</Button>
+          <Button onClick={() => setAction('retry')}>{t('지급 실패 다시 시도')}</Button>
         )}
       </Space>
 
-      {!runId && <Alert type="info" showIcon title="정산 초안을 만들면 결과가 여기에 표시돼요." />}
+      {!runId && (
+        <Alert type="info" showIcon title={t('정산 초안을 만들면 결과가 여기에 표시돼요.')} />
+      )}
 
       {runId && (
         <QueryBoundary query={run}>
           {(data) => (
             <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
               <Descriptions size="small" column={3}>
-                <Descriptions.Item label="회차">{data.runNo}</Descriptions.Item>
-                <Descriptions.Item label="상태">{label(RUN_STATUS, data.status)}</Descriptions.Item>
-                <Descriptions.Item label="기준 시각">
+                <Descriptions.Item label={t('회차')}>{data.runNo}</Descriptions.Item>
+                <Descriptions.Item label={t('상태')}>
+                  {label(RUN_STATUS, data.status)}
+                </Descriptions.Item>
+                <Descriptions.Item label={t('기준 시각')}>
                   <DateText value={data.basedOnAt} />
                 </Descriptions.Item>
               </Descriptions>
@@ -115,24 +120,29 @@ export default function ChallengeSettlementPage() {
                 <Alert
                   type="warning"
                   showIcon
-                  title="아직 확정할 수 없어요."
+                  title={t('아직 확정할 수 없어요.')}
                   description={
                     <ul style={{ margin: 0, paddingLeft: 18 }}>
                       {blockers.notEnded && <li>{BLOCKER_LABEL.notEnded}</li>}
                       {blockers.pendingDays > 0 && (
-                        <li>
-                          {BLOCKER_LABEL.pendingDays} ({blockers.pendingDays}건)
-                        </li>
+                        <li>{t('{0} ({1}건)', BLOCKER_LABEL.pendingDays, blockers.pendingDays)}</li>
                       )}
                       {blockers.waitingSubmissions > 0 && (
                         <li>
-                          {BLOCKER_LABEL.waitingSubmissions} ({blockers.waitingSubmissions}건)
+                          {t(
+                            '{0} ({1}건)',
+                            BLOCKER_LABEL.waitingSubmissions,
+                            blockers.waitingSubmissions,
+                          )}
                         </li>
                       )}
                       {blockers.incompleteParticipants > 0 && (
                         <li>
-                          {BLOCKER_LABEL.incompleteParticipants} ({blockers.incompleteParticipants}
-                          명)
+                          {t(
+                            '{0} ({1}명)',
+                            BLOCKER_LABEL.incompleteParticipants,
+                            blockers.incompleteParticipants,
+                          )}
                         </li>
                       )}
                     </ul>
@@ -140,7 +150,7 @@ export default function ChallengeSettlementPage() {
                 />
               )}
               {data.entries.length === 0 ? (
-                <StatePanel type="empty" message="정산 대상 참가자가 없어요." />
+                <StatePanel type="empty" message={t('정산 대상 참가자가 없어요.')} />
               ) : (
                 <SettlementPreviewTable entries={data.entries} />
               )}

@@ -1,40 +1,41 @@
+import { t } from '../../i18n/index.js';
 // Option lists of the mission forms. Values follow the backend validation. Status texts come from
 // constants/labels.js (StatusTag), so they are not repeated here.
 
 export const EXERCISE_OPTIONS = [
-  { value: 'push_up', label: '푸시업' },
-  { value: 'burpee', label: '버피' },
-  { value: 'squat', label: '스쿼트' },
-  { value: 'lunge', label: '런지' },
-  { value: 'plank', label: '플랭크' },
-  { value: 'running', label: '달리기' },
+  { value: 'push_up', label: t('푸시업') },
+  { value: 'burpee', label: t('버피') },
+  { value: 'squat', label: t('스쿼트') },
+  { value: 'lunge', label: t('런지') },
+  { value: 'plank', label: t('플랭크') },
+  { value: 'running', label: t('달리기') },
 ];
 
 export const METHOD_OPTIONS = [
-  { value: 'camera', label: '카메라' },
-  { value: 'sensor', label: '센서' },
+  { value: 'camera', label: t('카메라') },
+  { value: 'sensor', label: t('센서') },
 ];
 
 // Statuses an admin may set on an admin definition (ADMIN_STATUSES of the backend).
 export const ADMIN_STATUS_OPTIONS = [
-  { value: 'public', label: '공개' },
-  { value: 'draft', label: '초안' },
-  { value: 'hidden', label: '숨김' },
+  { value: 'public', label: t('공개') },
+  { value: 'draft', label: t('초안') },
+  { value: 'hidden', label: t('숨김') },
 ];
 
 // All statuses a definition list can be filtered by (PUBLICATION_STATUSES of the backend).
 export const FILTER_STATUS_OPTIONS = [
-  { value: 'private', label: '비공개' },
-  { value: 'review_pending', label: '검수 대기' },
-  { value: 'public', label: '공개' },
-  { value: 'rejected', label: '반려' },
-  { value: 'hidden', label: '숨김' },
-  { value: 'draft', label: '초안' },
+  { value: 'private', label: t('비공개') },
+  { value: 'review_pending', label: t('검수 대기') },
+  { value: 'public', label: t('공개') },
+  { value: 'rejected', label: t('반려') },
+  { value: 'hidden', label: t('숨김') },
+  { value: 'draft', label: t('초안') },
 ];
 
 export const ORIGIN_OPTIONS = [
-  { value: 'admin', label: '관리자' },
-  { value: 'user', label: '사용자' },
+  { value: 'admin', label: t('관리자') },
+  { value: 'user', label: t('사용자') },
 ];
 
 export const labelOf = (options, value) =>

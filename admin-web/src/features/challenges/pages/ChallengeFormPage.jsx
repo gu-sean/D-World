@@ -23,6 +23,7 @@ import {
   useDifficultyLevels,
   useUpdateChallenge,
 } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 const DURATIONS = [7, 14, 30];
 const DATE_FORMAT = 'YYYY-MM-DD';
@@ -80,7 +81,7 @@ function ChallengeForm({ challenge, categories, difficulties }) {
         ),
       );
       if (Object.keys(patch).length === 0) {
-        message.info('바꾼 항목이 없어요.');
+        message.info(t('바꾼 항목이 없어요.'));
         return;
       }
       setPending({ patch });
@@ -90,11 +91,11 @@ function ChallengeForm({ challenge, categories, difficulties }) {
   };
 
   const validatePeriod = (_, value) => {
-    if (!value) return Promise.reject(new Error('기간을 선택해 주세요.'));
+    if (!value) return Promise.reject(new Error(t('기간을 선택해 주세요.')));
     const days = value[1].diff(value[0], 'day') + 1;
     return DURATIONS.includes(days)
       ? Promise.resolve()
-      : Promise.reject(new Error('기간은 7일·14일·30일 중 하나여야 해요. (시작·종료일 포함)'));
+      : Promise.reject(new Error(t('기간은 7일·14일·30일 중 하나여야 해요. (시작·종료일 포함)')));
   };
 
   return (
@@ -107,20 +108,20 @@ function ChallengeForm({ challenge, categories, difficulties }) {
         initialValues={initial ?? { reward: { points: 0, petXp: 0 } }}
       >
         <Form.Item
-          label="제목"
+          label={t('제목')}
           name="title"
           rules={[
-            { required: true, whitespace: true, message: '제목을 입력해 주세요.' },
+            { required: true, whitespace: true, message: t('제목을 입력해 주세요.') },
             { max: 200 },
           ]}
         >
           <Input maxLength={200} />
         </Form.Item>
         <Form.Item
-          label="설명"
+          label={t('설명')}
           name="description"
           rules={[
-            { required: true, whitespace: true, message: '설명을 입력해 주세요.' },
+            { required: true, whitespace: true, message: t('설명을 입력해 주세요.') },
             { max: 5000 },
           ]}
         >
@@ -128,9 +129,9 @@ function ChallengeForm({ challenge, categories, difficulties }) {
         </Form.Item>
         <Space align="start" wrap>
           <Form.Item
-            label="분야"
+            label={t('분야')}
             name="categoryId"
-            rules={[{ required: true, message: '분야를 선택해 주세요.' }]}
+            rules={[{ required: true, message: t('분야를 선택해 주세요.') }]}
           >
             <Select
               style={{ width: 200 }}
@@ -140,9 +141,9 @@ function ChallengeForm({ challenge, categories, difficulties }) {
             />
           </Form.Item>
           <Form.Item
-            label="난이도"
+            label={t('난이도')}
             name="difficultyId"
-            rules={[{ required: true, message: '난이도를 선택해 주세요.' }]}
+            rules={[{ required: true, message: t('난이도를 선택해 주세요.') }]}
           >
             <Select
               style={{ width: 200 }}
@@ -154,9 +155,9 @@ function ChallengeForm({ challenge, categories, difficulties }) {
         </Space>
         <Space align="start" wrap>
           <Form.Item
-            label="인증 방식"
+            label={t('인증 방식')}
             name="verificationMethod"
-            rules={[{ required: true, message: '인증 방식을 선택해 주세요.' }]}
+            rules={[{ required: true, message: t('인증 방식을 선택해 주세요.') }]}
           >
             <Select
               style={{ width: 200 }}
@@ -167,7 +168,7 @@ function ChallengeForm({ challenge, categories, difficulties }) {
             />
           </Form.Item>
           <Form.Item
-            label="운동 종류"
+            label={t('운동 종류')}
             name="exerciseCode"
             dependencies={['verificationMethod']}
             rules={[
@@ -177,7 +178,7 @@ function ChallengeForm({ challenge, categories, difficulties }) {
                   (value === 'running') === (getFieldValue('verificationMethod') === 'sensor')
                     ? Promise.resolve()
                     : Promise.reject(
-                        new Error('달리기는 센서, 나머지 운동은 카메라 인증만 가능해요.'),
+                        new Error(t('달리기는 센서, 나머지 운동은 카메라 인증만 가능해요.')),
                       ),
               }),
             ]}
@@ -190,22 +191,22 @@ function ChallengeForm({ challenge, categories, difficulties }) {
           </Form.Item>
         </Space>
         <Space align="start" wrap>
-          <Form.Item label="목표 값" name="targetValue">
+          <Form.Item label={t('목표 값')} name="targetValue">
             <InputNumber min={0.01} max={99999999} style={{ width: 140 }} />
           </Form.Item>
-          <Form.Item label="목표 단위" name="targetUnit" rules={[{ max: 20 }]}>
+          <Form.Item label={t('목표 단위')} name="targetUnit" rules={[{ max: 20 }]}>
             <Input maxLength={20} style={{ width: 140 }} />
           </Form.Item>
-          <Form.Item label="예상 소요(초)" name="estimatedDurationSeconds">
+          <Form.Item label={t('예상 소요(초)')} name="estimatedDurationSeconds">
             <InputNumber min={1} max={86400} precision={0} style={{ width: 140 }} />
           </Form.Item>
         </Space>
-        <Form.Item label="챌린지 기간" name="period" rules={[{ validator: validatePeriod }]}>
+        <Form.Item label={t('챌린지 기간')} name="period" rules={[{ validator: validatePeriod }]}>
           <DatePicker.RangePicker />
         </Form.Item>
         <Space align="start" wrap>
           <Form.Item
-            label="완주 필요 일수"
+            label={t('완주 필요 일수')}
             name="requiredSuccessDays"
             dependencies={['period']}
             rules={[
@@ -215,47 +216,50 @@ function ChallengeForm({ challenge, categories, difficulties }) {
                   if (!value || !period) return Promise.resolve();
                   return value <= period[1].diff(period[0], 'day') + 1
                     ? Promise.resolve()
-                    : Promise.reject(new Error('완주 필요 일수는 기간 일수를 넘을 수 없어요.'));
+                    : Promise.reject(new Error(t('완주 필요 일수는 기간 일수를 넘을 수 없어요.')));
                 },
               }),
             ]}
           >
             <InputNumber min={1} max={30} precision={0} style={{ width: 160 }} />
           </Form.Item>
-          <Form.Item label="최대 참가자" name="maxParticipants">
+          <Form.Item label={t('최대 참가자')} name="maxParticipants">
             <InputNumber min={1} max={1000000} precision={0} style={{ width: 160 }} />
           </Form.Item>
         </Space>
-        <Typography.Title level={5}>완주 보상</Typography.Title>
+        <Typography.Title level={5}>{t('완주 보상')}</Typography.Title>
         <Space align="start" wrap>
           <Form.Item
-            label="포인트"
+            label={t('포인트')}
             name={['reward', 'points']}
-            rules={[{ required: true, message: '필수' }]}
+            rules={[{ required: true, message: t('필수') }]}
           >
             <InputNumber min={0} max={1000000} precision={0} />
           </Form.Item>
           <Form.Item
-            label="펫 경험치"
+            label={t('펫 경험치')}
             name={['reward', 'petXp']}
-            rules={[{ required: true, message: '필수' }]}
+            rules={[{ required: true, message: t('필수') }]}
           >
             <InputNumber min={0} max={1000000} precision={0} />
           </Form.Item>
         </Space>
-        <Form.Item label="배지 업적 버전 ID (선택)" name={['reward', 'badgeAchievementVersionId']}>
+        <Form.Item
+          label={t('배지 업적 버전 ID (선택)')}
+          name={['reward', 'badgeAchievementVersionId']}
+        >
           <Input placeholder="ID" />
         </Form.Item>
         <Space>
-          <Button onClick={() => navigate('/challenges')}>취소</Button>
+          <Button onClick={() => navigate('/challenges')}>{t('취소')}</Button>
           <Button type="primary" htmlType="submit">
-            저장
+            {t('저장')}
           </Button>
         </Space>
       </Form>
       <ConfirmActionModal
         open={Boolean(pending)}
-        title={isEdit ? '공식 챌린지 수정' : '공식 챌린지 등록'}
+        title={isEdit ? t('공식 챌린지 수정') : t('공식 챌린지 등록')}
         summary={isEdit ? challenge.title : (form.getFieldValue('title') ?? '')}
         onSubmit={async ({ reason, idempotencyKey }) => {
           if (isEdit) {
@@ -267,7 +271,7 @@ function ChallengeForm({ challenge, categories, difficulties }) {
           } else {
             await create.mutateAsync({ body: { ...pending.body, reason }, idempotencyKey });
           }
-          message.success('처리했어요');
+          message.success(t('처리했어요'));
           setPending(null);
           navigate('/challenges');
         }}
@@ -286,7 +290,7 @@ export default function ChallengeFormPage() {
   return (
     <>
       <Typography.Title level={4}>
-        {challengeId ? '공식 챌린지 수정' : '공식 챌린지 등록'}
+        {challengeId ? t('공식 챌린지 수정') : t('공식 챌린지 등록')}
       </Typography.Title>
       <QueryBoundary query={categories}>
         {(categoryList) => (

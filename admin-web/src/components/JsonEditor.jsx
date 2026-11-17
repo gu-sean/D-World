@@ -1,6 +1,7 @@
 import { Input } from 'antd';
+import { t } from '../i18n/index.js';
 
-const INVALID_JSON_TEXT = '입력한 내용을 다시 확인해 주세요.'; // COMMON_VALIDATION_FAILED, docs/05 §7
+const INVALID_JSON_TEXT = t('입력한 내용을 다시 확인해 주세요.'); // COMMON_VALIDATION_FAILED, docs/05 §7
 
 // Returns the parsed value, or `undefined` when `text` is empty or not valid JSON.
 const parse = (text) => {

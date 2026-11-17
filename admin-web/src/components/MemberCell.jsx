@@ -1,5 +1,6 @@
 import { Typography } from 'antd';
 import { Link } from 'react-router';
+import { t } from '../i18n/index.js';
 
 /**
  * 회원 한 명을 모든 목록에서 같은 모양으로 보여 준다.
@@ -11,7 +12,7 @@ import { Link } from 'react-router';
  */
 export function MemberCell({ id, nickname }) {
   if (!id && !nickname) return '-';
-  const name = nickname ?? '(닉네임 없음)';
+  const name = nickname ?? t('(닉네임 없음)');
   return (
     <div style={{ minWidth: 0 }}>
       {id ? (
@@ -25,7 +26,7 @@ export function MemberCell({ id, nickname }) {
       {id && (
         <Typography.Text
           type="secondary"
-          copyable={{ text: id, tooltips: ['회원 ID 복사', '복사했어요'] }}
+          copyable={{ text: id, tooltips: [t('회원 ID 복사'), t('복사했어요')] }}
           onClick={(event) => event.stopPropagation()}
           style={{
             display: 'block',

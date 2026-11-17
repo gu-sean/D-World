@@ -16,8 +16,9 @@ import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
 import { useCatalog, useCreateCatalogItem, useUpdateCatalogItem } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
-const KIND_LABEL = { categories: '분야', difficulties: '난이도' };
+const KIND_LABEL = { categories: t('분야'), difficulties: t('난이도') };
 
 function CatalogTab({ kind }) {
   const label = KIND_LABEL[kind];
@@ -29,11 +30,11 @@ function CatalogTab({ kind }) {
   const [pending, setPending] = useState(null); // {type: 'create', values} | {type: 'active', row, isActive}
 
   const columns = [
-    { title: '코드', dataIndex: 'code' },
-    { title: '이름', dataIndex: 'name' },
-    { title: '표시 순서', dataIndex: 'displayOrder' },
+    { title: t('코드'), dataIndex: 'code' },
+    { title: t('이름'), dataIndex: 'name' },
+    { title: t('표시 순서'), dataIndex: 'displayOrder' },
     {
-      title: '사용',
+      title: t('사용'),
       dataIndex: 'isActive',
       render: (value, row) => (
         <Switch
@@ -46,9 +47,9 @@ function CatalogTab({ kind }) {
 
   const summary =
     pending?.type === 'create'
-      ? `${label} 추가 · ${pending.values.name}`
+      ? t('{0} 추가 · {1}', label, pending.values.name)
       : pending
-        ? `${pending.row.name} · ${pending.isActive ? '사용' : '사용 중지'}`
+        ? `${pending.row.name} · ${pending.isActive ? t('사용') : t('사용 중지')}`
         : '';
 
   return (
@@ -64,7 +65,7 @@ function CatalogTab({ kind }) {
               setFormOpen(true);
             }}
           >
-            {label} 추가
+            {t('{0} 추가', label)}
           </Button>
           {data.length === 0 ? (
             <StatePanel type="empty" />
@@ -72,12 +73,12 @@ function CatalogTab({ kind }) {
             <Table rowKey="id" columns={columns} dataSource={data} pagination={false} />
           )}
           <Modal
-            title={`${label} 추가`}
+            title={t('{0} 추가', label)}
             open={formOpen}
             onCancel={() => setFormOpen(false)}
             onOk={() => form.submit()}
-            okText="다음"
-            cancelText="취소"
+            okText={t('다음')}
+            cancelText={t('취소')}
           >
             <Form
               form={form}
@@ -88,27 +89,29 @@ function CatalogTab({ kind }) {
               }}
             >
               <Form.Item
-                label="코드"
+                label={t('코드')}
                 name="code"
-                rules={[{ required: true, message: '코드를 입력해 주세요.' }]}
+                rules={[{ required: true, message: t('코드를 입력해 주세요.') }]}
               >
                 <Input />
               </Form.Item>
               <Form.Item
-                label="이름"
+                label={t('이름')}
                 name="name"
-                rules={[{ required: true, message: '이름을 입력해 주세요.' }]}
+                rules={[{ required: true, message: t('이름을 입력해 주세요.') }]}
               >
                 <Input />
               </Form.Item>
-              <Form.Item label="표시 순서" name="displayOrder" rules={[{ required: true }]}>
+              <Form.Item label={t('표시 순서')} name="displayOrder" rules={[{ required: true }]}>
                 <InputNumber min={0} precision={0} />
               </Form.Item>
             </Form>
           </Modal>
           <ConfirmActionModal
             open={Boolean(pending)}
-            title={pending?.type === 'create' ? `${label} 추가` : `${label} 사용 여부 변경`}
+            title={
+              pending?.type === 'create' ? t('{0} 추가', label) : t('{0} 사용 여부 변경', label)
+            }
             summary={summary}
             danger={pending?.type === 'active' && !pending.isActive}
             onSubmit={async ({ reason, idempotencyKey }) => {
@@ -121,7 +124,7 @@ function CatalogTab({ kind }) {
                   idempotencyKey,
                 });
               }
-              message.success('처리했어요');
+              message.success(t('처리했어요'));
               setPending(null);
             }}
             onCancel={() => setPending(null)}
@@ -135,14 +138,14 @@ function CatalogTab({ kind }) {
 export default function CategoryDifficultyPage() {
   return (
     <div>
-      <Typography.Title level={4}>분야·난이도</Typography.Title>
+      <Typography.Title level={4}>{t('분야·난이도')}</Typography.Title>
       <Typography.Paragraph type="secondary">
-        미션 보상표는 보상 관리 &gt; 포인트 정책 &gt; 미션 보상표에서 관리해요.
+        {t('미션 보상표는 보상 관리 > 포인트 정책 > 미션 보상표에서 관리해요.')}
       </Typography.Paragraph>
       <Tabs
         items={[
-          { key: 'categories', label: '분야', children: <CatalogTab kind="categories" /> },
-          { key: 'difficulties', label: '난이도', children: <CatalogTab kind="difficulties" /> },
+          { key: 'categories', label: t('분야'), children: <CatalogTab kind="categories" /> },
+          { key: 'difficulties', label: t('난이도'), children: <CatalogTab kind="difficulties" /> },
         ]}
       />
     </div>

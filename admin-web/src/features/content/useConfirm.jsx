@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { message } from 'antd';
 import { ConfirmActionModal } from '../../components/ConfirmActionModal.jsx';
+import { t } from '../../i18n/index.js';
 
 /**
  * One confirm dialog for a whole page (two dialogs on one page would repeat the reason field id).
@@ -22,7 +23,7 @@ export function useConfirm() {
       onCancel={() => setOpen(false)}
       onSubmit={async (input) => {
         await request.submit(input);
-        message.success('처리했어요');
+        message.success(t('처리했어요'));
         setOpen(false);
       }}
     />

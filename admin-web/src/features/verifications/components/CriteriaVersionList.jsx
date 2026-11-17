@@ -1,6 +1,7 @@
 import { Table, Typography } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
 import { METHOD_LABEL } from './format.js';
+import { t } from '../../../i18n/index.js';
 
 /**
  * Versions of the verification criteria (ADM-10). Versions are never edited; a change adds a new
@@ -13,14 +14,18 @@ import { METHOD_LABEL } from './format.js';
  */
 export default function CriteriaVersionList({ versions, categoryName }) {
   const columns = [
-    { title: '분야', dataIndex: 'categoryId', render: categoryName },
+    { title: t('분야'), dataIndex: 'categoryId', render: categoryName },
     {
-      title: '인증 방식',
+      title: t('인증 방식'),
       dataIndex: 'verificationMethod',
       render: (value) => METHOD_LABEL[value] ?? value,
     },
-    { title: '버전', dataIndex: 'versionNo', width: 72 },
-    { title: '시행 시각', dataIndex: 'effectiveAt', render: (value) => <DateText value={value} /> },
+    { title: t('버전'), dataIndex: 'versionNo', width: 72 },
+    {
+      title: t('시행 시각'),
+      dataIndex: 'effectiveAt',
+      render: (value) => <DateText value={value} />,
+    },
   ];
 
   return (

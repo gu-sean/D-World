@@ -9,6 +9,7 @@ import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useChallenge, useModerate, useParticipantDays, useRankings } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 export default function ChallengeRankingReviewPage() {
   const { challengeId } = useParams();
@@ -21,35 +22,35 @@ export default function ChallengeRankingReviewPage() {
   const settled = challenge.data?.settlementStatus === 'confirmed';
 
   const columns = [
-    { title: '순위', dataIndex: 'rankNo', width: 80 },
+    { title: t('순위'), dataIndex: 'rankNo', width: 80 },
     memberColumn({ idKey: 'userId', nicknameKey: 'nickname' }),
-    { title: '점수', dataIndex: 'score' },
-    { title: '성공 일수', dataIndex: 'successfulDays' },
+    { title: t('점수'), dataIndex: 'score' },
+    { title: t('성공 일수'), dataIndex: 'successfulDays' },
     {
-      title: '표시',
+      title: t('표시'),
       dataIndex: 'flags',
       render: (flags) => (flags ?? []).map((flag) => <Tag key={flag}>{flag}</Tag>),
     },
     {
-      title: '처리',
+      title: t('처리'),
       key: 'actions',
       render: (_, row) => (
         <Button size="small" onClick={() => setSelected(row)}>
-          검토
+          {t('검토')}
         </Button>
       ),
     },
   ];
 
   const dayColumns = [
-    { title: '날짜', dataIndex: 'date' },
+    { title: t('날짜'), dataIndex: 'date' },
     {
-      title: '상태',
+      title: t('상태'),
       dataIndex: 'status',
       render: (value) => <StatusTag kind="challengeDailyMissionStatus" value={value} />,
     },
     {
-      title: '조정',
+      title: t('조정'),
       key: 'adjust',
       render: (_, day) =>
         day.status === 'excluded' ? (
@@ -58,13 +59,13 @@ export default function ChallengeRankingReviewPage() {
             disabled={settled}
             onClick={() =>
               setPending({
-                title: '하루 복구',
-                summary: `${day.date} 기록을 다시 반영해요.`,
+                title: t('하루 복구'),
+                summary: t('{0} 기록을 다시 반영해요.', day.date),
                 body: { action: 'restore_day', dailyMissionId: day.id },
               })
             }
           >
-            복구
+            {t('복구')}
           </Button>
         ) : (
           <Button
@@ -73,14 +74,14 @@ export default function ChallengeRankingReviewPage() {
             disabled={settled || day.status === 'cancelled'}
             onClick={() =>
               setPending({
-                title: '하루 제외',
-                summary: `${day.date} 기록을 점수에서 제외해요.`,
+                title: t('하루 제외'),
+                summary: t('{0} 기록을 점수에서 제외해요.', day.date),
                 body: { action: 'exclude_day', dailyMissionId: day.id },
                 danger: true,
               })
             }
           >
-            제외
+            {t('제외')}
           </Button>
         ),
     },
@@ -89,18 +90,18 @@ export default function ChallengeRankingReviewPage() {
   return (
     <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
       <Typography.Title level={4} style={{ margin: 0 }}>
-        랭킹 검토와 정정
+        {t('랭킹 검토와 정정')}
       </Typography.Title>
       {challenge.data && (
         <Typography.Text type="secondary">
           {challenge.data.title}
-          {settled && ' · 정산이 확정되어 정정은 정정 정산으로 처리해야 해요.'}
+          {settled && t(' · 정산이 확정되어 정정은 정정 정산으로 처리해야 해요.')}
         </Typography.Text>
       )}
       <QueryBoundary query={rankings}>
         {(data) =>
           data.entries.length === 0 ? (
-            <StatePanel type="empty" message="참가자가 없어요." />
+            <StatePanel type="empty" message={t('참가자가 없어요.')} />
           ) : (
             <>
               <Table
@@ -110,7 +111,7 @@ export default function ChallengeRankingReviewPage() {
                 pagination={{ pageSize: 20 }}
               />
               <Typography.Text type="secondary">
-                계산 시각: <DateText value={data.ranking.calculatedAt} />
+                {t('계산 시각:')} <DateText value={data.ranking.calculatedAt} />
               </Typography.Text>
             </>
           )
@@ -119,7 +120,7 @@ export default function ChallengeRankingReviewPage() {
       <Drawer
         open={Boolean(selected)}
         size={520}
-        title={selected ? `${selected.nickname} · ${selected.rankNo}위` : ''}
+        title={selected ? t('{0} · {1}위', selected.nickname, selected.rankNo) : ''}
         onClose={() => setSelected(null)}
         extra={
           <Button
@@ -127,21 +128,24 @@ export default function ChallengeRankingReviewPage() {
             disabled={settled}
             onClick={() =>
               setPending({
-                title: '참가자 실격',
-                summary: `${selected.nickname}님을 실격 처리해요. 순위에서 빠지고 되돌릴 수 없어요.`,
+                title: t('참가자 실격'),
+                summary: t(
+                  '{0}님을 실격 처리해요. 순위에서 빠지고 되돌릴 수 없어요.',
+                  selected.nickname,
+                ),
                 body: { action: 'disqualify' },
                 danger: true,
               })
             }
           >
-            실격 처리
+            {t('실격 처리')}
           </Button>
         }
       >
         <QueryBoundary query={days}>
           {(data) =>
             data.items.length === 0 ? (
-              <StatePanel type="empty" message="일별 기록이 없어요." />
+              <StatePanel type="empty" message={t('일별 기록이 없어요.')} />
             ) : (
               <Table
                 rowKey="id"
@@ -167,7 +171,7 @@ export default function ChallengeRankingReviewPage() {
             reason,
             idempotencyKey,
           });
-          message.success('처리했어요');
+          message.success(t('처리했어요'));
           setPending(null);
         }}
         onCancel={() => setPending(null)}

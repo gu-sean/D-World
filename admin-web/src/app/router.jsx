@@ -3,6 +3,7 @@ import { Empty, Result, Spin } from 'antd';
 import { createBrowserRouter, Navigate } from 'react-router';
 import AdminLayout from './AdminLayout.jsx';
 import RequireAuth from './RequireAuth.jsx';
+import { t } from '../i18n/index.js';
 
 // Every page is the default export of src/features/<feature>/pages/<PageName>.jsx.
 // A page that does not exist yet shows a placeholder, and starts working as soon as its file
@@ -58,9 +59,9 @@ const ROUTES = [
 // components, because a component defined here would break fast refresh (lint rule
 // react-refresh/only-export-components) in a file that exports the router.
 const placeholderElement = (
-  <Empty style={{ marginTop: 96 }} description="아직 준비되지 않은 화면이에요." />
+  <Empty style={{ marginTop: 96 }} description={t('아직 준비되지 않은 화면이에요.')} />
 );
-const notFoundElement = <Result status="404" title="찾을 수 없어요." />;
+const notFoundElement = <Result status="404" title={t('찾을 수 없어요.')} />;
 
 function pageElement(page) {
   const [feature, name] = page.split('/');

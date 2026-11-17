@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, message, Radio, Space } from 'antd';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
+import { t } from '../../../i18n/index.js';
 
 /**
  * Approve / reject choice followed by the shared confirm modal (reason + Idempotency-Key,
@@ -29,12 +30,12 @@ export default function DecisionForm({ labels, confirmTitle, submitText, onDecid
       <ConfirmActionModal
         open={open}
         title={confirmTitle}
-        summary={decision ? `"${labels[decision]}"(으)로 처리합니다.` : null}
+        summary={decision ? t('"{0}"(으)로 처리합니다.', labels[decision]) : null}
         danger={decision === 'rejected'}
         onCancel={() => setOpen(false)}
         onSubmit={async ({ reason, idempotencyKey }) => {
           await onDecide({ decision, reason, idempotencyKey });
-          message.success('처리했어요');
+          message.success(t('처리했어요'));
           setOpen(false);
         }}
       />

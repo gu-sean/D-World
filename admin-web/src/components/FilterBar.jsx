@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, DatePicker, Input, Select, Space } from 'antd';
 import dayjs from 'dayjs';
+import { t } from '../i18n/index.js';
 
 const DATE_FORMAT = 'YYYY-MM-DD'; // docs/05 §3: a `date` is YYYY-MM-DD (Asia/Seoul)
 
@@ -101,9 +102,9 @@ export function FilterBar({ fields, value, onChange }) {
         );
       })}
       <Button type="primary" onClick={submit}>
-        검색
+        {t('검색')}
       </Button>
-      <Button onClick={reset}>초기화</Button>
+      <Button onClick={reset}>{t('초기화')}</Button>
     </Space>
   );
 }

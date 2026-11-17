@@ -5,6 +5,8 @@ import { Outlet, useLocation, useNavigate } from 'react-router';
 import { getAdmin } from '../api/session.js';
 import { useLogout, useMe } from '../features/auth/queries.js';
 import { findGroupKey, findSelectedPath, menuItems } from './menu.js';
+import LanguageSwitch from '../components/LanguageSwitch.jsx';
+import { t } from '../i18n/index.js';
 
 const { Header, Sider, Content } = Layout;
 
@@ -32,7 +34,7 @@ export default function AdminLayout() {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider width={220} theme="light">
         <Typography.Title level={4} style={{ margin: 16 }}>
-          D-World 관리자
+          {t('D-World 관리자')}
         </Typography.Title>
         <Menu
           mode="inline"
@@ -54,9 +56,10 @@ export default function AdminLayout() {
           }}
         >
           <Space>
+            <LanguageSwitch />
             <Typography.Text>{loginId}</Typography.Text>
             <Button icon={<LogoutOutlined />} loading={logout.isPending} onClick={handleLogout}>
-              로그아웃
+              {t('로그아웃')}
             </Button>
           </Space>
         </Header>

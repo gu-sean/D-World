@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Button, Input, InputNumber, Radio, Space } from 'antd';
 import { labels } from '../../../constants/labels.js';
 import { useResolveTicket } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 const MIN_DAYS = 1; // docs/07 AccountActionInput
 const MAX_DAYS = 365;
@@ -12,18 +13,18 @@ const OUTCOME_OPTIONS = Object.entries(labels.ticketResolutionOutcome).map(([val
   label: text,
 }));
 const ACTION_TYPE_OPTIONS = [
-  { value: 'warning', label: '경고' },
-  { value: 'restriction', label: '이용 제한' },
+  { value: 'warning', label: t('경고') },
+  { value: 'restriction', label: t('이용 제한') },
 ];
 const CONTENT_ACTION_OPTIONS = [
-  { value: 'hidden', label: '숨김' },
-  { value: 'deleted', label: '삭제' },
+  { value: 'hidden', label: t('숨김') },
+  { value: 'deleted', label: t('삭제') },
 ];
 
-const REPLY_REQUIRED_TEXT = '회원에게 보낼 답변을 입력해 주세요.';
-const DAYS_TEXT = `이용 제한 일수를 ${MIN_DAYS}~${MAX_DAYS} 사이의 정수로 입력해 주세요.`;
-const ACTION_REASON_TEXT = '회원에게 보일 조치 사유를 입력해 주세요.';
-const CONTENT_ACTION_TEXT = '콘텐츠 조치를 선택해 주세요.';
+const REPLY_REQUIRED_TEXT = t('회원에게 보낼 답변을 입력해 주세요.');
+const DAYS_TEXT = t('이용 제한 일수를 {0}~{1} 사이의 정수로 입력해 주세요.', MIN_DAYS, MAX_DAYS);
+const ACTION_REASON_TEXT = t('회원에게 보일 조치 사유를 입력해 주세요.');
+const CONTENT_ACTION_TEXT = t('콘텐츠 조치를 선택해 주세요.');
 
 /**
  * The resolution of a ticket (M24): an inquiry is answered (`reply_only`); a report gets one of
@@ -75,13 +76,13 @@ export function ResolutionForm({ ticket, onConfirm }) {
     if (needsContent) input.contentAction = contentAction;
 
     onConfirm({
-      title: '처리 확정',
+      title: t('처리 확정'),
       summary: (
         <>
           <div>
             {ticket.subject} · {labels.ticketResolutionOutcome[outcome].text}
           </div>
-          <div>처리를 확정하면 되돌릴 수 없어요.</div>
+          <div>{t('처리를 확정하면 되돌릴 수 없어요.')}</div>
         </>
       ),
       danger: needsAccount || needsContent,
@@ -110,8 +111,8 @@ export function ResolutionForm({ ticket, onConfirm }) {
         rows={3}
         maxLength={REASON_MAX_LENGTH * 4}
         showCount
-        aria-label="회원에게 보낼 답변"
-        placeholder={needsReply ? '회원에게 보낼 답변 (필수)' : '회원에게 보낼 답변 (선택)'}
+        aria-label={t('회원에게 보낼 답변')}
+        placeholder={needsReply ? t('회원에게 보낼 답변 (필수)') : t('회원에게 보낼 답변 (선택)')}
         value={userReply}
         onChange={(event) => setUserReply(event.target.value)}
       />
@@ -128,20 +129,20 @@ export function ResolutionForm({ ticket, onConfirm }) {
                 min={MIN_DAYS}
                 max={MAX_DAYS}
                 precision={0}
-                placeholder="일수"
-                aria-label="이용 제한 일수"
+                placeholder={t('일수')}
+                aria-label={t('이용 제한 일수')}
                 value={days}
                 onChange={setDays}
               />
-              일
+              {t('일')}
             </Space>
           )}
           <Input.TextArea
             rows={2}
             maxLength={REASON_MAX_LENGTH}
             showCount
-            aria-label="회원에게 보일 조치 사유"
-            placeholder="회원에게 보일 조치 사유"
+            aria-label={t('회원에게 보일 조치 사유')}
+            placeholder={t('회원에게 보일 조치 사유')}
             value={actionReason}
             onChange={(event) => setActionReason(event.target.value)}
           />
@@ -157,7 +158,7 @@ export function ResolutionForm({ ticket, onConfirm }) {
       {error && <Alert type="warning" showIcon title={error} />}
       <div>
         <Button type="primary" onClick={handleNext}>
-          처리 확정
+          {t('처리 확정')}
         </Button>
       </div>
     </div>

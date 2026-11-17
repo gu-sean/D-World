@@ -6,6 +6,7 @@ import { Alert, Button, Space, Typography } from 'antd';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import RecordSummary from '../components/RecordSummary.jsx';
 import { useVerification } from '../queries.js';
+import { t } from '../../../i18n/index.js';
 
 export default function VerificationDetailPage() {
   const { recordId } = useParams();
@@ -13,8 +14,8 @@ export default function VerificationDetailPage() {
 
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Typography.Title level={3}>인증 기록 상세</Typography.Title>
-      <Link to="/verifications">← 인증 기록</Link>
+      <Typography.Title level={3}>{t('인증 기록 상세')}</Typography.Title>
+      <Link to="/verifications">{t('← 인증 기록')}</Link>
       <QueryBoundary query={query}>
         {(record) => (
           <>
@@ -22,11 +23,11 @@ export default function VerificationDetailPage() {
               <Alert
                 type="warning"
                 showIcon
-                title="AI가 판정을 보류한 건이에요. 처리 대기에서 판정해 주세요."
+                title={t('AI가 판정을 보류한 건이에요. 처리 대기에서 판정해 주세요.')}
                 action={
                   <Link to={`/verifications/appeals/hold/${record.recordId}`}>
                     <Button size="small" type="primary">
-                      판정하러 가기
+                      {t('판정하러 가기')}
                     </Button>
                   </Link>
                 }

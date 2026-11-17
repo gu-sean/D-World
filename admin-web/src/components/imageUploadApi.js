@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { AdminError } from '../api/errors.js';
 import { http } from '../api/httpClient.js';
+import { t } from '../i18n/index.js';
 
 /**
  * M84 POST /assets/upload-urls (docs/09 §8, ADM-25·26). Asks for a signed upload URL.
@@ -24,7 +25,7 @@ export const putToStorage = async (ticket, file) => {
     await axios.put(ticket.uploadUrl, file, { headers: ticket.uploadHeaders });
   } catch {
     // The storage answers in its own format (and 403 here does not mean "no admin permission").
-    throw new AdminError({ code: 'COMMON_INTERNAL', message: '잠시 후 다시 시도해 주세요.' });
+    throw new AdminError({ code: 'COMMON_INTERNAL', message: t('잠시 후 다시 시도해 주세요.') });
   }
 };
 
