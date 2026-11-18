@@ -80,7 +80,8 @@ export class MobileChallengesService {
       this.database.query(
         `SELECT participation_id,
                 count(*) FILTER (WHERE status = 'success')::int AS success,
-                max(status) FILTER (WHERE challenge_date = ${TODAY_SQL}) AS today_status
+                max(status) FILTER (WHERE challenge_date = ${TODAY_SQL}) AS today_status,
+                max(mission_id) FILTER (WHERE challenge_date = ${TODAY_SQL}) AS today_mission_id
            FROM challenge_daily_missions
           WHERE participation_id = ANY($1::short_id[])
           GROUP BY participation_id`,
@@ -89,9 +90,11 @@ export class MobileChallengesService {
     ]);
     const byChallenge = new Map(challenges.rows.map((c) => [c.id, c]));
     const stats = new Map(counts.rows.map((c) => [c.participation_id, c]));
+    const todayKst = kstDate();
     return rows.map((row) => {
       const challenge = toView(byChallenge.get(row.challenge_id));
       const stat = stats.get(row.id);
+      const successful = stat?.success ?? 0;
       return {
         id: row.id,
         challengeId: row.challenge_id,
@@ -99,12 +102,23 @@ export class MobileChallengesService {
         joinedAt: row.joined_at,
         withdrawnAt: row.withdrawn_at,
         completedAt: row.completed_at,
-        challenge: { ...challenge, joined: row.status === 'enrolled' },
+        // 문서 규격(07 MyChallenge·Challenge): 앱 화면은 challenge.myParticipation·daysLeft·todayMissionId를 읽는다
+        challenge: {
+          ...challenge,
+          joined: row.status === 'enrolled',
+          myParticipation: {
+            id: row.id,
+            status: row.status,
+            successfulDays: successful,
+          },
+        },
         participationId: row.id,
-        successDays: stat?.success ?? 0,
-        successfulDays: stat?.success ?? 0,
+        successDays: successful,
+        successfulDays: successful,
         requiredDays: challenge.requiredSuccessDays,
         todayStatus: stat?.today_status ?? null,
+        todayMissionId: stat?.today_mission_id ?? null,
+        daysLeft: Math.max(0, daysBetween(todayKst, challenge.endDate) - 1),
       };
     });
   }
@@ -163,17 +177,20 @@ export class MobileChallengesService {
   /** A105 ChallengeRanking */
   async ranking(userId, challengeId, limit) {
     const ranking = await this.scoring.ranking(userId, challengeId, { limit });
+    // 문서 규격(07 DTO ChallengeRanking): displayName·isMe·me·participantCount
     const entry = (item) => ({
       rankNo: item.rank,
-      nickname: item.displayName,
+      displayName: item.displayName,
       score: item.score,
       successfulDays: item.successfulDays,
+      isMe: item.isMe,
     });
     return {
       challengeId,
       calculatedAt: new Date().toISOString(),
       isFinal: !ranking.provisional,
-      myRank: ranking.me ? entry(ranking.me) : null,
+      participantCount: ranking.total,
+      me: ranking.me ? entry(ranking.me) : null,
       entries: ranking.items.map(entry),
     };
   }
@@ -182,23 +199,58 @@ export class MobileChallengesService {
   async result(userId, challengeId) {
     const mine = await this.mine(userId, challengeId);
     const { rows } = await this.database.query(
-      `SELECT e.rank_no, e.score, e.paid_points, e.promised_points, r.confirmed_at
+      `SELECT e.rank_no, e.score, e.paid_points, e.promised_points, e.user_xp, e.pet_xp,
+              e.outcome, r.confirmed_at,
+              v.achievement_id AS badge_achievement_id, v.title AS badge_title, v.rarity AS badge_rarity
          FROM challenge_settlement_entries e
          JOIN challenge_settlement_runs r ON r.id = e.run_id AND r.status = 'confirmed'
+         LEFT JOIN challenge_reward_grants g
+                ON g.participation_id = e.participation_id AND g.status = 'active'
+         LEFT JOIN user_achievements ua ON ua.id = g.badge_grant_id
+         LEFT JOIN achievement_versions v ON v.id = ua.achievement_version_id
         WHERE e.participation_id = $1`,
       [mine.participationId],
     );
     const settled = rows[0];
+    const rewardPoints = settled
+      ? Number(settled.paid_points ?? settled.promised_points)
+      : 0;
+    // 문서 규격(07 ChallengeResult): settled·outcome·achievementRate·rewards
+    const outcome = settled?.outcome ?? mine.status;
+    const periodDays = mine.challenge.periodDays;
     return {
+      challengeId,
+      settled: Boolean(settled),
+      outcome,
+      achievementRate: periodDays
+        ? Math.min(
+            1,
+            Math.round((mine.successDays / periodDays) * 10000) / 10000,
+          )
+        : 0,
+      rewards:
+        settled && outcome === 'completed'
+          ? {
+              points: rewardPoints,
+              userXp: settled.user_xp,
+              petXp: settled.pet_xp,
+              badge: settled.badge_achievement_id
+                ? {
+                    achievementId: settled.badge_achievement_id,
+                    title: settled.badge_title,
+                    rarity: settled.badge_rarity,
+                    badgeImageUrl: null,
+                  }
+                : null,
+            }
+          : null,
       challenge: mine.challenge,
       participationId: mine.participationId,
       status: mine.status,
       rankNo: settled?.rank_no ?? null,
       successfulDays: mine.successDays,
       requiredDays: mine.requiredDays,
-      rewardPoints: settled
-        ? Number(settled.paid_points ?? settled.promised_points)
-        : 0,
+      rewardPoints,
       settledAt: settled?.confirmed_at ?? null,
     };
   }
