@@ -8,20 +8,12 @@
 import React, { useState } from 'react';
 import { ImageBackground, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import {
-  format,
-  labels,
-  useActiveRecommendations,
-  useHome,
-  useMe,
-  useMyChallenges,
-} from '../../client';
+import { format, useActiveRecommendations, useHome, useMe, useMyChallenges } from '../../client';
 import {
   Button,
   Card,
   Icon,
   MissionCard,
-  OptionRow,
   ProgressRing,
   QueryState,
   Screen,
@@ -39,31 +31,8 @@ function bannerSubText({ totalCount, completedCount }) {
   return '하나 더 하면 연속 기록이\n이어져요';
 }
 
-/**
- * 오늘의 미션 상태 필터. 각 칸이 어떤 미션 상태를 묶어 보여 주는지 정한다.
- * '진행 중'에는 인증 중(submitted)도 넣는다 — 사용자가 손댄 뒤 아직 끝나지 않은 미션이라서.
- * 실패·취소는 '전체'에서만 보인다.
- */
-const MISSION_FILTERS = [
-  { value: 'all', label: '전체', statuses: null },
-  { value: 'scheduled', label: labels.missionStatus.scheduled, statuses: ['scheduled'] },
-  {
-    value: 'in_progress',
-    label: labels.missionStatus.in_progress,
-    statuses: ['in_progress', 'submitted'],
-  },
-  { value: 'completed', label: labels.missionStatus.completed, statuses: ['completed'] },
-];
-
-function filterMissions(missions, filterValue) {
-  const filter = MISSION_FILTERS.find((f) => f.value === filterValue);
-  if (!filter?.statuses) return missions;
-  return missions.filter((mission) => filter.statuses.includes(mission.status));
-}
-
 export default function HomeScreen({ navigation }) {
   const [date, setDate] = useState(() => format.todayKst());
-  const [missionFilter, setMissionFilter] = useState('all');
 
   const home = useHome(date);
   const me = useMe();
@@ -144,32 +113,15 @@ export default function HomeScreen({ navigation }) {
                 </Card>
               ) : (
                 <View style={styles.missions}>
-                  <OptionRow
-                    size="sm"
-                    options={MISSION_FILTERS}
-                    value={missionFilter}
-                    onChange={setMissionFilter}
-                  />
-                  {(() => {
-                    const visible = filterMissions(summary.missions, missionFilter);
-                    if (visible.length === 0) {
-                      const label = MISSION_FILTERS.find((f) => f.value === missionFilter)?.label;
-                      return (
-                        <Card>
-                          <Text style={styles.emptyText}>{label} 미션이 없어요.</Text>
-                        </Card>
-                      );
-                    }
-                    return visible.map((mission) => (
-                      <MissionCard
-                        key={mission.id}
-                        mission={mission}
-                        onPress={() =>
-                          navigation.navigate(Routes.MISSION_DETAIL, { missionId: mission.id })
-                        }
-                      />
-                    ));
-                  })()}
+                  {summary.missions.map((mission) => (
+                    <MissionCard
+                      key={mission.id}
+                      mission={mission}
+                      onPress={() =>
+                        navigation.navigate(Routes.MISSION_DETAIL, { missionId: mission.id })
+                      }
+                    />
+                  ))}
                 </View>
               )}
             </View>
