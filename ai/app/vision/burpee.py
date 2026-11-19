@@ -88,8 +88,12 @@ class BurpeeCounter:
 
         return "transition"
 
-    def update(self, landmarks):
+    def update(self, landmarks, timestamp_sec=None):
         pose = self.classify_pose(landmarks)
+        if not hasattr(self, "events"):
+            self.events: list[dict] = []
+            self.attempts = 0
+            self._crouch_at = None
 
         if pose == "unknown":
             self.last_pose = None
@@ -113,10 +117,21 @@ class BurpeeCounter:
         elif self.stage == "standing":
             if pose == "crouch":
                 self.stage = "crouching"
+                self._crouch_at = timestamp_sec
 
         elif self.stage == "crouching":
             if pose == "plank":
                 self.stage = "planking"
+            elif pose == "standing":
+                # 앉았다가 다리를 뒤로 뻗지 않고 바로 일어섬 = 엎드리기를 건너뛴 시도
+                self.attempts += 1
+                self.events.append({
+                    "attempt": self.attempts,
+                    "code": "burpee_no_plank",
+                    "time": round(self._crouch_at or 0.0, 1),
+                    "value": None,
+                })
+                self.stage = "standing"
 
         elif self.stage == "planking":
             if pose == "crouch":
@@ -124,6 +139,7 @@ class BurpeeCounter:
 
         elif self.stage == "returning" and pose == "standing":
             self.count += 1
+            self.attempts += 1
             self.stage = "standing"
 
         return self.result(pose, True)

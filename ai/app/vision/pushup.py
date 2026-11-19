@@ -1,6 +1,14 @@
 
+from app.vision.attempts import AttemptLog
 from app.vision.geometry import is_horizontal
 from app.vision.squat import angle
+
+# 팔꿈치 각도 기준 (초기 실험값: 실제 영상으로 조정)
+DOWN_BELOW = 106  # 이보다 작으면 내려간 것
+# 이보다 크면 팔을 편 것. 실제 폰 영상(2026-11-19, 옆에서 촬영)에서 빠르게 반복하면
+# 위 자세 팔꿈치가 120~130°로 측정돼 155°로는 10회 중 1회만 셌다 → 115°
+UP_ABOVE = 115
+PARTIAL_BELOW = 112  # 여기까지는 굽혔지만 DOWN_BELOW에 못 미치면 '덜 굽힌 시도'
 
 VISIBLE = 0.5
 
@@ -46,8 +54,18 @@ class PushupCounter:
         self.stage = "up"
         self.down_frames = 0
         self.invalid_frames = 0
+        # 팔꿈치가 PARTIAL_BELOW까지는 굽었지만 DOWN_BELOW까지 못 간 동작 = 덜 굽힌 시도
+        self.log = AttemptLog("push_up_shallow", PARTIAL_BELOW)
 
-    def update(self, landmarks):
+    @property
+    def attempts(self) -> int:
+        return self.log.attempts
+
+    @property
+    def events(self) -> list[dict]:
+        return self.log.events
+
+    def update(self, landmarks, timestamp_sec=None):
         # MediaPipe 관절 번호
         # 왼쪽: 어깨 11, 팔꿈치 13, 손목 15
         # 오른쪽: 어깨 12, 팔꿈치 14, 손목 16
@@ -93,6 +111,7 @@ class PushupCounter:
             if self.invalid_frames >= INVALID_FRAMES_TO_RESET:
                 self.stage = "up"
                 self.down_frames = 0
+                self.log.reset()  # 쉬는 중(서거나 무릎 꿇기)은 시도로 보지 않는다
             return {
                 "count": self.count,
                 "stage": "invalid_posture",
@@ -102,17 +121,20 @@ class PushupCounter:
             }
 
         self.invalid_frames = 0
+        self.log.track(elbow_angle, timestamp_sec, UP_ABOVE)
 
         # 초기 실험값: 실제 영상으로 나중에 조정
-        if elbow_angle < 106:
+        if elbow_angle < DOWN_BELOW:
             self.down_frames += 1
 
             if self.down_frames >= 2:
                 self.stage = "down"
 
-        elif elbow_angle > 155:
-            if self.stage == "down":
+        elif elbow_angle > UP_ABOVE:
+            counted = self.stage == "down"
+            if counted:
                 self.count += 1
+            self.log.complete(counted)
 
             self.stage = "up"
             self.down_frames = 0

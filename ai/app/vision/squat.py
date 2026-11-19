@@ -1,5 +1,7 @@
 import math
 
+from app.vision.attempts import AttemptLog
+
 
 def angle(a, b, c):
     """세 관절 좌표 사이의 각도 계산"""
@@ -26,8 +28,18 @@ class SquatCounter:
         self.down_frames = 0
         self.required_down_frames = 2
         self.rising_confirmed = False
+        # 무릎이 140°까지는 굽었지만 105°에 못 미친 동작 = 덜 앉은 시도
+        self.log = AttemptLog("squat_shallow", 140)
 
-    def update(self, landmarks):
+    @property
+    def attempts(self) -> int:
+        return self.log.attempts
+
+    @property
+    def events(self) -> list[dict]:
+        return self.log.events
+
+    def update(self, landmarks, timestamp_sec=None):
         sides = [
             (23, 25, 27),
             (24, 26, 28),
@@ -64,6 +76,7 @@ class SquatCounter:
             }
 
         knee_angle = sum(angles) / len(angles)
+        self.log.track(knee_angle, timestamp_sec, 155)
 
         if knee_angle < 105:
             self.down_frames += 1
@@ -79,10 +92,13 @@ class SquatCounter:
             self.down_frames = 0
 
             # 중간 각도를 거쳐 올라온 경우에만 집계
-            if self.stage == "down" and self.rising_confirmed:
+            counted = self.stage == "down" and self.rising_confirmed
+            if counted:
                 self.count += 1
                 self.stage = "up"
                 self.rising_confirmed = False
+            if counted or self.stage != "down":
+                self.log.complete(counted)
 
         else:
             self.down_frames = 0
