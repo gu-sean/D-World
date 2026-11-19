@@ -82,6 +82,9 @@ class VerificationMetrics(ApiModel):
     media_sha256: str | None = None
     flags: list[str] = Field(default_factory=list)
     issues: list[PoseIssue] = Field(default_factory=list)
+    # 인증이 안 됐을 때 다시 할 때 고칠 점 (app/vision/coaching.py, Gemini 또는 규칙 문장)
+    coaching_tips: list[str] = Field(default_factory=list)
+    coaching_source: str | None = None
 
 
 class AcceptedResponse(ApiModel):

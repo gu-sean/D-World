@@ -1,12 +1,44 @@
 
 from app.vision.squat import angle
 
+# 자세가 무너진 구간으로 보고할 최소 길이(초). 순간 흔들림은 빼고
+MIN_BAD_SECONDS = 1.0
+
+
+def _posture_kind(landmarks) -> str:
+    """엉덩이가 어깨~발목 선보다 아래면 처짐(sag), 위면 솟음(pike)."""
+    for shoulder, hip, ankle in ((11, 23, 27), (12, 24, 28)):
+        s, h, a = landmarks[shoulder], landmarks[hip], landmarks[ankle]
+        if min(getattr(p, "visibility", 1.0) for p in (s, h, a)) < 0.5 or a.x == s.x:
+            continue
+        line_y = s.y + (a.y - s.y) * (h.x - s.x) / (a.x - s.x)
+        if h.y > line_y + 0.015:
+            return "plank_sag"
+        if h.y < line_y - 0.015:
+            return "plank_pike"
+    return "plank_posture"
+
 
 class PlankCounter:
     def __init__(self):
         self.hold_seconds = 0.0
         self.stage = "not_detected"
         self.previous_time = None
+        self.events: list[dict] = []
+        self._bad: dict | None = None
+
+    def _close_bad(self, t: float) -> None:
+        if self._bad is not None and t - self._bad["start"] >= MIN_BAD_SECONDS:
+            self.events.append({
+                "code": self._bad["kind"],
+                "time": round(self._bad["start"], 1),
+                "end": round(t, 1),
+            })
+        self._bad = None
+
+    def finish(self, t: float) -> None:
+        """영상이 끝났을 때 열려 있는 구간을 닫는다."""
+        self._close_bad(t)
 
     def update(self, landmarks, timestamp_sec):
         # 어깨 - 엉덩이 - 발목
@@ -49,6 +81,7 @@ class PlankCounter:
 
         if not angles:
             self.stage = "not_detected"
+            self._close_bad(current_time)
             return {
                 "holdSeconds": round(self.hold_seconds, 2),
                 "stage": self.stage,
@@ -89,8 +122,15 @@ class PlankCounter:
         if body_angle >= 160 and horizontal:
             self.stage = "holding"
             self.hold_seconds += delta_time
+            self._close_bad(current_time)
         else:
             self.stage = "invalid_posture"
+            if horizontal and self.hold_seconds > 0:
+                # 엎드린 채로 몸이 꺾임 = 자세가 무너진 구간 (서거나 무릎 꿇고 쉬는 건 휴식이라 제외)
+                if self._bad is None:
+                    self._bad = {"start": current_time, "kind": _posture_kind(landmarks)}
+            else:
+                self._close_bad(current_time)
 
         return {
             "holdSeconds": round(self.hold_seconds, 2),

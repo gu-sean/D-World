@@ -121,16 +121,17 @@ def analyze(exercise_code, video_path):
                 )
                 current_time = timestamp_ms / 1000
 
-                if exercise_code == "plank":
-                    last_state = counter.update(landmarks, current_time)
-                else:
-                    last_state = counter.update(landmarks)
+                # 시각을 넘겨 동작마다 몇 초에 있었는지 기록한다(자세 피드백용)
+                last_state = counter.update(landmarks, current_time)
 
                 if last_state.get("detected"):
                     detected_frames += 1
 
     finally:
         capture.release()
+
+    if hasattr(counter, "finish"):
+        counter.finish(frame_index / fps)
 
     detection_ratio = (
         detected_frames / analyzed_frames
@@ -154,6 +155,12 @@ def analyze(exercise_code, video_path):
         )
     else:
         result["repCount"] = counter.count
+        result["attempts"] = getattr(counter, "attempts", None)
+
+    # 기준에 못 미친 동작·자세가 무너진 구간 (app/vision/feedback.py가 문장으로 바꾼다)
+    result["events"] = list(getattr(counter, "events", []))
+    # 동작마다 가장 깊은 각도·걸린 시간 (app/vision/coaching.py가 AI 코칭에 쓴다)
+    result["cycles"] = list(getattr(getattr(counter, "log", None), "cycles", []))
 
     # 사람을 안정적으로 감지하지 못했다면 검토 필요
     result["decision"] = "review_required"

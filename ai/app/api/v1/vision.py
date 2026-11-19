@@ -19,12 +19,15 @@ from app.schemas.contracts import (
     AcceptedResponse,
     ApiModel,
     CameraExercise,
+    PoseIssue,
     VerificationMetrics,
     VisionAnalysisCallback,
     VisionAnalysisRequest,
 )
 from app.storage import r2
+from app.vision.coaching import coaching_tips
 from app.vision.decision import Judgement, judge
+from app.vision.feedback import build_feedback
 from app.vision.media_registry import get_registry
 
 router = APIRouter(tags=["vision"], dependencies=[Depends(require_internal_token)])
@@ -88,16 +91,32 @@ def analyze_local(exercise: str, path: Path) -> dict:
 
 
 def metrics_for(
-    exercise: str, result: dict, sha: str | None = None, flags: list[str] | None = None
+    exercise: str,
+    result: dict,
+    sha: str | None = None,
+    flags: list[str] | None = None,
+    coaching: tuple[list[str], str] | None = None,
 ):
+    _, issues = build_feedback(result.get("events"))
+    rep_count = result.get("repCount")
+    invalid = [i for i in issues if not i["code"].startswith("plank_")]
     return VerificationMetrics(
         exercise_code=exercise,
-        rep_count=result.get("repCount"),
+        rep_count=rep_count,
+        # 기준을 채워 센 동작 / 시도했지만 기준에 못 미친 동작
+        valid_rep_count=rep_count,
+        invalid_rep_count=len(invalid) if rep_count is not None else None,
         hold_seconds=result.get("holdSeconds"),
         duration_seconds=result.get("durationSeconds"),
         person_detected=result.get("detectedFrames", 0) > 0,
         media_sha256=sha,
         flags=["algorithm_unverified", *(flags or [])],
+        issues=[
+            PoseIssue(code=i["code"], start_sec=i["startSec"], end_sec=i["endSec"])
+            for i in issues[:50]
+        ],
+        coaching_tips=coaching[0] if coaching else [],
+        coaching_source=coaching[1] if coaching and coaching[0] else None,
     )
 
 
@@ -186,8 +205,18 @@ def run_job(request: VisionAnalysisRequest, path: Path | None):
             callback.decision = verdict.decision
             callback.reason = verdict.reason
             callback.confidence = verdict.confidence
+            # 인증이 안 됐으면 다시 할 때 고칠 점 (Gemini, 실패 시 규칙 문장)
+            coaching = coaching_tips(
+                request.exercise_code,
+                request.target_value,
+                request.target_unit,
+                result,
+                verdict.decision,
+                verdict.reason,
+                verdict.flags,
+            )
             callback.metrics = metrics_for(
-                request.exercise_code, result, digest.hexdigest(), verdict.flags
+                request.exercise_code, result, digest.hexdigest(), verdict.flags, coaching
             )
             log.info(
                 "Vision judged record=%s exercise=%s decision=%s reps=%s hold=%s detection=%s",

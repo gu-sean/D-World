@@ -14,6 +14,8 @@
 
 from dataclasses import dataclass, field
 
+from app.vision.feedback import build_feedback
+
 # 서버·폰 시계 차이와 촬영 앱 전환 시간 여유 (초)
 RECORDING_GRACE_SECONDS = 15.0
 
@@ -108,27 +110,39 @@ def judge(
         )
     if achieved >= target_value:
         if ratio >= min_ratio:
-            return Judgement(
+            verdict = Judgement(
                 "approved",
                 f"목표 {goal} 중 {done}를 확인했어요.",
                 confidence,
             )
-        return Judgement(
-            "review_required",
-            f"{done}를 확인했지만 몸이 자주 가려져서 검토 후 알려 드릴게요.",
-            confidence,
-            ["low_detection"],
-        )
-    if achieved >= target_value * borderline:
-        return Judgement(
+        else:
+            verdict = Judgement(
+                "review_required",
+                f"{done}를 확인했지만 몸이 자주 가려져서 검토 후 알려 드릴게요.",
+                confidence,
+                ["low_detection"],
+            )
+    elif achieved >= target_value * borderline:
+        verdict = Judgement(
             "review_required",
             f"목표 {goal} 중 {done}를 확인했어요. 거의 다 와서 검토 후 알려 드릴게요.",
             confidence,
             ["near_target"],
         )
-    return Judgement(
-        "rejected",
-        f"목표 {goal} 중 {done}만 확인됐어요.",
-        confidence,
-        ["below_target"],
-    )
+    else:
+        verdict = Judgement(
+            "rejected",
+            f"목표 {goal} 중 {done}만 확인됐어요.",
+            confidence,
+            ["below_target"],
+        )
+    return _with_feedback(verdict, result)
+
+
+def _with_feedback(verdict: Judgement, result: dict) -> Judgement:
+    """세지 않은 동작·무너진 자세가 있으면 몇 번째·몇 초에 무엇이 부족했는지 사유에 덧붙인다."""
+    text, _ = build_feedback(result.get("events"))
+    if text:
+        verdict.reason = f"{verdict.reason} {text}"
+        verdict.flags.append("form_feedback")
+    return verdict

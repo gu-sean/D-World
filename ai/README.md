@@ -22,24 +22,27 @@ Copy-Item .env.example .env   # GEMINI_API_KEY, INTERNAL_API_TOKEN(백엔드와 
    ~~~powershell
    Invoke-WebRequest https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task -OutFile models\pose_landmarker_lite.task
    ~~~
-2. 로컬 저장소 MinIO (저장소 루트, Docker Desktop 필요): `docker compose --profile minio up -d minio`
-3. `ai/.env`
+2. 영상 저장소 — 기본은 **팀 Cloudflare R2 공용 버킷**(Docker 불필요).
+   `ai/.env`의 R2 값을 `backend/.env.supabase`의 R2 값과 같게 채운다(`.env.example` 참고).
    ~~~dotenv
    VISION_MEDIA_SOURCE=r2
    VISION_ENGINE=mediapipe
-   R2_ENDPOINT=http://localhost:9000
-   R2_ACCESS_KEY_ID=minioadmin
-   R2_SECRET_ACCESS_KEY=minioadmin
-   R2_BUCKET=dworld-dev
+   R2_ENDPOINT=                 # 비우면 R2_ACCOUNT_ID로 https://<id>.r2.cloudflarestorage.com
+   R2_ACCOUNT_ID=...
+   R2_ACCESS_KEY_ID=...
+   R2_SECRET_ACCESS_KEY=...
+   R2_BUCKET=d-world-dev
    ~~~
-4. 백엔드는 `backend/.env.minio`(STORAGE_DRIVER=r2 + 위 MinIO 값)를 마지막에 읽게 실행한다.
-   `.env.supabase`에 팀 R2 계정이 있어 순서가 중요하다.
+   백엔드는 `.env.supabase`(STORAGE_DRIVER=r2, 같은 버킷)까지 읽게 실행한다.
    ~~~powershell
-   node --env-file=.env --env-file=.env.supabase --env-file=.env.minio dist/main.js
+   node --env-file=.env --env-file=.env.supabase dist/main.js
    ~~~
-   백엔드 `.env`에는 `AI_SERVICE_URL=http://127.0.0.1:8001`, `BACKEND_PUBLIC_URL=http://localhost:3000`이 있어야 한다.
-5. 에뮬레이터: `adb reverse tcp:3000 tcp:3000`, `adb reverse tcp:9000 tcp:9000`(업로드). 실제 사람을 찍으려면
-   AVD `config.ini`에서 `hw.camera.back=webcam0`(노트북 웹캠).
+   로컬 MinIO를 쓰려면: `docker compose --profile minio up -d minio`, ai/.env에
+   `R2_ENDPOINT=http://localhost:9000`·`minioadmin`·`dworld-dev`, 백엔드는 `--env-file=.env.minio`를 마지막에 추가.
+3. 백엔드 `.env`에는 `AI_SERVICE_URL=http://127.0.0.1:8001`, `BACKEND_PUBLIC_URL=http://localhost:3000`,
+   ai/.env와 같은 `INTERNAL_API_TOKEN`이 있어야 한다.
+4. 에뮬레이터·폰(USB): `adb reverse tcp:3000 tcp:3000`, `adb reverse tcp:9000 tcp:9000`(업로드),
+   `adb reverse tcp:8081 tcp:8081`(Metro). 에뮬레이터로 실제 사람을 찍으려면 AVD `config.ini`에서 `hw.camera.back=webcam0`.
 
 ## 기능
 
@@ -67,6 +70,13 @@ Copy-Item .env.example .env   # GEMINI_API_KEY, INTERNAL_API_TOKEN(백엔드와 
 관리자 판정 기준 `rules_json`의 `minDetectionRatio`·`rejectDetectionRatio`·`borderlineRatio`로 값을 바꿀 수 있다.
 `VISION_AUTO_DECISION=false`면 모두 관리자 검토(부정 플래그는 그대로 표시).
 각 운동 카운터의 각도 기준값은 실제 영상으로 아직 보정 전이다(`algorithm_unverified` 플래그).
+푸쉬업만 실제 폰 영상으로 한 번 조정했다(위 자세 115° 이상, 아래 106° 이하).
+
+- **자세 피드백** (`attempts.py`, `feedback.py`): 기준까지 못 내려간 동작·무너진 플랭크 자세를 몇 번째·몇 초인지
+  판정 사유에 덧붙이고 `metrics.issues`로 보낸다(`form_feedback` 플래그).
+- **AI 코칭** (`coaching.py`): 승인되지 않으면 분석 수치(동작별 가장 깊은 각도·걸린 시간, 감지 비율 — 영상은 보내지 않음)로
+  Gemini가 '다시 할 때 고칠 점' 2~4개를 쓴다 → `metrics.coachingTips`, `metrics.coachingSource`(gemini|rule).
+  Gemini가 실패하면 규칙 문장. 앱은 다시 찍기 화면(VerifyRetryGuideScreen)에서 보여 준다.
 
 ### 재조정 검증 (I06)
 
@@ -78,10 +88,12 @@ Copy-Item .env.example .env   # GEMINI_API_KEY, INTERNAL_API_TOKEN(백엔드와 
 
 | 키 | 기본값 | 뜻 |
 |---|---|---|
-| `LLM_MAX_REQUESTS_PER_MINUTE` / `_PER_DAY` | 5 / 100 | Gemini 호출 한도(재시도 포함, KST 자정 초기화). 넘으면 동기 API 429 `AI_LLM_QUOTA_EXCEEDED`, 백그라운드 작업은 최대 3분 대기 |
+| `LLM_MAX_REQUESTS_PER_MINUTE` / `_PER_DAY` | 15 / 500 (.env.example) | Gemini 호출 한도(재시도 포함, KST 자정 초기화). 넘으면 동기 API 429 `AI_LLM_QUOTA_EXCEEDED`, 백그라운드 작업은 최대 3분 대기 |
 | `GEMINI_MAX_OUTPUT_TOKENS` | 16384 | 응답 길이 한도. 잘리면 `LlmTruncatedError` |
 | `LLM_DIFFICULTY_MODE` | chain | `single`이면 난이도 추천을 Gemini 1회로(측정: chain 약 6초, single 약 3.4초) |
 | `VISION_AUTO_DECISION` | true | 영상 자동 승인·반려 |
+| `VISION_AI_COACHING` | true | 인증 실패 시 Gemini 코칭(false면 규칙 문장만) |
+| `LLM_PLAN_LOCAL_FALLBACK` | true (.env.example) | Gemini 계획 실패(503 등) 시 규칙 계획으로 대체 |
 | `MEDIA_REGISTRY_PATH` | data/media_registry.sqlite3 | 제출 영상 지문 기록 |
 
 비동기 작업 접수 기록(`app/core/job_ledger.py`)은 끝난 작업을 6시간 뒤 또는 1000건이 차면 지운다(진행 중 작업은 유지).
@@ -93,4 +105,5 @@ Copy-Item .env.example .env   # GEMINI_API_KEY, INTERNAL_API_TOKEN(백엔드와 
 .\.venv\Scripts\python.exe -m pytest tests -q -o asyncio_default_fixture_loop_scope=function
 ~~~
 
-`tests/`: 화면 비율 보정·푸쉬업 자세, 판정 규칙, 호출 한도, 작업 기록, 영상 지문, 재조정 검증.
+`tests/`: 화면 비율 보정·푸쉬업 자세, 판정 규칙, 호출 한도, 작업 기록, 영상 지문, 재조정 검증,
+규칙 계획(루틴·세트·러닝 km), 자세 피드백, AI 코칭.
