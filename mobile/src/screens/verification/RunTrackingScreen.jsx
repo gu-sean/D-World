@@ -22,7 +22,6 @@ import {
   ProgressBar,
   Screen,
 } from '../../components';
-import goHome from '../../navigation/goHome';
 import Routes from '../../navigation/routes';
 import { colors, radius, spacing, typography } from '../../theme';
 import RunRoute from './RunRoute';
@@ -136,7 +135,7 @@ export default function RunTrackingScreen({ navigation, route }) {
           <Text style={styles.description}>끝나면 알림으로 알려 드릴게요.</Text>
         </View>
         <View style={styles.footer}>
-          <Button title="홈으로" onPress={() => goHome(navigation)} full />
+          <Button title="홈으로" onPress={() => navigation.navigate(Routes.HOME_TAB)} full />
         </View>
       </Screen>
     );

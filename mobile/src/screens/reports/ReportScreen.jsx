@@ -1,8 +1,7 @@
 // REPORT-01 리포트 (리포트 탭)
 //
-// 고른 기간(주·월·전체)의 성적표다. 위에서부터 달성률 요약,
-// (주간이면) 요일별 완료 막대 / (월간이면) 날짜별 달성 잔디 달력 / (전체면) 누적 기록,
-// 분야별 진행, AI 인사이트, 다음 주 제안 순으로 보여 준다.
+// 고른 기간(주·월·전체)의 성적표다. 위에서부터 달성률 요약, 분야별 진행,
+// AI 인사이트, 다음 주 제안 순으로 보여 준다.
 //
 // 분야 필터를 바꿔도 분야별 진행 막대는 항상 세 분야를 모두 보여 준다 —
 // 서버가 그렇게 내려 주기 때문이다. 오른쪽 위 달력 버튼으로 월별 보기로 간다.
@@ -14,7 +13,6 @@ import {
   Button,
   Card,
   Icon,
-  LifetimeStats,
   OptionRow,
   ProgressBar,
   ProgressRing,
@@ -22,8 +20,6 @@ import {
   Screen,
   SectionTitle,
   SegmentedControl,
-  MonthlyHeatmap,
-  WeeklyBarChart,
 } from '../../components';
 import Routes from '../../navigation/routes';
 import { categoryStyle, colors, radius, spacing, typography } from '../../theme';
@@ -136,39 +132,6 @@ export default function ReportScreen({ navigation }) {
                   </Text>
                   <Text style={styles.summarySub}>{summary.streakDays}일 연속 달성</Text>
                 </View>
-              </Card>
-            )}
-
-            {period === 'week' && (
-              <Card>
-                <WeeklyBarChart
-                  startDate={summary.periodStart}
-                  endDate={summary.periodEnd}
-                  onMissionPress={(mission) =>
-                    navigation.navigate(Routes.MISSION_DETAIL, { missionId: mission.id })
-                  }
-                />
-              </Card>
-            )}
-
-            {period === 'month' && (
-              <Card>
-                <MonthlyHeatmap
-                  month={summary.periodStart.slice(0, 7)}
-                  onMissionPress={(mission) =>
-                    navigation.navigate(Routes.MISSION_DETAIL, { missionId: mission.id })
-                  }
-                />
-              </Card>
-            )}
-
-            {period === 'all' && (
-              <Card>
-                <LifetimeStats
-                  completedMissionCount={summary.completedMissionCount}
-                  // 연속 기록·포인트·업적 화면은 '마이' 탭 안에 있어 탭을 거쳐 연다 (linking.js와 같은 방식)
-                  onNavigate={(route) => navigation.navigate(Routes.MY_TAB, { screen: route })}
-                />
               </Card>
             )}
 

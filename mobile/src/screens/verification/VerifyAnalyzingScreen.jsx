@@ -17,7 +17,6 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { useCameraVerification, useMe } from '../../client';
 import { Button, ErrorBanner, Icon, ProgressRing, Screen } from '../../components';
-import goHome from '../../navigation/goHome';
 import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
 
@@ -68,7 +67,7 @@ export default function VerifyAnalyzingScreen({ navigation, route }) {
           </Text>
         </View>
         <View style={styles.footer}>
-          <Button title="홈으로" onPress={() => goHome(navigation)} full />
+          <Button title="홈으로" onPress={() => navigation.navigate(Routes.HOME_TAB)} full />
         </View>
       </Screen>
     );
