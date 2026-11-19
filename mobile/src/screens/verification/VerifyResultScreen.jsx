@@ -29,6 +29,17 @@ import { STATUS_TONE } from '../../components/StatusTag';
 import Routes from '../../navigation/routes';
 import { colors, radius, spacing, typography } from '../../theme';
 
+/** AI가 보낸 자세 문제 코드 → 화면 문구 (ai/app/vision/feedback.py와 같은 코드) */
+const ISSUE_LABELS = {
+  push_up_shallow: '팔을 덜 굽혔어요',
+  squat_shallow: '덜 앉았어요',
+  lunge_shallow: '무릎을 덜 굽혔어요',
+  burpee_no_plank: '엎드리는 동작을 건너뛰었어요',
+  plank_sag: '엉덩이가 처졌어요',
+  plank_pike: '엉덩이가 너무 올라갔어요',
+  plank_posture: '몸이 일자에서 벗어났어요',
+};
+
 /** 측정값 중 사람이 읽을 만한 것만 골라 줄로 만든다. */
 function metricRows(metrics) {
   if (!metrics) return [];
@@ -138,12 +149,18 @@ export default function VerifyResultScreen({ navigation, route }) {
                 {(result?.metrics?.issues ?? []).length > 0 && (
                   <Card style={styles.issues}>
                     <Text style={styles.metricsLabel}>자세를 확인해 볼 구간</Text>
-                    {result.metrics.issues.map((issue, index) => (
-                      <Text key={`${issue.code}-${index}`} style={styles.issue}>
-                        {format.formatDuration(Math.round(issue.startSec))} ~{' '}
-                        {format.formatDuration(Math.round(issue.endSec))}
-                      </Text>
-                    ))}
+                    {result.metrics.issues.map((issue, index) => {
+                      const start = format.formatDuration(Math.round(issue.startSec));
+                      const end = format.formatDuration(Math.round(issue.endSec));
+                      // 동작 하나(시작=끝)는 그 시각만, 구간(플랭크)은 시작~끝
+                      const when = start === end ? start : `${start} ~ ${end}`;
+                      const label = ISSUE_LABELS[issue.code];
+                      return (
+                        <Text key={`${issue.code}-${index}`} style={styles.issue}>
+                          {label ? `${when} · ${label}` : when}
+                        </Text>
+                      );
+                    })}
                   </Card>
                 )}
 

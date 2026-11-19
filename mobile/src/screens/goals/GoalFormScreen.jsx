@@ -153,22 +153,17 @@ export default function GoalFormScreen({ navigation, route }) {
     [difficulties.data],
   );
 
+  // 사용자가 고른 난이도를 그대로 쓴다. 에이전트 추천은 위 안내 칸에 참고로만 다시 보여 준다(덮어쓰지 않음).
   const chooseDifficulty = (requestedDifficultyCode) => {
     set('difficultyCode')(requestedDifficultyCode);
-    difficultyRecommendation.mutate(
-      {
-        mode: 'manual',
-        requestedDifficultyCode,
-        targetFrequency: form.targetFrequency ? Number(form.targetFrequency) : undefined,
-        dailyAvailableMinutes: form.dailyAvailableMinutes
-          ? Number(form.dailyAvailableMinutes)
-          : undefined,
-      },
-      {
-        onSuccess: (result) =>
-          setForm((prev) => ({ ...prev, difficultyCode: result.recommendedDifficultyCode })),
-      },
-    );
+    difficultyRecommendation.mutate({
+      mode: 'manual',
+      requestedDifficultyCode,
+      targetFrequency: form.targetFrequency ? Number(form.targetFrequency) : undefined,
+      dailyAvailableMinutes: form.dailyAvailableMinutes
+        ? Number(form.dailyAvailableMinutes)
+        : undefined,
+    });
   };
 
   const persistGoal = (mode, difficultyCode) => {
@@ -198,28 +193,21 @@ export default function GoalFormScreen({ navigation, route }) {
     );
   };
 
+  // 등록은 사용자가 고른 난이도로 바로 한다(에이전트를 다시 부르지 않아 기다림도 없다).
   const submit = (mode) => {
     setPlanMode(mode);
-    difficultyRecommendation.mutate(
-      {
-        mode: aiRecommended ? 'ai_recommendation' : 'manual',
-        requestedDifficultyCode: form.difficultyCode,
-        targetFrequency: form.targetFrequency ? Number(form.targetFrequency) : undefined,
-        dailyAvailableMinutes: form.dailyAvailableMinutes
-          ? Number(form.dailyAvailableMinutes)
-          : undefined,
-      },
-      {
-        onSuccess: (result) => {
-          setForm((current) => ({
-            ...current,
-            difficultyCode: result.recommendedDifficultyCode,
-          }));
-          persistGoal(mode, result.recommendedDifficultyCode);
-        },
-      },
+    persistGoal(
+      mode,
+      form.difficultyCode ?? difficultyRecommendation.data?.recommendedDifficultyCode ?? 'normal',
     );
   };
+
+  const DIFFICULTY_RANK = { easy: 0, normal: 1, hard: 2 };
+  const recommendedCode = difficultyRecommendation.data?.recommendedDifficultyCode;
+  const aboveRecommendation =
+    !!recommendedCode &&
+    !!form.difficultyCode &&
+    DIFFICULTY_RANK[form.difficultyCode] > DIFFICULTY_RANK[recommendedCode];
 
   const mutation = editing ? updateGoal : createGoal;
 
@@ -229,7 +217,8 @@ export default function GoalFormScreen({ navigation, route }) {
       onBack={() => navigation.goBack()}
       padded={false}>
       <FormScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <ErrorBanner error={mutation.error ?? difficultyRecommendation.error} />
+        {/* 에이전트 추천은 참고용이라 실패해도 오류로 막지 않는다 */}
+        <ErrorBanner error={mutation.error} />
 
         {aiRecommended && (
           <View style={styles.aiPreset}>
@@ -281,6 +270,7 @@ export default function GoalFormScreen({ navigation, route }) {
             </Text>
             <Text style={styles.aiHintText}>{difficultyRecommendation.data.reason}</Text>
             <Text style={styles.agentChain}>프로필 분석 → 최근 수행 기록 → 안전 검토</Text>
+            <Text style={styles.aiHintText}>참고용 추천이에요. 난이도는 아래에서 직접 고를 수 있어요.</Text>
           </View>
         )}
 
@@ -290,6 +280,11 @@ export default function GoalFormScreen({ navigation, route }) {
           value={form.difficultyCode}
           onChange={chooseDifficulty}
         />
+        {aboveRecommendation && (
+          <Text style={styles.difficultyWarning}>
+            에이전트 권장보다 높은 난이도예요. 무리하지 말고 컨디션에 맞춰 조절해 주세요.
+          </Text>
+        )}
 
         {editing ? (
           <View style={styles.lockedField}>
@@ -329,7 +324,7 @@ export default function GoalFormScreen({ navigation, route }) {
             <Button
               title="저장"
               onPress={() => submit()}
-              loading={mutation.isPending || difficultyRecommendation.isPending}
+              loading={mutation.isPending}
               disabled={!ready}
               full
             />
@@ -342,9 +337,7 @@ export default function GoalFormScreen({ navigation, route }) {
               <Button
                 title="만들고 AI 계획 받기"
                 onPress={() => submit('ai')}
-                loading={
-                  (mutation.isPending || difficultyRecommendation.isPending) && planMode === 'ai'
-                }
+                loading={mutation.isPending && planMode === 'ai'}
                 disabled={!ready || mutation.isPending}
                 full
               />
@@ -352,10 +345,7 @@ export default function GoalFormScreen({ navigation, route }) {
                 title="만들고 직접 계획 짜기"
                 variant="secondary"
                 onPress={() => submit('manual')}
-                loading={
-                  (mutation.isPending || difficultyRecommendation.isPending) &&
-                  planMode === 'manual'
-                }
+                loading={mutation.isPending && planMode === 'manual'}
                 disabled={!ready || mutation.isPending}
                 full
               />
@@ -388,4 +378,5 @@ const styles = StyleSheet.create({
   aiHintTitle: { ...typography.bodyStrong, color: colors.primary },
   aiHintText: { ...typography.caption, color: colors.textSub },
   agentChain: { ...typography.caption, color: colors.primary, fontWeight: '600' },
+  difficultyWarning: { ...typography.caption, color: colors.warning, marginTop: -spacing.xs },
 });

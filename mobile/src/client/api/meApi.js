@@ -20,12 +20,16 @@ export function updateProfile(input) {
   return request({ method: 'PATCH', path: '/me/profile', body: input });
 }
 
+/** 난이도 추천은 Gemini 에이전트를 거쳐 기본 15초보다 오래 걸릴 수 있다 */
+export const DIFFICULTY_TIMEOUT_MS = 45000;
+
 /** 신체정보·최근 수행률을 세 에이전트가 차례로 검토해 난이도를 추천한다. */
 export function recommendDifficulty(input) {
   return request({
     method: 'POST',
     path: '/me/difficulty-recommendations',
     body: input,
+    timeoutMs: DIFFICULTY_TIMEOUT_MS,
   });
 }
 

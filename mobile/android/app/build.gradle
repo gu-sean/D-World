@@ -128,4 +128,9 @@ dependencies {
 }
 
 // 푸시(FCM): google-services.json을 읽는다(파일은 커밋하지 않는다)
-apply plugin: "com.google.gms.google-services"
+// 파일이 없는 PC에서도 빌드되게, 있을 때만 적용한다(없으면 푸시만 빠지고 앱은 그대로 동작)
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+} else {
+    logger.warn("google-services.json not found: building without FCM push")
+}
