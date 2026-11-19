@@ -11,6 +11,8 @@ import {
 import { DatabaseService } from '../../database/database.service.js';
 import { MediaService } from '../../media/media.service.js';
 import { DecisionService } from '../decision.service.js';
+import { loadRunFile } from '../run-rules/run-rule-judge.js';
+import { buildRunRoute } from '../run-rules/run-route.js';
 
 const num = (value) => Number(value);
 
@@ -117,6 +119,43 @@ export class AdminReviewService {
         count.rows[0].n,
       ),
     };
+  }
+
+  /**
+   * 러닝 회차의 경로 그림 데이터: 원본 파일(sensor_raw)의 GPS 점을 판정과 같은 규칙으로 걸러
+   * 경로·탈것 의심 구간·이동거리 표시로 돌려준다. 저장하지 않고 요청 때마다 계산한다.
+   */
+  async getRoute(recordId) {
+    const { rows: records } = await this.database.query(
+      'SELECT id FROM mission_records WHERE id = $1',
+      [recordId],
+    );
+    if (!records[0]) throw recordNotFound();
+    const { rows: files } = await this.database.query(
+      `SELECT id FROM media_files
+        WHERE record_id = $1 AND media_kind = 'sensor_raw' AND upload_status = 'uploaded'
+        ORDER BY created_at DESC LIMIT 1`,
+      [recordId],
+    );
+    if (!files[0]) {
+      throw new AppException(
+        HttpStatus.NOT_FOUND,
+        'route_not_available',
+        '이 회차에는 러닝 기록 파일이 없음',
+      );
+    }
+    const { url } = await this.media.signedUrlForAdmin(files[0].id);
+    let runFile;
+    try {
+      runFile = await loadRunFile({ url });
+    } catch (error) {
+      throw new AppException(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'route_file_unreadable',
+        `러닝 기록 파일을 읽을 수 없음: ${error.message}`,
+      );
+    }
+    return { recordId, ...buildRunRoute(runFile) };
   }
 
   /** 회차 상세: 미션 조건, 판정 이력 전체, 이의 제기, 증거 파일의 조회용 URL(짧은 유효 시간) */

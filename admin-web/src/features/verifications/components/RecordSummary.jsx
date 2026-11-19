@@ -5,6 +5,7 @@ import { StatusTag } from '../../../components/StatusTag.jsx';
 import EvidenceViewer from './EvidenceViewer.jsx';
 import { formatConfidence, formatTarget, METHOD_LABEL } from './format.js';
 import MetricsTable from './MetricsTable.jsx';
+import RunRouteImage from './RunRouteImage.jsx';
 import { t } from '../../../i18n/index.js';
 
 const resultColumns = [
@@ -94,6 +95,13 @@ export default function RecordSummary({ record }) {
         <Typography.Title level={5}>{t('증거 파일')}</Typography.Title>
         <EvidenceViewer files={record.files} duplicateOfMediaId={record.duplicateOfMediaId} />
       </div>
+
+      {mission.verificationMethod === 'sensor' && (
+        <div>
+          <Typography.Title level={5}>{t('러닝 경로')}</Typography.Title>
+          <RunRouteImage recordId={record.recordId} />
+        </div>
+      )}
 
       <div>
         <Typography.Title level={5}>{t('판정 이력과 측정값')}</Typography.Title>

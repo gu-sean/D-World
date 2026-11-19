@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Card, Descriptions, message, Typography } from 'antd';
+import { Button, Card, Descriptions, Typography } from 'antd';
+import { message } from '../../../lib/message.jsx';
 import { Link, useParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { DateText } from '../../../components/DateText.jsx';

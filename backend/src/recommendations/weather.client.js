@@ -1,6 +1,7 @@
 import { Dependencies, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { fetchKmaWeatherByGrid, toGrid } from './kma-weather.js';
+import { sidoOf } from './korea-regions.js';
 import { WeatherStoreService } from './weather-store.service.js';
 
 export const WEATHER_TIMEOUT_MS = 5000;
@@ -64,6 +65,22 @@ export class WeatherClient {
     this.fetchImpl = (...args) => globalThis.fetch(...args);
   }
 
+  /**
+   * 회원의 날씨 지역(격자·시도)을 기억한다: 날씨 알림이 어느 지역 날씨를 볼지 정하는 데 쓴다.
+   * 좌표는 격자·시도로 바꾸는 데만 쓰고 저장하지 않는다. 실패해도 추천에는 영향이 없다.
+   */
+  async rememberRegion(userId, { latitude, longitude }) {
+    if (latitude === undefined || longitude === undefined) return;
+    const grid = toGrid(latitude, longitude);
+    const sido = sidoOf(latitude, longitude);
+    if (!grid || !sido) return;
+    try {
+      await this.store.saveUserRegion(userId, { ...grid, sido });
+    } catch (error) {
+      this.logger.warn(`날씨 지역 기록 실패: ${error?.name ?? 'error'}`);
+    }
+  }
+
   /** @returns {Promise<{weather: string, temperatureC: number}|null>} */
   async current({ latitude, longitude }) {
     const driver = this.config.get('WEATHER_DRIVER');
@@ -108,7 +125,7 @@ export class WeatherClient {
     const grid = toGrid(latitude, longitude);
     if (!grid) return null;
     try {
-      await this.store.touchCell(grid);
+      await this.store.touchCell(grid, sidoOf(latitude, longitude));
       const stored = await this.store.latest(grid);
       if (stored) return stored;
       const fetched = await fetchKmaWeatherByGrid({

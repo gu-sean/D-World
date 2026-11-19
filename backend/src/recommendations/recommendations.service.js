@@ -229,6 +229,8 @@ export class RecommendationsService {
    * 읽기 → (AI 호출은 트랜잭션 밖) → 저장 순서. 좌표는 날씨 조회에만 쓰고 저장하지 않는다.
    */
   async request(userId, input) {
+    // 날씨 알림용 지역(격자·시도만, 좌표는 저장하지 않음)
+    await this.weather.rememberRegion(userId, input);
     const context = await this.buildContext(input);
     await this.assertNotRateLimited(this.database, userId);
 

@@ -15,6 +15,7 @@ import { NoticeDeliveryService } from '../notices/notice-delivery.service.js';
 import { AiReportsService } from '../ai-analysis/ai-reports.service.js';
 import { PlanAdjustmentRunsService } from '../ai-analysis/plan-adjustment-runs.service.js';
 import { AiDispatchService } from '../verification/ai/ai-dispatch.service.js';
+import { WeatherAdviceService } from '../recommendations/weather-advice.service.js';
 import { WeatherCollectorService } from '../recommendations/weather-collector.service.js';
 import { WeatherStoreService } from '../recommendations/weather-store.service.js';
 
@@ -48,6 +49,7 @@ const MIN = 60 * SEC;
   PlanAdjustmentRunsService,
   WeatherCollectorService,
   WeatherStoreService,
+  WeatherAdviceService,
 )
 export class JobsService {
   logger = new Logger(JobsService.name);
@@ -73,6 +75,7 @@ export class JobsService {
     planAdjustments,
     weatherCollector,
     weatherStore,
+    weatherAdvice,
   ) {
     this.storage = storage;
     this.config = config;
@@ -155,10 +158,16 @@ export class JobsService {
         run: () => this.cleanupAssetUploads(),
       },
       {
-        // 최근 요청된 격자의 날씨를 매시간 한 번씩 저장(10분마다 확인, 이미 수집한 격자는 건너뜀)
+        // 매시간: 회원 지역·기본 지역(서울)의 날씨와 시도별 미세먼지를 수집하고, 야외 활동이 어려운 날씨면
+        // 오늘 러닝 미션이 있는 회원에게 수정 권유 알림을 보낸다(알림은 하루 한 번, 06~22시)
         name: 'weather-collect',
-        everyMs: 10 * MIN,
-        run: () => weatherCollector.collect(),
+        everyMs: 60 * MIN,
+        run: async () => {
+          await weatherCollector.trackRegions();
+          const collected = await weatherCollector.collect();
+          const advice = await weatherAdvice.run();
+          return { ...collected, advice };
+        },
       },
       {
         name: 'weather-purge',

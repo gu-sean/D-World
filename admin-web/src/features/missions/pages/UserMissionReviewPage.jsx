@@ -1,6 +1,7 @@
 // ADM-16 사용자 미션 검수
 import { useState } from 'react';
-import { Button, message, Space, Typography } from 'antd';
+import { Button, Space, Typography } from 'antd';
+import { message } from '../../../lib/message.jsx';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';

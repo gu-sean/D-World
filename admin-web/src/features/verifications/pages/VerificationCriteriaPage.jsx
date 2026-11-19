@@ -1,6 +1,7 @@
 // ADM-10 Verification criteria: versions are append-only, so "edit" means "add a new version"
 import { useState } from 'react';
-import { Button, DatePicker, Form, message, Modal, Select, Space, Typography } from 'antd';
+import { Button, DatePicker, Form, Modal, Select, Space, Typography } from 'antd';
+import { message } from '../../../lib/message.jsx';
 import dayjs from 'dayjs';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';

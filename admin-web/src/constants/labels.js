@@ -110,8 +110,9 @@ export const labels = {
   // verification_appeals.status
   verificationAppealStatus: {
     open: { text: t('접수'), color: 'processing' },
-    accepted: { text: t('인정(판정 변경)'), color: 'success' },
-    rejected: { text: t('기각(판정 유지)'), color: 'error' },
+    // 처리하면 '완료'로 보이고, 결과(인정/기각)는 괄호로 함께 알려 준다
+    accepted: { text: t('완료(이의 인정)'), color: 'success' },
+    rejected: { text: t('완료(기각)'), color: 'default' },
   },
   // point_transactions.kind
   pointTransactionKind: {
@@ -238,6 +239,11 @@ export const labels = {
     verification: { text: t('인증'), color: 'default' },
     points: { text: t('포인트'), color: 'default' },
     challenge: { text: t('챌린지'), color: 'default' },
+    // user_reports.category
+    abuse: { text: t('욕설·괴롭힘'), color: 'default' },
+    inappropriate_content: { text: t('부적절한 내용'), color: 'default' },
+    cheating: { text: t('부정행위'), color: 'default' },
+    impersonation: { text: t('사칭'), color: 'default' },
     other: { text: t('기타'), color: 'default' },
   },
   // support_ticket_resolutions.outcome

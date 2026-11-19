@@ -1,91 +1,22 @@
-// ADM-24 Point policies: monthly cap and mission reward table
+// ADM-24 Point policies: daily limit (read-only, app rules) and mission reward table
 import { useState } from 'react';
-import { Button, DatePicker, Form, InputNumber, Select, Table, Tabs, Typography } from 'antd';
+import { Button, Collapse, Form, InputNumber, Select, Table, Tabs, Typography } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
 import { EffectiveAtItem } from '../components/EffectiveAtItem.jsx';
+import { DailyLimitRules } from '../components/GameRulesCards.jsx';
+import { GAME_RULES } from '../components/gameRules.js';
 import { toIso } from '../components/helpers.js';
 import { MAX_POINTS } from '../components/labels.js';
 import { useConfirmedChange } from '../components/useConfirmedChange.jsx';
 import {
   useCategories,
-  useCreatePointCap,
   useCreateRewardRate,
   useDifficultyLevels,
-  usePointCaps,
   useRewardRates,
 } from '../queries.js';
 import { t } from '../../../i18n/index.js';
-
-function MonthlyCapTab() {
-  const [form] = Form.useForm();
-  const list = usePointCaps();
-  const create = useCreatePointCap();
-  const [ask, modal] = useConfirmedChange();
-
-  const onFinish = ({ month, monthlyLimitPoints }) =>
-    ask({
-      title: t('새 월 한도를 저장할까요?'),
-      summary: `${month.format('YYYY-MM')} · ${monthlyLimitPoints.toLocaleString()} P`,
-      run: ({ reason, idempotencyKey }) =>
-        create.mutateAsync({
-          payload: { effectiveMonth: month.format('YYYY-MM-01'), monthlyLimitPoints, reason },
-          idempotencyKey,
-        }),
-      onDone: () => form.resetFields(),
-    });
-
-  return (
-    <>
-      {modal}
-      <QueryBoundary query={list}>
-        {({ items }) =>
-          items.length === 0 ? (
-            <StatePanel type="empty" />
-          ) : (
-            <Table
-              rowKey="id"
-              pagination={false}
-              dataSource={items}
-              columns={[
-                { title: t('적용 월'), dataIndex: 'effectiveMonth', render: (m) => m?.slice(0, 7) },
-                {
-                  title: t('월 한도'),
-                  dataIndex: 'monthlyLimitPoints',
-                  align: 'right',
-                  render: (n) => `${n.toLocaleString()} P`,
-                },
-              ]}
-            />
-          )
-        }
-      </QueryBoundary>
-      <Typography.Title level={5} style={{ marginTop: 24 }}>
-        {t('새 월 한도 추가')}
-      </Typography.Title>
-      <Form form={form} layout="vertical" style={{ maxWidth: 420 }} onFinish={onFinish}>
-        <Form.Item
-          name="month"
-          label={t('적용 월')}
-          rules={[{ required: true, message: t('적용 월을 선택해 주세요.') }]}
-        >
-          <DatePicker picker="month" />
-        </Form.Item>
-        <Form.Item
-          name="monthlyLimitPoints"
-          label={t('월 한도')}
-          rules={[{ required: true, message: t('월 한도를 입력해 주세요.') }]}
-        >
-          <InputNumber min={0} max={MAX_POINTS} precision={0} suffix="P" />
-        </Form.Item>
-        <Button type="primary" htmlType="submit">
-          {t('저장')}
-        </Button>
-      </Form>
-    </>
-  );
-}
 
 function RewardRateTab() {
   const [form] = Form.useForm();
@@ -154,38 +85,78 @@ function RewardRateTab() {
           />
         </Form.Item>
       </Form>
+      <Typography.Paragraph type="secondary">
+        {t(
+          '앱 기준: 모든 분야·난이도의 세부 미션 1회는 {0} P · 펫 XP {1}이에요(하루 포인트 한도 {2} P). 새 버전은 이후에 만드는 미션부터 적용돼요.',
+          GAME_RULES.missionPoints,
+          GAME_RULES.missionPetXp,
+          GAME_RULES.dailyPointLimit,
+        )}
+      </Typography.Paragraph>
       <QueryBoundary query={list}>
-        {(items) =>
-          items.length === 0 ? (
-            <StatePanel type="empty" />
-          ) : (
-            <Table
-              rowKey="id"
-              pagination={false}
-              dataSource={items}
-              columns={[
-                {
-                  title: t('분야'),
-                  dataIndex: 'categoryId',
-                  render: (id) => nameOf(categories.data, id),
-                },
-                {
-                  title: t('난이도'),
-                  dataIndex: 'difficultyId',
-                  render: (id) => nameOf(difficulties.data, id),
-                },
-                { title: t('버전'), dataIndex: 'versionNo', render: (v) => `v${v}` },
-                { title: t('포인트'), dataIndex: 'points', align: 'right' },
-                { title: t('펫 XP'), dataIndex: 'petXp', align: 'right' },
-                {
-                  title: t('시행 시각'),
-                  dataIndex: 'effectiveAt',
-                  render: (value) => <DateText value={value} />,
-                },
-              ]}
-            />
-          )
-        }
+        {(items) => {
+          if (items.length === 0) return <StatePanel type="empty" />;
+          // 시행 시각 내림차순: 분야·난이도마다 이미 시행된 첫 버전이 '현재 적용 중', 나머지는 이력
+          const now = Date.now();
+          const seen = new Set();
+          const current = [];
+          const history = [];
+          for (const row of items) {
+            const key = `${row.categoryId}:${row.difficultyId}`;
+            if (!seen.has(key) && new Date(row.effectiveAt).getTime() <= now) {
+              seen.add(key);
+              current.push(row);
+            } else {
+              history.push(row);
+            }
+          }
+          const columns = [
+            {
+              title: t('분야'),
+              dataIndex: 'categoryId',
+              render: (id) => nameOf(categories.data, id),
+            },
+            {
+              title: t('난이도'),
+              dataIndex: 'difficultyId',
+              render: (id) => nameOf(difficulties.data, id),
+            },
+            { title: t('버전'), dataIndex: 'versionNo', render: (v) => `v${v}` },
+            { title: t('포인트'), dataIndex: 'points', align: 'right' },
+            { title: t('펫 XP'), dataIndex: 'petXp', align: 'right' },
+            {
+              title: t('시행 시각'),
+              dataIndex: 'effectiveAt',
+              render: (value) => <DateText value={value} />,
+            },
+          ];
+          return (
+            <>
+              <Typography.Title level={5}>{t('현재 적용 중')}</Typography.Title>
+              <Table rowKey="id" pagination={false} dataSource={current} columns={columns} />
+              {history.length > 0 && (
+                <Collapse
+                  ghost
+                  style={{ marginTop: 8 }}
+                  items={[
+                    {
+                      key: 'history',
+                      label: t('이전·예정 버전 이력 ({0})', history.length),
+                      children: (
+                        <Table
+                          rowKey="id"
+                          pagination={false}
+                          dataSource={history}
+                          columns={columns}
+                        />
+                      ),
+                    },
+                  ]}
+                />
+              )}
+            </>
+          );
+        }}
       </QueryBoundary>
       <Typography.Title level={5} style={{ marginTop: 24 }}>
         {t('새 보상표 버전 추가')}
@@ -225,7 +196,7 @@ export default function PointPolicyPage() {
       </Typography.Paragraph>
       <Tabs
         items={[
-          { key: 'cap', label: t('월간 한도'), children: <MonthlyCapTab /> },
+          { key: 'daily', label: t('하루 한도'), children: <DailyLimitRules /> },
           { key: 'rates', label: t('미션 보상표'), children: <RewardRateTab /> },
         ]}
       />

@@ -20,42 +20,38 @@ export function weekDates(date) {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 }
 
-/** 현재 KST 시(0~23) */
-export function kstHour(at = new Date()) {
-  return (at.getUTCHours() + 9) % 24;
+/** 한국 날짜(YYYY-MM-DD)의 요일: 1=월 … 7=일 */
+export function weekdayOf(date) {
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay(); // 0=일
+  return day === 0 ? 7 : day;
 }
 
-/** 추천 문구 조건(recommendation_messages.condition_type)이 지금 맞는지 */
-export function messageMatches(message, context) {
-  const params = message.condition_params ?? {};
-  switch (message.condition_type) {
-    case 'always':
-      return true;
-    case 'no_mission_today':
-      return context.totalCount === 0;
-    case 'streak_at_risk':
-      return (
-        context.isToday &&
-        context.streakDays > 0 &&
-        context.completedCount === 0 &&
-        context.lastSuccessDate !== context.date
-      );
-    case 'inactive_days':
-      return (
-        context.daysSinceLastCompleted !== null &&
-        context.daysSinceLastCompleted >= Number(params.days)
-      );
-    case 'time_slot': {
-      const start = Number(params.start_hour);
-      const end = Number(params.end_hour);
-      const hour = context.hour;
-      return start < end
-        ? hour >= start && hour < end
-        : hour >= start || hour < end;
-    }
-    default:
-      return false;
+/** 문자열을 0 이상 n 미만의 정수로 고르게 흩뿌림(FNV-1a): 같은 입력이면 항상 같은 값 */
+export function stableIndex(text, n) {
+  let hash = 0x811c9dc5;
+  for (const char of text) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
   }
+  return hash % n;
+}
+
+/**
+ * 오늘 보여 줄 문구: 오늘 요일의 문구 → 없으면 '매일'(요일 없음) 문구 → 없으면 null
+ * 같은 요일에 문구가 여러 개면 사용자·날짜마다 정해진 하나(화면을 새로 고쳐도 바뀌지 않음)
+ * @param {{message: string, weekday: number|null, category_id: string|null}[]} messages id 순으로 정렬된 활성 문구
+ * @param {{date: string, userId: string, categoryIds: Set<string>}} context
+ */
+export function chooseMessage(messages, { date, userId, categoryIds }) {
+  const usable = messages.filter(
+    (row) => row.category_id === null || categoryIds.has(row.category_id),
+  );
+  const weekday = weekdayOf(date);
+  const today = usable.filter((row) => row.weekday === weekday);
+  const pool =
+    today.length > 0 ? today : usable.filter((row) => row.weekday === null);
+  if (pool.length === 0) return null;
+  return pool[stableIndex(`${userId}:${date}`, pool.length)].message;
 }
 
 /** A29 홈 화면 요약 (07 HomeSummary) */
@@ -154,11 +150,6 @@ export class HomeService {
       message: await this.pickMessage({
         userId,
         date,
-        isToday: date === today,
-        totalCount,
-        completedCount,
-        streakDays: streak?.current_success_days ?? 0,
-        lastSuccessDate: streak?.last_success_date ?? null,
         categoryIds: new Set(missionRows.rows.map((r) => r.category_id)),
       }),
       week: week.map((d) => ({
@@ -189,36 +180,16 @@ export class HomeService {
     };
   }
 
-  /** 조건에 맞는 활성 문구 중 우선순위가 가장 높은 것, 없으면 기본 문구 */
+  /** 오늘 요일의 활성 문구(없으면 매일 문구), 그것도 없으면 기본 문구 */
   async pickMessage(context) {
-    const [messages, last] = await Promise.all([
-      this.database.query(
-        `SELECT message, condition_type, condition_params, category_id
-           FROM recommendation_messages
-          WHERE is_active
-            AND (starts_at IS NULL OR starts_at <= now())
-            AND (ends_at IS NULL OR ends_at > now())
-          ORDER BY priority DESC, id`,
-      ),
-      this.database.query(
-        `SELECT ($2::date - max(scheduled_date))::int AS days
-           FROM missions
-          WHERE user_id = $1 AND deleted_at IS NULL AND status = 'completed'
-            AND scheduled_date <= $2::date`,
-        [context.userId, context.date],
-      ),
-    ]);
-    const full = {
-      ...context,
-      hour: kstHour(),
-      daysSinceLastCompleted: last.rows[0]?.days ?? null,
-    };
-    const found = messages.rows.find(
-      (row) =>
-        (row.category_id === null ||
-          context.categoryIds.has(row.category_id)) &&
-        messageMatches(row, full),
+    const { rows } = await this.database.query(
+      `SELECT message, weekday, category_id
+         FROM recommendation_messages
+        WHERE is_active
+          AND (starts_at IS NULL OR starts_at <= now())
+          AND (ends_at IS NULL OR ends_at > now())
+        ORDER BY id`,
     );
-    return found?.message ?? DEFAULT_MESSAGE;
+    return chooseMessage(rows, context) ?? DEFAULT_MESSAGE;
   }
 }

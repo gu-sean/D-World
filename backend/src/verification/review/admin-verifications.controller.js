@@ -66,6 +66,13 @@ export class AdminVerificationsController {
     return this.reviews.getRecord(idOf(id));
   }
 
+  /** 러닝 회차의 경로 그림 데이터 (원본 GPS 파일로 계산, 저장 안 함) */
+  @Get(':id/route')
+  @Bind(Param('id'))
+  route(id) {
+    return this.reviews.getRoute(idOf(id));
+  }
+
   /** M31 */
   @Post(':id/decisions')
   @HttpCode(200)

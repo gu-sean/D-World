@@ -7,14 +7,17 @@ import {
   fetchCategories,
   fetchCriteria,
   fetchVerification,
+  fetchVerificationRoute,
   fetchVerifications,
   resolveAppeal,
 } from './api.js';
+import { dashboardKeys } from '../dashboard/queries.js';
 
 export const verificationKeys = {
   all: ['verifications'],
   list: (params) => ['verifications', 'list', params],
   detail: (id) => ['verifications', 'detail', id],
+  route: (id) => ['verifications', 'route', id],
   appeals: (params) => ['verifications', 'appeals', params],
   appeal: (id) => ['verifications', 'appeal', id],
   categories: ['verifications', 'categories'],
@@ -34,10 +37,23 @@ export const useVerification = (recordId) =>
     queryFn: () => fetchVerification(recordId),
   });
 
+/** Route of a running record. A missing raw file (404) is a normal case, so it is not retried. */
+export const useVerificationRoute = (recordId) =>
+  useQuery({
+    queryKey: verificationKeys.route(recordId),
+    queryFn: () => fetchVerificationRoute(recordId),
+    retry: false,
+  });
+
 /** After a decision the record, the lists and the appeals are stale. */
 const useInvalidateAll = () => {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: verificationKeys.all });
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: verificationKeys.all }),
+      // 대시보드의 대기 건수(이의 신청·AI 판정 보류)도 바뀐다
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all }),
+    ]);
 };
 
 export const useDecideVerification = () => {

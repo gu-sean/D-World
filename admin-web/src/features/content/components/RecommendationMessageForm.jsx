@@ -1,63 +1,36 @@
 import { useState } from 'react';
-import { Alert, Button, Card, Input, InputNumber, Radio, Switch } from 'antd';
-import { labels } from '../../../constants/labels.js';
+import { Alert, Button, Card, Input, Radio, Switch } from 'antd';
 import { useCreateRecommendationMessage, useUpdateRecommendationMessage } from '../queries.js';
 import { fromInputValue, toInputValue } from '../time.js';
 import { Field } from './Field.jsx';
 import { formStyle } from './formStyle.js';
+import { WEEKDAYS } from '../weekdays.js';
 import { t } from '../../../i18n/index.js';
 
 const MESSAGE_MAX_LENGTH = 200; // docs/07 RecommendationMessageAdmin
-const conditionOptions = Object.entries(labels.recommendationConditionType).map(
-  ([value, { text }]) => ({ value, label: text }),
-);
+// 라디오 값은 문자열: 'all' = 매일(요일 없음), '1'~'7' = 월~일
+const weekdayOptions = [
+  { value: 'all', label: t('매일') },
+  ...WEEKDAYS.map((day) => ({ value: String(day.value), label: day.label })),
+];
 
 function initialState(item) {
-  const params = item?.conditionParams ?? {};
   return {
     message: item?.message ?? '',
-    conditionType: item?.conditionType ?? 'always',
-    days: params.days ?? null,
-    startHour: params.startHour ?? null,
-    endHour: params.endHour ?? null,
+    weekday: item?.weekday == null ? 'all' : String(item.weekday),
     categoryCode: item?.categoryCode ?? '',
-    priority: item?.priority ?? 50,
     startsAt: toInputValue(item?.startsAt),
     endsAt: toInputValue(item?.endsAt),
     isActive: item?.isActive ?? true,
   };
 }
 
-const isHour = (value) => Number.isInteger(value) && value >= 0 && value <= 23;
-
 function validate(form) {
   if (!form.message.trim()) return t('문구를 입력해 주세요.');
-  if (form.conditionType === 'inactive_days') {
-    if (!Number.isInteger(form.days) || form.days < 1 || form.days > 365) {
-      return t('미접속 일수를 1~365 사이의 정수로 입력해 주세요.');
-    }
-  }
-  if (form.conditionType === 'time_slot') {
-    if (!isHour(form.startHour) || !isHour(form.endHour)) {
-      return t('시작·종료 시각을 0~23 사이의 정수로 입력해 주세요.');
-    }
-    if (form.startHour === form.endHour) return t('시작 시각과 종료 시각은 같을 수 없어요.');
-  }
-  if (!Number.isInteger(form.priority) || form.priority < 0 || form.priority > 100) {
-    return t('우선순위를 0~100 사이의 정수로 입력해 주세요.');
-  }
   if (form.startsAt && form.endsAt && form.endsAt <= form.startsAt) {
     return t('종료 시각은 시작 시각 이후여야 해요.');
   }
   return null;
-}
-
-function conditionParamsOf(form) {
-  if (form.conditionType === 'inactive_days') return { days: form.days };
-  if (form.conditionType === 'time_slot') {
-    return { startHour: form.startHour, endHour: form.endHour };
-  }
-  return {};
 }
 
 /**
@@ -87,10 +60,8 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
     }
     const input = {
       message: form.message.trim(),
-      conditionType: form.conditionType,
-      conditionParams: conditionParamsOf(form),
+      weekday: form.weekday === 'all' ? null : Number(form.weekday),
       categoryCode: form.categoryCode.trim() || null,
-      priority: form.priority,
       startsAt: fromInputValue(form.startsAt),
       endsAt: fromInputValue(form.endsAt),
       isActive: form.isActive,
@@ -120,64 +91,24 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
             onChange={(event) => set({ message: event.target.value })}
           />
         </Field>
-        <Field label={t('보여줄 조건')}>
+        <Field
+          label={t('보여줄 요일')}
+          hint={t(
+            '홈 화면은 오늘 요일의 문구를 보여줘요. 같은 요일에 여러 개면 날마다 하나씩 골라요.',
+          )}
+        >
           <Radio.Group
-            value={form.conditionType}
-            onChange={(event) => set({ conditionType: event.target.value })}
-            options={conditionOptions}
+            value={form.weekday}
+            onChange={(event) => set({ weekday: event.target.value })}
+            options={weekdayOptions}
           />
         </Field>
-        {form.conditionType === 'inactive_days' && (
-          <Field label={t('미접속 일수 (1~365)')}>
-            <InputNumber
-              aria-label={t('미접속 일수')}
-              min={1}
-              max={365}
-              precision={0}
-              value={form.days}
-              onChange={(value) => set({ days: value })}
-            />
-          </Field>
-        )}
-        {form.conditionType === 'time_slot' && (
-          <Field label={t('시간대 (0~23시, 한국 시간)')}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <InputNumber
-                aria-label={t('시작 시각')}
-                min={0}
-                max={23}
-                precision={0}
-                value={form.startHour}
-                onChange={(value) => set({ startHour: value })}
-              />
-              <span>~</span>
-              <InputNumber
-                aria-label={t('종료 시각')}
-                min={0}
-                max={23}
-                precision={0}
-                value={form.endHour}
-                onChange={(value) => set({ endHour: value })}
-              />
-            </div>
-          </Field>
-        )}
         <Field label={t('분야 코드 (선택)')}>
           <Input
             aria-label={t('분야 코드')}
             style={{ maxWidth: 240 }}
             value={form.categoryCode}
             onChange={(event) => set({ categoryCode: event.target.value })}
-          />
-        </Field>
-        <Field label={t('우선순위 (0~100)')} hint={t('숫자가 클수록 먼저 보여줘요.')}>
-          <InputNumber
-            aria-label={t('우선순위')}
-            min={0}
-            max={100}
-            precision={0}
-            value={form.priority}
-            onChange={(value) => set({ priority: value })}
           />
         </Field>
         <Field label={t('시작 시각 (선택, 한국 시간)')}>

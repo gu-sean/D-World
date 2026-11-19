@@ -92,10 +92,19 @@ export class AdminAppealsController {
   @Get()
   @Bind(Query())
   list(query) {
+    // completed: 처리가 끝난 건(accepted + rejected) 전체, 관리자 웹의 '처리 완료' 탭이 사용
     const status =
-      pickEnum(query, 'status', ['open', 'accepted', 'rejected']) ?? 'open';
+      pickEnum(query, 'status', [
+        'open',
+        'accepted',
+        'rejected',
+        'completed',
+      ]) ?? 'open';
     const paging = parseAdminPage(query, {
       'filedAt,asc': 'a.filed_at ASC, a.id ASC',
+      'filedAt,desc': 'a.filed_at DESC, a.id DESC',
+      'resolvedAt,desc': 'a.resolved_at DESC NULLS LAST, a.id DESC',
+      'resolvedAt,asc': 'a.resolved_at ASC NULLS LAST, a.id ASC',
     });
     return this.appeals.list({ status, member: query.member, paging });
   }

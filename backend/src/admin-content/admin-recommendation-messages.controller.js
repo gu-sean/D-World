@@ -25,8 +25,6 @@ import {
   boolean,
   idOf,
   integer,
-  jsonObject,
-  oneOf,
   string,
   timestamp,
   shortId,
@@ -35,25 +33,18 @@ import {
 import { DatabaseService } from '../database/database.service.js';
 import { REASON_RULE_OPTIONS } from '../admin-members/admin-members.service.js';
 
-const CONDITIONS = [
-  'always',
-  'no_mission_today',
-  'streak_at_risk',
-  'inactive_days',
-  'time_slot',
-];
-
 /** null이면 값을 비움(PATCH), 없으면 그대로 */
 const nullable = (rule) => (raw) =>
   raw === null ? { value: null } : rule(raw);
 
+/** 요일: 1=월 … 7=일, null이면 매일 */
+const weekdayRule = () => integer({ min: 1, max: 7, optional: true });
+
 const view = (row) => ({
   id: row.id,
   message: row.message,
-  conditionType: row.condition_type,
-  conditionParams: row.condition_params,
+  weekday: row.weekday,
   categoryId: row.category_id,
-  priority: row.priority,
   startsAt: row.starts_at,
   endsAt: row.ends_at,
   isActive: row.is_active,
@@ -63,42 +54,16 @@ const view = (row) => ({
   updatedAt: row.updated_at,
 });
 
-/** 조건 종류별 conditionParams 규칙(DB CHECK와 같음)을 필드별 오류로 돌려줌 */
-function assertCondition({ conditionType, conditionParams, startsAt, endsAt }) {
-  const errors = [];
-  const keys = Object.keys(conditionParams);
-  const int = (value, min, max) =>
-    Number.isInteger(value) && value >= min && value <= max;
-  if (
-    ['always', 'no_mission_today', 'streak_at_risk'].includes(conditionType)
-  ) {
-    if (keys.length > 0) {
-      errors.push(`conditionParams: ${conditionType}은 비어 있어야 함`);
-    }
-  } else if (conditionType === 'inactive_days') {
-    if (keys.join() !== 'days' || !int(conditionParams.days, 1, 365)) {
-      errors.push('conditionParams: {days: 1~365 정수}만 가능');
-    }
-  } else if (conditionType === 'time_slot') {
-    const { start_hour: start, end_hour: end } = conditionParams;
-    if (
-      keys.length !== 2 ||
-      !int(start, 0, 23) ||
-      !int(end, 0, 23) ||
-      start === end
-    ) {
-      errors.push(
-        'conditionParams: {start_hour, end_hour} 0~23 정수, 서로 달라야 함',
-      );
-    }
-  }
+function assertPeriod({ startsAt, endsAt }) {
   if (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) {
-    errors.push('endsAt: startsAt보다 늦어야 함');
+    throw new BadRequestException(['endsAt: startsAt보다 늦어야 함']);
   }
-  if (errors.length > 0) throw new BadRequestException(errors);
 }
 
-/** 관리자 상황 추천 문구 API: 목록(M98), 등록(M99), 수정(M100) */
+/**
+ * 관리자 추천 문구 API: 목록(M98), 등록(M99), 수정(M100)
+ * 문구는 요일별로 정한다(weekday 1=월 … 7=일, null=매일). 홈 화면은 오늘 요일의 문구를 보여 준다.
+ */
 @Controller('admin/v1/recommendation-messages')
 @AdminOnly()
 @Dependencies(DatabaseService, AdminMutationService)
@@ -108,22 +73,34 @@ export class AdminRecommendationMessagesController {
     this.mutation = mutation;
   }
 
-  /** M98 */
+  /** M98: 기본 정렬은 매일 문구 → 월~일 순 */
   @Get()
   @Bind(Query())
   async list(query) {
     const active = pickEnum(query, 'isActive', ['true', 'false']);
-    const conditionType = pickEnum(query, 'conditionType', CONDITIONS);
+    const weekday = pickEnum(query, 'weekday', [
+      'all',
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+    ]);
     const paging = parseAdminPage(query, {
-      'priority,desc': 'priority DESC, created_at DESC, id DESC',
+      'weekday,asc': 'weekday ASC NULLS FIRST, created_at DESC, id DESC',
       'createdAt,desc': 'created_at DESC, id DESC',
     });
     const params = [
       active === undefined ? null : active === 'true',
-      conditionType ?? null,
+      // all: 매일(요일 없음) 문구만, 1~7: 그 요일 문구만, 생략: 전부
+      weekday ?? null,
     ];
     const where = `($1::boolean IS NULL OR is_active = $1)
-      AND ($2::text IS NULL OR condition_type = $2)`;
+      AND ($2::text IS NULL
+           OR ($2 = 'all' AND weekday IS NULL)
+           OR ($2 <> 'all' AND weekday = $2::smallint))`;
     const [{ rows }, count] = await Promise.all([
       this.database.query(
         `SELECT * FROM recommendation_messages WHERE ${where}
@@ -144,17 +121,14 @@ export class AdminRecommendationMessagesController {
   create(request, body) {
     const input = validateBody(body, {
       message: string({ min: 1, max: 200, pattern: /\S/ }),
-      conditionType: oneOf(CONDITIONS),
-      conditionParams: jsonObject({ optional: true }),
+      weekday: nullable(weekdayRule()),
       categoryId: shortId({ optional: true }),
-      priority: integer({ min: 0, max: 100, optional: true }),
       startsAt: timestamp({ optional: true }),
       endsAt: timestamp({ optional: true }),
       isActive: boolean({ optional: true }),
       reason: string(REASON_RULE_OPTIONS),
     });
-    const params = input.conditionParams ?? {};
-    assertCondition({ ...input, conditionParams: params });
+    assertPeriod(input);
     const adminId = request.auth.adminId;
     return this.mutation.run(adminId, {
       key: readIdempotencyKey(request),
@@ -164,17 +138,15 @@ export class AdminRecommendationMessagesController {
       run: async (tx) => {
         const { rows } = await tx.query(
           `INSERT INTO recommendation_messages
-             (id, message, condition_type, condition_params, category_id, priority,
-              starts_at, ends_at, is_active, created_by_admin_id, updated_by_admin_id)
-           VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10, $10)
+             (id, message, weekday, category_id, starts_at, ends_at, is_active,
+              created_by_admin_id, updated_by_admin_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
            RETURNING *`,
           [
             newId(),
             input.message.trim(),
-            input.conditionType,
-            JSON.stringify(params),
+            input.weekday ?? null,
             input.categoryId ?? null,
-            input.priority ?? 50,
             input.startsAt ?? null,
             input.endsAt ?? null,
             input.isActive ?? true,
@@ -186,7 +158,7 @@ export class AdminRecommendationMessagesController {
           result,
           after: {
             id: result.id,
-            conditionType: result.conditionType,
+            weekday: result.weekday,
             message: result.message,
           },
         };
@@ -194,17 +166,15 @@ export class AdminRecommendationMessagesController {
     });
   }
 
-  /** M100: 보낸 필드만 바꿈, 시작·종료 시각과 분야는 null로 비울 수 있음 */
+  /** M100: 보낸 필드만 바꿈, 요일·시작·종료 시각과 분야는 null로 비울 수 있음(요일 null = 매일) */
   @Patch(':messageId')
   @Bind(Req(), Param('messageId'), Body())
   update(request, messageId, body) {
     const id = idOf(messageId);
     const input = validateBody(body, {
       message: string({ min: 1, max: 200, pattern: /\S/, optional: true }),
-      conditionType: oneOf(CONDITIONS, { optional: true }),
-      conditionParams: jsonObject({ optional: true }),
+      weekday: nullable(weekdayRule()),
       categoryId: nullable(shortId({ optional: true })),
-      priority: integer({ min: 0, max: 100, optional: true }),
       startsAt: nullable(timestamp({ optional: true })),
       endsAt: nullable(timestamp({ optional: true })),
       isActive: boolean({ optional: true }),
@@ -231,35 +201,25 @@ export class AdminRecommendationMessagesController {
           input[key] === undefined ? fallback : input[key];
         const next = {
           message: pick('message', current.message).trim(),
-          conditionType: pick('conditionType', current.condition_type),
-          conditionParams:
-            input.conditionParams ??
-            (input.conditionType &&
-            input.conditionType !== current.condition_type
-              ? {}
-              : current.condition_params),
+          weekday: pick('weekday', current.weekday),
           categoryId: clearsCategory
             ? null
             : pick('categoryId', current.category_id),
-          priority: pick('priority', current.priority),
           startsAt: pick('startsAt', current.starts_at),
           endsAt: pick('endsAt', current.ends_at),
           isActive: pick('isActive', current.is_active),
         };
-        assertCondition(next);
+        assertPeriod(next);
         const updated = await tx.query(
           `UPDATE recommendation_messages
-              SET message = $2, condition_type = $3, condition_params = $4::jsonb,
-                  category_id = $5, priority = $6, starts_at = $7, ends_at = $8,
-                  is_active = $9, updated_by_admin_id = $10, updated_at = now()
+              SET message = $2, weekday = $3, category_id = $4, starts_at = $5,
+                  ends_at = $6, is_active = $7, updated_by_admin_id = $8, updated_at = now()
             WHERE id = $1 RETURNING *`,
           [
             id,
             next.message,
-            next.conditionType,
-            JSON.stringify(next.conditionParams),
+            next.weekday,
             next.categoryId,
-            next.priority,
             next.startsAt,
             next.endsAt,
             next.isActive,
@@ -270,12 +230,12 @@ export class AdminRecommendationMessagesController {
           result: view(updated.rows[0]),
           before: {
             message: current.message,
-            conditionType: current.condition_type,
+            weekday: current.weekday,
             isActive: current.is_active,
           },
           after: {
             message: next.message,
-            conditionType: next.conditionType,
+            weekday: next.weekday,
             isActive: next.isActive,
           },
         };

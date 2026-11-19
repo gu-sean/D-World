@@ -1,4 +1,4 @@
-// ADM-26 Pet species (append-only versions, 3 stages with images) and pet level thresholds
+// ADM-26 Pet species (append-only versions, 3 stages with images) and growth rules (read-only)
 import { useMemo, useState } from 'react';
 import {
   Button,
@@ -11,7 +11,6 @@ import {
   Select,
   Table,
   Tabs,
-  Tag,
   Typography,
 } from 'antd';
 import { newId } from '../../../api/ids.js';
@@ -22,7 +21,9 @@ import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import { EffectiveAtItem } from '../components/EffectiveAtItem.jsx';
-import { pickCurrent, toIso } from '../components/helpers.js';
+import { GrowthRules } from '../components/GameRulesCards.jsx';
+import { STAGE_MIN_XP } from '../components/gameRules.js';
+import { toIso } from '../components/helpers.js';
 import {
   conditionOptions,
   optionsOf,
@@ -34,10 +35,8 @@ import { useConfirmedChange } from '../components/useConfirmedChange.jsx';
 import {
   useAchievements,
   useCategories,
-  useCreatePetLevels,
   useCreatePetSpecies,
   useCreatePetSpeciesVersion,
-  usePetLevels,
   usePetSpecies,
 } from '../queries.js';
 import { t } from '../../../i18n/index.js';
@@ -76,9 +75,10 @@ function SpeciesDrawer({ target, onClose }) {
   );
   const unlockType = Form.useWatch('unlockConditionType', form);
 
+  // 단계별 필요 XP는 앱 규칙으로 고정한다(알 0, 아기 90, 성체 450). 예전 버전의 값(50/200 등)은 새 버전에서 바꾼다
   const stageDefaults = [1, 2, 3].map((stageNo) => ({
     stageNo,
-    minTotalXp: stageNo === 1 ? 0 : undefined,
+    minTotalXp: STAGE_MIN_XP[stageNo],
     bonusBasisPoints: 0,
   }));
   const initial = isNew
@@ -91,6 +91,10 @@ function SpeciesDrawer({ target, onClose }) {
       }
     : {
         ...current,
+        stages: current.stages.map((stage) => ({
+          ...stage,
+          minTotalXp: STAGE_MIN_XP[stage.stageNo],
+        })),
         status: target.species.status === 'hidden' ? 'draft' : target.species.status,
         effectiveAt: dayjs().add(5, 'minute'),
       };
@@ -269,7 +273,7 @@ function SpeciesDrawer({ target, onClose }) {
                   label={t('필요 누적 XP')}
                   rules={[{ required: true, message: t('필요 XP를 입력해 주세요.') }]}
                 >
-                  <InputNumber min={0} precision={0} disabled={index === 0} />
+                  <InputNumber min={0} precision={0} disabled />
                 </Form.Item>
                 <Form.Item
                   name={[field.name, 'bonusBasisPoints']}
@@ -398,121 +402,6 @@ function SpeciesTab() {
   );
 }
 
-function LevelsTab() {
-  const [form] = Form.useForm();
-  const list = usePetLevels();
-  const create = useCreatePetLevels();
-  const [ask, modal] = useConfirmedChange();
-
-  // POST /policies/pet-levels has no `reason` field: the modal only asks for confirmation and
-  // makes the Idempotency-Key, so the reason typed there is not sent.
-  const onFinish = ({ thresholds, effectiveAt }) =>
-    ask({
-      title: t('새 레벨 기준을 저장할까요?'),
-      summary: t('{0}개 레벨 기준', thresholds.length),
-      run: ({ idempotencyKey }) =>
-        create.mutateAsync({
-          payload: { thresholds, effectiveAt: toIso(effectiveAt) },
-          idempotencyKey,
-        }),
-      onDone: () => form.resetFields(),
-    });
-
-  return (
-    <>
-      {modal}
-      <QueryBoundary query={list}>
-        {({ items }) => {
-          const current = pickCurrent(items);
-          return items.length === 0 ? (
-            <StatePanel type="empty" />
-          ) : (
-            <Table
-              rowKey="id"
-              pagination={false}
-              dataSource={items}
-              columns={[
-                { title: t('버전'), dataIndex: 'versionNo', render: (v) => `v${v}` },
-                {
-                  title: t('시행 시각'),
-                  dataIndex: 'effectiveAt',
-                  render: (value) => <DateText value={value} />,
-                },
-                {
-                  title: t('레벨별 필요 XP'),
-                  dataIndex: 'thresholds',
-                  render: (thresholds) =>
-                    thresholds
-                      .map((x) => `Lv${x.levelNo}: ${Number(x.minTotalXp).toLocaleString()}`)
-                      .join(' · '),
-                },
-                {
-                  title: t('상태'),
-                  render: (_, row) =>
-                    row.id === current?.id ? (
-                      <Tag color="green">{t('적용 중')}</Tag>
-                    ) : (
-                      <Tag>{t('이력')}</Tag>
-                    ),
-                },
-              ]}
-            />
-          );
-        }}
-      </QueryBoundary>
-      <Typography.Title level={5} style={{ marginTop: 24 }}>
-        {t('새 레벨 기준 추가')}
-      </Typography.Title>
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={{ thresholds: [{ levelNo: 1, minTotalXp: 0 }] }}
-        style={{ maxWidth: 480 }}
-        onFinish={onFinish}
-      >
-        <Form.List name="thresholds">
-          {(fields, { add, remove }) => (
-            <>
-              {fields.map((field) => (
-                <div key={field.key} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-                  <Form.Item
-                    name={[field.name, 'levelNo']}
-                    label={t('레벨')}
-                    rules={[{ required: true, message: t('레벨을 입력해 주세요.') }]}
-                  >
-                    <InputNumber min={1} max={100} precision={0} />
-                  </Form.Item>
-                  <Form.Item
-                    name={[field.name, 'minTotalXp']}
-                    label={t('필요 누적 XP')}
-                    rules={[{ required: true, message: t('필요 XP를 입력해 주세요.') }]}
-                  >
-                    <InputNumber min={0} precision={0} />
-                  </Form.Item>
-                  <Button onClick={() => remove(field.name)} disabled={fields.length === 1}>
-                    {t('삭제')}
-                  </Button>
-                </div>
-              ))}
-              <Button
-                onClick={() => add({ levelNo: fields.length + 1 })}
-                style={{ marginBottom: 16 }}
-                disabled={fields.length >= 100}
-              >
-                {t('레벨 추가')}
-              </Button>
-            </>
-          )}
-        </Form.List>
-        <EffectiveAtItem />
-        <Button type="primary" htmlType="submit">
-          {t('새 버전 저장')}
-        </Button>
-      </Form>
-    </>
-  );
-}
-
 export default function PetPolicyPage() {
   return (
     <div>
@@ -523,7 +412,7 @@ export default function PetPolicyPage() {
       <Tabs
         items={[
           { key: 'species', label: t('펫 종류'), children: <SpeciesTab /> },
-          { key: 'levels', label: t('펫 레벨 기준'), children: <LevelsTab /> },
+          { key: 'growth', label: t('성장 단계 기준'), children: <GrowthRules /> },
         ]}
       />
     </div>

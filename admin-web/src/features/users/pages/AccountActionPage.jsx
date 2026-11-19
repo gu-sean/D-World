@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, Button, InputNumber, message, Radio, Space, Typography } from 'antd';
+import { Alert, Button, InputNumber, Radio, Space, Typography } from 'antd';
+import { message } from '../../../lib/message.jsx';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { useCreateAccountAction, useUser } from '../queries.js';

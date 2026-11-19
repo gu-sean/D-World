@@ -126,10 +126,13 @@ export class AdminChallengesController {
     const key = readIdempotencyKey(request);
     if (body && typeof body === 'object' && 'action' in body) {
       const { action, reason } = validateBody(body, {
-        action: oneOf(['publish', 'hide', 'cancel']),
+        action: oneOf(['publish', 'hide', 'unhide', 'cancel']),
         reason: reasonRule(),
       });
       const challengeId = idOf(id);
+      if (action === 'unhide') {
+        return this.challenges.unhide(adminId, challengeId, reason.trim(), key);
+      }
       if (action === 'publish') {
         return this.challenges.publish(adminId, challengeId, key, reason);
       }

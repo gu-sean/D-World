@@ -75,16 +75,19 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
     >
       <div style={{ marginBottom: 16 }}>{summary}</div>
       <label htmlFor="confirm-action-reason">{t('사유 (선택)')}</label>
-      <Input.TextArea
-        id="confirm-action-reason"
-        rows={3}
-        maxLength={REASON_MAX_LENGTH}
-        showCount
-        placeholder={t("비워 두면 '관리자 처리'로 기록돼요.")}
-        readOnly={triedOnce}
-        value={reason}
-        onChange={(event) => setReason(event.target.value)}
-      />
+      {/* The character count is drawn below the box; the padding keeps it off the footer buttons. */}
+      <div style={{ paddingBottom: 24 }}>
+        <Input.TextArea
+          id="confirm-action-reason"
+          rows={3}
+          maxLength={REASON_MAX_LENGTH}
+          showCount
+          placeholder={t("비워 두면 '관리자 처리'로 기록돼요.")}
+          readOnly={triedOnce}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </div>
       {submitError && (
         <div role="alert" style={{ color: '#ff4d4f', marginTop: 12 }}>
           {submitError}

@@ -71,6 +71,8 @@ export function DataTable({ columns, query, rowKey = 'id', onRowClick, defaultSo
           columns={tableColumns}
           dataSource={data.items}
           rowKey={rowKey}
+          // On a narrow screen scroll sideways instead of squeezing text into one character per line
+          scroll={{ x: 'max-content' }}
           loading={query.isFetching}
           locale={{ emptyText: <StatePanel type="empty" /> }}
           pagination={{

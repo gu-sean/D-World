@@ -198,7 +198,9 @@ export class AppealsService {
   async list({ status, member, paging }) {
     // member: 닉네임 또는 회원 ID (common/member-query.js)
     const search = memberQueryParams(member);
-    const where = `a.status = $1 AND ${memberWhere('r.user_id', '$2', '$3')}`;
+    // status='completed'는 open이 아닌 모든 건(인정·기각)
+    const where = `(a.status = $1::text OR ($1::text = 'completed' AND a.status <> 'open'))
+      AND ${memberWhere('r.user_id', '$2', '$3')}`;
     const params = [status, search.like, search.id];
     const [{ rows }, count] = await Promise.all([
       this.database.query(

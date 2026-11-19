@@ -13,16 +13,14 @@ const ACTION_TEXT = { manual_grant: t('지급'), manual_recovery: t('회수') };
 function MemberCheck({ query }) {
   if (!query.data && !query.isError) return null;
   if (query.isError) {
-    return (
-      <Alert type="error" showIcon message={t('이 회원 ID로 가입한 회원을 찾을 수 없어요.')} />
-    );
+    return <Alert type="error" showIcon title={t('이 회원 ID로 가입한 회원을 찾을 수 없어요.')} />;
   }
   const user = query.data;
   return (
     <Alert
       type="info"
       showIcon
-      message={t(
+      title={t(
         '{0} · 보유 {1} P',
         user.nickname ?? t('(닉네임 없음)'),
         user.availablePoints.toLocaleString(),

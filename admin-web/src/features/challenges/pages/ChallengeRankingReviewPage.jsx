@@ -1,6 +1,7 @@
 // ADM-21 랭킹 검토와 정정
 import { useState } from 'react';
-import { Button, Drawer, message, Space, Table, Tag, Typography } from 'antd';
+import { Button, Drawer, Space, Table, Tag, Typography } from 'antd';
+import { message } from '../../../lib/message.jsx';
 import { useParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { DateText } from '../../../components/DateText.jsx';

@@ -1,17 +1,7 @@
 // ADM-15 분야·난이도 (미션 보상표는 보상 관리 > 포인트 정책 > 미션 보상표 한 곳에서 관리)
 import { useState } from 'react';
-import {
-  Button,
-  Form,
-  Input,
-  InputNumber,
-  message,
-  Modal,
-  Switch,
-  Table,
-  Tabs,
-  Typography,
-} from 'antd';
+import { Button, Form, Input, InputNumber, Modal, Switch, Table, Tabs, Typography } from 'antd';
+import { message } from '../../../lib/message.jsx';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';

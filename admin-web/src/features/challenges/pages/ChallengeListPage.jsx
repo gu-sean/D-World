@@ -2,7 +2,8 @@
 // 챌린지는 관리자만 만들고 관리한다 (회원 개설·검수 없음). 회원은 앱에서 참여 여부만 고른다.
 import { useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
-import { Button, Dropdown, message, Space, Typography } from 'antd';
+import { Button, Dropdown, Space, Typography } from 'antd';
+import { message } from '../../../lib/message.jsx';
 import { useNavigate } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { DataTable } from '../../../components/DataTable.jsx';
@@ -65,6 +66,13 @@ export default function ChallengeListPage() {
         label: t('숨김'),
         danger: true,
         onClick: () => ask(row, 'action', 'hide', t('챌린지 숨김'), true),
+      });
+    }
+    if (row.publicationStatus === 'hidden') {
+      items.push({
+        key: 'unhide',
+        label: t('숨김 해제'),
+        onClick: () => ask(row, 'action', 'unhide', t('챌린지 숨김 해제')),
       });
     }
     if (['public', 'hidden'].includes(row.publicationStatus)) {

@@ -5,6 +5,7 @@ import { DatabaseService } from '../database/database.service.js';
 import { RewardPayoutService } from './reward-payout.service.js';
 import { conflict, httpError } from '../common/errors/http-errors.js';
 import { TODAY_SQL } from '../common/time/kst-sql.js';
+import { sharedRanks } from './shared-rank.js';
 
 const notFound = (
   code = 'challenge_not_found',
@@ -194,6 +195,12 @@ export class SettlementService {
         ORDER BY rank_no NULLS LAST, participation_id`,
       [runId],
     );
+    // 화면에 보이는 순위는 같은 점수끼리 공동 순위(저장된 rank_no는 줄 순서로만 쓰임)
+    const ranked = entries.filter((row) => row.rank_no !== null);
+    const ranks = sharedRanks(ranked);
+    ranked.forEach((row, index) => {
+      row.rank_no = ranks[index];
+    });
     return {
       id: run.id,
       challengeId: run.challenge_id,

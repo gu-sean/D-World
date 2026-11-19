@@ -1,6 +1,7 @@
 // ADM-20 챌린지 정산과 보상
 import { useState } from 'react';
-import { Alert, Button, Descriptions, message, Space, Typography } from 'antd';
+import { Alert, Button, Descriptions, Space, Typography } from 'antd';
+import { message } from '../../../lib/message.jsx';
 import { useParams, useSearchParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { DateText } from '../../../components/DateText.jsx';

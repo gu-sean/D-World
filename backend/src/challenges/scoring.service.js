@@ -6,6 +6,7 @@ import { POINTS_PER_SUCCESS_DAY } from './challenges.constants.js';
 import { ParticipationService } from './participation.service.js';
 import { conflict, httpError } from '../common/errors/http-errors.js';
 import { TODAY_SQL } from '../common/time/kst-sql.js';
+import { sharedRanks } from './shared-rank.js';
 
 const notFound = (
   code = 'challenge_not_found',
@@ -185,19 +186,21 @@ export class ScoringService {
          FROM challenge_live_rankings WHERE challenge_id = $1 ORDER BY rank_no`,
       [challengeId],
     );
-    const view = (row) => ({
-      rank: Number(row.rank_no),
+    // 같은 점수는 같은 순위(공동 순위), 줄 순서는 뷰의 동점 규칙 그대로
+    const ranks = sharedRanks(rows);
+    const view = (row, index) => ({
+      rank: ranks[index],
       displayName: row.display_name,
       successfulDays: row.successful_days,
       score: row.score,
       isMe: row.user_id === userId,
     });
-    const mine = rows.find((row) => row.user_id === userId);
+    const mineIndex = rows.findIndex((row) => row.user_id === userId);
     return {
       provisional: challenge[0].settlement_status !== 'confirmed',
       total: rows.length,
       items: rows.slice(0, limit).map(view),
-      me: mine ? view(mine) : null,
+      me: mineIndex >= 0 ? view(rows[mineIndex], mineIndex) : null,
     };
   }
 
@@ -211,19 +214,20 @@ export class ScoringService {
         WHERE r.challenge_id = $1 ORDER BY f.rank_no`,
       [challengeId],
     );
-    const view = (row) => ({
-      rank: row.rank_no,
+    const ranks = sharedRanks(rows);
+    const view = (row, index) => ({
+      rank: ranks[index],
       displayName: row.display_name,
       successfulDays: row.score / POINTS_PER_SUCCESS_DAY,
       score: row.score,
       isMe: row.user_id === userId,
     });
-    const mine = rows.find((row) => row.user_id === userId);
+    const mineIndex = rows.findIndex((row) => row.user_id === userId);
     return {
       provisional: false,
       total: rows.length,
       items: rows.slice(0, limit).map(view),
-      me: mine ? view(mine) : null,
+      me: mineIndex >= 0 ? view(rows[mineIndex], mineIndex) : null,
     };
   }
 
@@ -262,7 +266,7 @@ export class ScoringService {
   }
 
   /**
-   * M60 순위: 점수·성공 일수 내림차순, 같으면 먼저 참가한 순서
+   * M60 순위: 점수·성공 일수 내림차순, 같으면 먼저 참가한 순서(순위 번호는 같은 점수끼리 공동 순위)
    * 실격자는 순위에서 뺌. flags는 자동 감지 항목이 아직 없어 빈 배열
    */
   async getRankings(challengeId) {
@@ -275,13 +279,14 @@ export class ScoringService {
           b.successfulDays - a.successfulDays ||
           new Date(a.joinedAt) - new Date(b.joinedAt),
       );
+    const ranks = sharedRanks(ranked);
     return {
       ranking: { challengeId, calculatedAt: new Date().toISOString() },
       entries: ranked.map((item, index) => ({
         participationId: item.id,
         userId: item.userId,
         nickname: item.nickname,
-        rankNo: index + 1,
+        rankNo: ranks[index],
         score: item.score,
         successfulDays: item.successfulDays,
         flags: [],

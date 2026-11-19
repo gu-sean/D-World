@@ -199,7 +199,10 @@ export class MobileChallengesService {
   async result(userId, challengeId) {
     const mine = await this.mine(userId, challengeId);
     const { rows } = await this.database.query(
-      `SELECT e.rank_no, e.score, e.paid_points, e.promised_points, e.user_xp, e.pet_xp,
+      `SELECT (SELECT 1 + count(*) FROM challenge_settlement_entries x
+                WHERE x.run_id = e.run_id AND x.rank_no IS NOT NULL AND x.score > e.score
+              ) AS shared_rank,
+              e.rank_no, e.score, e.paid_points, e.promised_points, e.user_xp, e.pet_xp,
               e.outcome, r.confirmed_at,
               v.achievement_id AS badge_achievement_id, v.title AS badge_title, v.rarity AS badge_rarity
          FROM challenge_settlement_entries e
@@ -247,7 +250,8 @@ export class MobileChallengesService {
       challenge: mine.challenge,
       participationId: mine.participationId,
       status: mine.status,
-      rankNo: settled?.rank_no ?? null,
+      // 같은 점수는 같은 순위(공동 순위), 순위가 없는 참가(포기·실격)는 null
+      rankNo: settled?.rank_no == null ? null : Number(settled.shared_rank),
       successfulDays: mine.successDays,
       requiredDays: mine.requiredDays,
       rewardPoints,

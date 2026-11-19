@@ -1,16 +1,7 @@
 // ADM-19 Official challenge create / edit
 import { useMemo, useState } from 'react';
-import {
-  Button,
-  DatePicker,
-  Form,
-  Input,
-  InputNumber,
-  message,
-  Select,
-  Space,
-  Typography,
-} from 'antd';
+import { Button, DatePicker, Form, Input, InputNumber, Select, Space, Typography } from 'antd';
+import { message } from '../../../lib/message.jsx';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';

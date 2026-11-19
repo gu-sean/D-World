@@ -1,6 +1,7 @@
 // ADM-14 Mission definition create / edit
 import { useState } from 'react';
-import { Button, Form, Input, InputNumber, message, Select, Space, Typography } from 'antd';
+import { Button, Form, Input, InputNumber, Select, Space, Typography } from 'antd';
+import { message } from '../../../lib/message.jsx';
 import { useNavigate, useParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
@@ -133,7 +134,7 @@ function DefinitionForm({ definition }) {
         summary={
           isEdit
             ? t('{0} · 이미 만들어진 미션에는 영향이 없어요.', definition.title)
-            : t('{0} · 등록', form.getFieldValue('title') ?? '')
+            : t('{0} · 등록', body?.title ?? '')
         }
         onSubmit={async ({ reason, idempotencyKey }) => {
           const payload = { ...body, reason };

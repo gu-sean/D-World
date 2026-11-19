@@ -20,6 +20,13 @@ export const fetchVerification = (recordId) =>
   http.get(`/verifications/${recordId}`).then((response) => response.data);
 
 /**
+ * GET /verifications/:id/route: GPS route of a running record, computed from the raw file on request.
+ * 404 `route_not_available` when the record has no raw file.
+ */
+export const fetchVerificationRoute = (recordId) =>
+  http.get(`/verifications/${recordId}/route`).then((response) => response.data);
+
+/**
  * M31 POST /verifications/:id/decisions
  * @param {{recordId: string, decision: 'approved'|'rejected', reason: string, idempotencyKey: string}} input
  */

@@ -10,21 +10,21 @@ import { FilterBar } from '../../../components/FilterBar.jsx';
 import { MEMBER_FIELD, memberColumn } from '../../../components/memberColumns.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
-import { labels } from '../../../constants/labels.js';
 import { formatConfidence, formatTarget, METHOD_LABEL } from '../components/format.js';
 import { useAppeals, useVerifications } from '../queries.js';
 import { t } from '../../../i18n/index.js';
 
-const APPEAL_FIELDS = [
+const APPEAL_FIELDS = [MEMBER_FIELD];
+const COMPLETED_FIELDS = [
   MEMBER_FIELD,
   {
-    name: 'status',
+    name: 'result',
     type: 'select',
-    label: t('상태'),
-    options: Object.entries(labels.verificationAppealStatus).map(([value, { text }]) => ({
-      value,
-      label: text,
-    })),
+    label: t('처리 결과'),
+    options: [
+      { value: 'accepted', label: t('이의 인정') },
+      { value: 'rejected', label: t('기각') },
+    ],
   },
 ];
 const HOLD_FIELDS = [
@@ -61,16 +61,6 @@ function AppealsTab({ params, setParams }) {
       render: (value) => (value ? <StatusTag kind="decision" value={value} /> : '-'),
     },
     { title: t('이의 사유'), dataIndex: 'reason', ellipsis: true },
-    {
-      title: t('상태'),
-      dataIndex: 'status',
-      render: (value) => <StatusTag kind="verificationAppealStatus" value={value} />,
-    },
-    {
-      title: t('처리 시각'),
-      dataIndex: 'resolvedAt',
-      render: (value) => <DateText value={value} />,
-    },
   ];
 
   return (
@@ -80,6 +70,56 @@ function AppealsTab({ params, setParams }) {
         query={query}
         columns={columns}
         defaultSort="filedAt,asc"
+        onRowClick={(row) => navigate(`/verifications/appeals/${row.id}`)}
+      />
+    </>
+  );
+}
+
+// 처리가 끝난 이의 신청: '이의 신청' 탭에서는 사라지고 여기서 '완료'로 보인다
+function CompletedTab({ params, setParams }) {
+  const navigate = useNavigate();
+  const { result, ...rest } = params;
+  const query = useAppeals({ sort: 'resolvedAt,desc', ...rest, status: result || 'completed' });
+
+  const columns = [
+    {
+      title: t('처리 시각'),
+      dataIndex: 'resolvedAt',
+      key: 'resolvedAt',
+      render: (value, row) => (
+        <Link to={`/verifications/appeals/${row.id}`}>
+          <DateText value={value} />
+        </Link>
+      ),
+    },
+    memberColumn({ idKey: 'userId', nicknameKey: 'nickname' }),
+    { title: t('미션'), dataIndex: 'missionTitle' },
+    {
+      title: t('기존 판정'),
+      dataIndex: 'originalDecision',
+      render: (value) => (value ? <StatusTag kind="decision" value={value} /> : '-'),
+    },
+    { title: t('이의 사유'), dataIndex: 'reason', ellipsis: true },
+    {
+      title: t('상태'),
+      dataIndex: 'status',
+      render: (value) => <StatusTag kind="verificationAppealStatus" value={value} />,
+    },
+    {
+      title: t('접수 시각'),
+      dataIndex: 'filedAt',
+      render: (value) => <DateText value={value} />,
+    },
+  ];
+
+  return (
+    <>
+      <FilterBar fields={COMPLETED_FIELDS} value={params} onChange={setParams} />
+      <DataTable
+        query={query}
+        columns={columns}
+        defaultSort="resolvedAt,desc"
         onRowClick={(row) => navigate(`/verifications/appeals/${row.id}`)}
       />
     </>
@@ -134,6 +174,7 @@ export default function AppealListPage() {
   const holdCount = useVerifications({ status: 'review_required', page: 1, size: 1 }).data
     ?.totalCount;
   const appealCount = useAppeals({ status: 'open', page: 1, size: 1 }).data?.totalCount;
+  const completedCount = useAppeals({ status: 'completed', page: 1, size: 1 }).data?.totalCount;
   const keepTab = (patch) => setParams({ ...patch, tab });
   const count = (n) => (typeof n === 'number' ? ` (${n})` : '');
 
@@ -150,13 +191,20 @@ export default function AppealListPage() {
       <Tabs
         activeKey={tab}
         // 탭을 바꾸면 검색 조건을 비운다 (두 목록의 필터가 다름)
-        onChange={(next) => setParams({ tab: next, member: '', status: '', method: '', sort: '' })}
+        onChange={(next) =>
+          setParams({ tab: next, member: '', status: '', result: '', method: '', sort: '' })
+        }
         destroyOnHidden
         items={[
           {
             key: 'appeals',
             label: t('이의 신청{0}', count(appealCount)),
             children: <AppealsTab params={params} setParams={keepTab} />,
+          },
+          {
+            key: 'completed',
+            label: t('처리 완료{0}', count(completedCount)),
+            children: <CompletedTab params={params} setParams={keepTab} />,
           },
           {
             key: 'hold',

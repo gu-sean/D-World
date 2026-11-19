@@ -2,42 +2,46 @@ import { useState } from 'react';
 import { Button, Space, Tag, Typography } from 'antd';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
-import { StatusTag } from '../../../components/StatusTag.jsx';
+import { FilterBar } from '../../../components/FilterBar.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { RecommendationMessageForm } from '../components/RecommendationMessageForm.jsx';
 import { useRecommendationMessages } from '../queries.js';
 import { useConfirm } from '../useConfirm.jsx';
+import { WEEKDAYS, weekdayLabel } from '../weekdays.js';
 import { t } from '../../../i18n/index.js';
 
-// "6~9시" or "3일" next to the name of the condition.
-function paramsText(item) {
-  const { conditionType, conditionParams: params } = item;
-  if (conditionType === 'inactive_days') return t('{0}일', params.days);
-  if (conditionType === 'time_slot') return t('{0}~{1}시', params.startHour, params.endHour);
-  return null;
-}
+// 요일 필터: all = 매일 문구만, 1~7 = 그 요일 문구만, 비움 = 전부
+const FIELDS = [
+  {
+    name: 'weekday',
+    type: 'select',
+    label: t('요일'),
+    options: [
+      { value: 'all', label: t('매일') },
+      ...WEEKDAYS.map((day) => ({ value: String(day.value), label: day.label })),
+    ],
+  },
+];
 
 /** ADM-35 추천 문구 (M98~M100) */
 export default function RecommendationMessagePage() {
-  const [params] = useListParams();
-  const query = useRecommendationMessages(params);
+  const [params, setParams] = useListParams();
+  // 매일 문구 → 월~일 순으로 보여 준다
+  const query = useRecommendationMessages({ sort: 'weekday,asc', ...params });
   const [confirmElement, ask] = useConfirm();
   const [editing, setEditing] = useState(null); // null: closed, {}: new, {item}: edit
 
   const columns = [
     { title: t('문구'), dataIndex: 'message' },
     {
-      title: t('조건'),
-      key: 'condition',
-      render: (_, item) => (
-        <Space>
-          <StatusTag kind="recommendationConditionType" value={item.conditionType} />
-          {paramsText(item)}
-        </Space>
+      title: t('요일'),
+      dataIndex: 'weekday',
+      width: 110,
+      render: (value) => (
+        <Tag color={value == null ? 'default' : 'blue'}>{weekdayLabel(value)}</Tag>
       ),
     },
     { title: t('분야'), dataIndex: 'categoryCode', render: (value) => value ?? '-' },
-    { title: t('우선순위'), dataIndex: 'priority' },
     {
       title: t('기간'),
       key: 'period',
@@ -86,7 +90,8 @@ export default function RecommendationMessagePage() {
           />
         </div>
       )}
-      <DataTable query={query} columns={columns} />
+      <FilterBar fields={FIELDS} value={params} onChange={setParams} />
+      <DataTable query={query} columns={columns} defaultSort="weekday,asc" />
       {confirmElement}
     </>
   );

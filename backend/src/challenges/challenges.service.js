@@ -584,6 +584,35 @@ export class ChallengesService {
     });
   }
 
+  /** 숨김 해제: 숨긴 챌린지를 다시 공개 (게시 시각은 그대로, 사유는 이벤트에 남김) */
+  unhide(adminId, id, reason, key) {
+    return this.mutation.run(adminId, {
+      key,
+      reason,
+      operation: 'challenge.update',
+      payload: { id, reason },
+      run: async (tx) => {
+        const current = await this.lockOfficial(tx, id, { anyOrigin: true });
+        if (current.publication_status !== 'hidden') {
+          throw conflict('challenge_not_hidden', '숨김 상태만 해제할 수 있음', {
+            status: current.publication_status,
+          });
+        }
+        await tx.query(
+          `UPDATE challenges SET publication_status = 'public', updated_at = now() WHERE id = $1`,
+          [id],
+        );
+        await tx.query(
+          `INSERT INTO challenge_rule_events (id, challenge_id, admin_id, event_type, reason)
+           VALUES ($1,$2,$3,'published',$4)`,
+          [newId(), id, adminId, reason],
+        );
+        const { rows } = await tx.query(`${SELECT} WHERE c.id = $1`, [id]);
+        return { result: toView(rows[0]) };
+      },
+    });
+  }
+
   async lockOfficial(tx, id, { anyOrigin = false } = {}) {
     const { rows } = await tx.query(
       `SELECT id, origin, title, description, category_id, difficulty_id, verification_method,

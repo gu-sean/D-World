@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConfigProvider } from 'antd';
+import { App, ConfigProvider } from 'antd';
 import enUS from 'antd/locale/en_US';
 import koKR from 'antd/locale/ko_KR';
 import dayjs from 'dayjs';
@@ -8,6 +8,7 @@ import 'dayjs/locale/ko';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
 import { getLang } from '../i18n/index.js';
+import { MessageBridge } from '../lib/message.jsx';
 
 // Dates are always displayed in Asia/Seoul (docs/parts/admin-web.md §2).
 dayjs.extend(utc);
@@ -32,7 +33,10 @@ export default function Providers({ children }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ConfigProvider locale={getLang() === 'en' ? enUS : koKR} theme={theme}>
-        {children}
+        <App>
+          <MessageBridge />
+          {children}
+        </App>
       </ConfigProvider>
     </QueryClientProvider>
   );

@@ -20,7 +20,7 @@ export default function EvidenceViewer({ files = [], duplicateOfMediaId = null }
         <Alert
           type="warning"
           showIcon
-          message={t('이전에 제출된 파일과 같은 파일이에요.')}
+          title={t('이전에 제출된 파일과 같은 파일이에요.')}
           description={t('이전 파일 {0}', duplicateOfMediaId)}
         />
       )}

@@ -110,6 +110,10 @@ const SCHEMA = z.object({
   OPENWEATHER_API_KEY: optional(z.string()),
   /** WEATHER_DRIVER=kma: 기상청 API허브(apihub.kma.go.kr) 인증키 */
   KMA_AUTH_KEY: optional(z.string()),
+  /** 미세먼지 조회 방식: mock은 수집하지 않음, airkorea는 AIRKOREA_SERVICE_KEY 필요(날씨 알림이 사용) */
+  AIR_DRIVER: withDefault(z.enum(['mock', 'airkorea']), 'mock'),
+  /** AIR_DRIVER=airkorea: 공공데이터포털 에어코리아 대기오염정보 서비스 키 */
+  AIRKOREA_SERVICE_KEY: optional(z.string()),
   APPLE_CLIENT_ID: optional(z.string()),
   /** 쉼표로 구분한 Google OAuth 클라이언트 ID(iOS·Android·웹) */
   GOOGLE_CLIENT_IDS: optional(z.string()),
@@ -210,6 +214,9 @@ export function validateEnv(config) {
     validated.SOCIAL_DRIVER === SocialDriver.Mock
   ) {
     errors.push('SOCIAL_DRIVER: 운영 환경에서는 mock 사용 불가');
+  }
+  if (validated.AIR_DRIVER === 'airkorea' && !validated.AIRKOREA_SERVICE_KEY) {
+    errors.push('AIRKOREA_SERVICE_KEY: AIR_DRIVER=airkorea일 때 필요함');
   }
   if (validated.WEATHER_DRIVER === 'kma' && !validated.KMA_AUTH_KEY) {
     errors.push('KMA_AUTH_KEY: WEATHER_DRIVER=kma일 때 필요함');

@@ -70,7 +70,18 @@ export const usePetSpecies = () =>
 
 // ---- mutations ----
 
-export const useAdjustPoints = () => useChange(api.adjustPoints, ['rewards', 'transactions']);
+// A grant/recovery also changes the balance shown in the member check on the adjust page.
+export const useAdjustPoints = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ payload, idempotencyKey }) => api.adjustPoints(payload, idempotencyKey),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['rewards', 'transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['rewards', 'member'] }),
+      ]),
+  });
+};
 export const useCreatePointCap = () => useChange(api.createPointCap, rewardKeys.caps);
 export const useCreateRewardRate = () =>
   useChange(api.createRewardRate, ['rewards', 'reward-rates']);

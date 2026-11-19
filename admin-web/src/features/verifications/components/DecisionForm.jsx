@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, message, Radio, Space } from 'antd';
+import { Button, Radio, Space } from 'antd';
+import { message } from '../../../lib/message.jsx';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { t } from '../../../i18n/index.js';
 
