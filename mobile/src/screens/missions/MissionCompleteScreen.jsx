@@ -9,6 +9,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { haptics, useRecord } from '../../client';
 import { Button, Icon, Pop, QueryState, RewardSummary, Screen } from '../../components';
+import goHome from '../../navigation/goHome';
 import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
 
@@ -74,7 +75,7 @@ export default function MissionCompleteScreen({ navigation, route }) {
               <Button
                 title="홈으로"
                 variant="secondary"
-                onPress={() => navigation.navigate(Routes.HOME_TAB)}
+                onPress={() => goHome(navigation)}
                 full
               />
             </View>
