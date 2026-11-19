@@ -26,6 +26,7 @@ import {
   TextField,
 } from '../../components';
 import { STATUS_TONE } from '../../components/StatusTag';
+import goHome from '../../navigation/goHome';
 import Routes from '../../navigation/routes';
 import { colors, radius, spacing, typography } from '../../theme';
 
@@ -189,7 +190,7 @@ export default function VerifyResultScreen({ navigation, route }) {
                 {reviewing && (
                   <Button
                     title="홈으로"
-                    onPress={() => navigation.navigate(Routes.HOME_TAB)}
+                    onPress={() => goHome(navigation)}
                     full
                   />
                 )}
