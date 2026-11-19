@@ -19,7 +19,7 @@ INSERT INTO policy_document_versions
     (id, document_type, version, body, effective_at, requires_reconsent, published_at)
 SELECT new_short_id(), t.document_type, 'dev-1',
        '[DEV] ' || t.document_type || ' placeholder text.',
-       timestamptz '2026-01-01 00:00:00+09', false, timestamptz '2026-01-01 00:00:00+09'
+       timestamptz '2026-09-01 00:00:00+09', false, timestamptz '2026-01-01 00:00:00+09'
   FROM (VALUES ('terms'), ('privacy'), ('marketing')) AS t(document_type)
 ON CONFLICT (document_type, version) DO NOTHING;
 
@@ -43,7 +43,7 @@ SELECT new_short_id(), c.id, m.method, 1,
        CASE WHEN c.code = 'exercise' AND m.method = 'sensor'
             THEN '{"minDurationSeconds": 300, "minDistanceMeters": 300}'::jsonb
             ELSE '{}'::jsonb END,
-       timestamptz '2026-01-01 00:00:00+09',
+       timestamptz '2026-09-01 00:00:00+09',
        'd4000001'
   FROM goal_categories c
  CROSS JOIN (VALUES ('camera'), ('sensor')) AS m(method)
@@ -57,7 +57,7 @@ SELECT new_short_id(), c.id, d.id, 1,
        CASE d.code WHEN 'easy' THEN 10 WHEN 'normal' THEN 20 ELSE 30 END,
        CASE d.code WHEN 'easy' THEN 10 WHEN 'normal' THEN 20 ELSE 30 END,
        CASE d.code WHEN 'easy' THEN  5 WHEN 'normal' THEN 10 ELSE 15 END,
-       timestamptz '2026-01-01 00:00:00+09',
+       timestamptz '2026-09-01 00:00:00+09',
        'd4000001'
   FROM goal_categories c
  CROSS JOIN difficulty_levels d
@@ -68,7 +68,7 @@ INSERT INTO streak_milestone_policy_versions
     (id, target_success_days, version_no, points, user_xp, pet_xp,
      effective_at, created_by_admin_id)
 SELECT new_short_id(), t.days, 1, t.points, 0, 0,
-       timestamptz '2026-01-01 00:00:00+09',
+       timestamptz '2026-09-01 00:00:00+09',
        'd4000001'
   FROM (VALUES (7, 70), (30, 300), (100, 1000)) AS t(days, points)
 ON CONFLICT (target_success_days, version_no) DO NOTHING;
@@ -80,7 +80,7 @@ DECLARE
     lvl integer;
 BEGIN
     INSERT INTO user_level_policy_versions (id, version_no, effective_at, created_by_admin_id)
-    VALUES (new_short_id(), 1, timestamptz '2026-01-01 00:00:00+09',
+    VALUES (new_short_id(), 1, timestamptz '2026-09-01 00:00:00+09',
             'd4000001')
     ON CONFLICT (version_no) DO NOTHING
     RETURNING id INTO policy_id;
@@ -93,7 +93,7 @@ BEGIN
 
     policy_id := NULL;
     INSERT INTO pet_level_policy_versions (id, version_no, effective_at, created_by_admin_id)
-    VALUES (new_short_id(), 1, timestamptz '2026-01-01 00:00:00+09',
+    VALUES (new_short_id(), 1, timestamptz '2026-09-01 00:00:00+09',
             'd4000001')
     ON CONFLICT (version_no) DO NOTHING
     RETURNING id INTO policy_id;

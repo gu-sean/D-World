@@ -1,7 +1,9 @@
-import { Alert, Button, Card, Col, Row, Space, Statistic, Table, Typography } from 'antd';
+import { Alert, Card, Col, Flex, Row, Segmented, Statistic, Typography } from 'antd';
+import dayjs from 'dayjs';
 import { Link } from 'react-router';
 import { DateText } from '../../../components/DateText.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { useDashboardSummary } from '../queries.js';
@@ -12,11 +14,12 @@ import { t } from '../../../i18n/index.js';
 // names of src/app/menu.js.
 const QUEUES = {
   verification: { label: t('AI 판정 보류'), path: '/verifications/appeals?tab=hold' },
+  appeal: { label: t('이의 신청'), path: '/verifications/appeals' },
   report: { label: t('신고'), path: '/support/abuse' },
   inquiry: { label: t('문의'), path: '/support/inquiries' },
   withdrawal: { label: t('탈퇴 요청'), path: '/users/withdrawals' },
-  appeal: { label: t('이의 신청'), path: '/verifications/appeals' },
 };
+const QUEUE_ORDER = Object.keys(QUEUES);
 
 const PERIOD_FIELDS = [{ name: 'period', type: 'dateRange' }]; // writes `from` and `to`
 
@@ -25,28 +28,52 @@ const PERIOD_ERROR_TEXTS = {
   reversed: t('시작일이 종료일보다 늦을 수 없어요.'),
 };
 
+// Statistics of the chosen period. The waiting counts are shown above as work to do.
 const STATS = [
   { key: 'activeUserCount', title: t('활동 사용자') },
   { key: 'missionCount', title: t('미션 수') },
-  { key: 'pendingVerificationCount', title: t('AI 판정 보류') },
-  { key: 'openReportCount', title: t('미처리 신고') },
 ];
 
-const QUEUE_COLUMNS = [
-  { title: t('업무'), dataIndex: 'type', render: (type) => QUEUES[type]?.label ?? type },
-  { title: t('대기 건수'), dataIndex: 'count' },
-  {
-    title: t('가장 오래된 접수'),
-    dataIndex: 'oldestAt',
-    render: (value) => <DateText value={value} />,
-  },
-  {
-    title: '',
-    dataIndex: 'type',
-    key: 'link',
-    render: (type) => (QUEUES[type] ? <Link to={QUEUES[type].path}>{t('바로가기')}</Link> : null),
-  },
+const PRESETS = [
+  { value: 1, label: t('오늘') },
+  { value: 7, label: t('최근 7일') },
+  { value: 30, label: t('최근 30일') },
 ];
+
+const WARNING_DAYS = 3; // a queue whose oldest item waited this long is shown in red
+const WARNING_COLOR = '#d4380d';
+const ATTENTION_COLOR = '#d46b08';
+
+/** One waiting-work card: the count is the first thing the eye finds; the whole card is a link. */
+function QueueCard({ queue }) {
+  const info = QUEUES[queue.type];
+  if (!info) return null;
+  const waitedDays = queue.oldestAt ? dayjs().diff(dayjs(queue.oldestAt), 'day') : 0;
+  const overdue = queue.count > 0 && waitedDays >= WARNING_DAYS;
+  const color = queue.count === 0 ? undefined : overdue ? WARNING_COLOR : ATTENTION_COLOR;
+  return (
+    <Link
+      to={info.path}
+      aria-label={`${info.label} ${queue.count}`}
+      style={{ display: 'block', height: '100%' }}
+    >
+      <Card hoverable size="small" style={{ height: '100%' }} styles={{ body: { padding: 16 } }}>
+        <Typography.Text type="secondary">{info.label}</Typography.Text>
+        <div style={{ fontSize: 32, fontWeight: 600, lineHeight: 1.3, color }}>{queue.count}</div>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {queue.count === 0 ? (
+            t('처리할 일이 없어요')
+          ) : (
+            <>
+              {t('가장 오래된 접수')} <DateText value={queue.oldestAt} />
+              {overdue ? ` · ${t('{0}일째 대기', waitedDays)}` : ''}
+            </>
+          )}
+        </Typography.Text>
+      </Card>
+    </Link>
+  );
+}
 
 /** ADM-01 대시보드 (M05). The period is in the URL (`?from=&to=`), today..today by default. */
 export default function DashboardPage() {
@@ -56,53 +83,88 @@ export default function DashboardPage() {
     { from: period.from, to: period.to },
     { enabled: period.error === null },
   );
+  const preset = PRESETS.find((item) => {
+    const range = lastDays(item.value);
+    return range.from === period.from && range.to === period.to;
+  });
 
-  return (
-    <>
-      <Typography.Title level={3}>{t('대시보드')}</Typography.Title>
-      <Space wrap style={{ marginBottom: 16 }}>
-        <Button onClick={() => setParams(lastDays(1))}>{t('오늘')}</Button>
-        <Button onClick={() => setParams(lastDays(7))}>{t('최근 7일')}</Button>
-        <Button onClick={() => setParams(lastDays(30))}>{t('최근 30일')}</Button>
-      </Space>
+  const periodControls = (
+    <Flex wrap gap={12} align="flex-end" style={{ marginBottom: 12 }}>
+      <Segmented
+        options={PRESETS}
+        value={preset?.value}
+        onChange={(value) => setParams(lastDays(value))}
+      />
       <FilterBar
+        compact
         fields={PERIOD_FIELDS}
         value={{ from: params.from, to: params.to }}
         onChange={setParams}
       />
-      {period.error ? (
+    </Flex>
+  );
+
+  if (period.error) {
+    return (
+      <>
+        <PageHeader title={t('대시보드')} />
+        {periodControls}
         <Alert type="warning" showIcon title={PERIOD_ERROR_TEXTS[period.error]} />
-      ) : (
-        <QueryBoundary query={query}>
-          {(summary) => (
+      </>
+    );
+  }
+
+  return (
+    <>
+      <PageHeader
+        title={t('대시보드')}
+        description={t('처리할 일을 먼저 보고, 아래에서 기간별 현황을 확인해요.')}
+      />
+      <QueryBoundary query={query}>
+        {(summary) => {
+          const queues = QUEUE_ORDER.map(
+            (type) =>
+              summary.queues.find((queue) => queue.type === type) ?? {
+                type,
+                count: 0,
+                oldestAt: null,
+              },
+          );
+          return (
             <>
-              <Typography.Paragraph type="secondary">
-                {t('{0} ~ {1} · 집계 시각', summary.from, summary.to)}{' '}
-                <DateText value={summary.aggregatedAt} />
-              </Typography.Paragraph>
+              <Typography.Title level={4} style={{ marginTop: 0 }}>
+                {t('처리 대기 업무')}
+              </Typography.Title>
               <Row gutter={[16, 16]}>
-                {STATS.map(({ key, title }) => (
-                  <Col key={key} xs={24} sm={12} lg={6}>
-                    <Card data-testid={`stat-${key}`}>
-                      <Statistic title={title} value={summary[key]} />
-                    </Card>
+                {queues.map((queue) => (
+                  <Col key={queue.type} xs={12} md={8} xl={{ flex: '20%' }}>
+                    <QueueCard queue={queue} />
                   </Col>
                 ))}
               </Row>
               <Typography.Title level={4} style={{ marginTop: 32 }}>
-                {t('처리 대기 업무')}
+                {t('기간별 현황')}
               </Typography.Title>
-              <Table
-                rowKey="type"
-                size="middle"
-                pagination={false}
-                columns={QUEUE_COLUMNS}
-                dataSource={summary.queues}
-              />
+              {periodControls}
+              <>
+                <Typography.Paragraph type="secondary">
+                  {t('{0} ~ {1} · 집계 시각', summary.from, summary.to)}{' '}
+                  <DateText value={summary.aggregatedAt} />
+                </Typography.Paragraph>
+                <Row gutter={[16, 16]}>
+                  {STATS.map(({ key, title }) => (
+                    <Col key={key} xs={12} md={8} xl={6}>
+                      <Card data-testid={`stat-${key}`} size="small">
+                        <Statistic title={title} value={summary[key]} />
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              </>
             </>
-          )}
-        </QueryBoundary>
-      )}
+          );
+        }}
+      </QueryBoundary>
     </>
   );
 }

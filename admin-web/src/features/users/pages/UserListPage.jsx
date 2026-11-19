@@ -1,4 +1,4 @@
-import { Tag, Typography } from 'antd';
+import { Tag } from 'antd';
 import { useNavigate } from 'react-router';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
@@ -10,6 +10,8 @@ import { useListParams } from '../../../components/useListParams.js';
 import { labels } from '../../../constants/labels.js';
 import { useUsers } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { ListCard } from '../../../components/ListCard.jsx';
 
 const DEFAULT_SORT = 'createdAt,desc'; // docs/09 M10
 
@@ -87,14 +89,16 @@ export default function UserListPage() {
 
   return (
     <>
-      <Typography.Title level={3}>{t('회원 목록')}</Typography.Title>
-      <FilterBar fields={FIELDS} value={filterValue} onChange={handleFilter} />
-      <DataTable
-        query={query}
-        columns={COLUMNS}
-        defaultSort={DEFAULT_SORT}
-        onRowClick={(user) => navigate(`/users/${user.id}`)}
-      />
+      <PageHeader title={t('회원 목록')} description={t('가입한 회원을 찾고 상태를 확인해요.')} />
+      <ListCard>
+        <FilterBar fields={FIELDS} value={filterValue} onChange={handleFilter} />
+        <DataTable
+          query={query}
+          columns={COLUMNS}
+          defaultSort={DEFAULT_SORT}
+          onRowClick={(user) => navigate(`/users/${user.id}`)}
+        />
+      </ListCard>
     </>
   );
 }

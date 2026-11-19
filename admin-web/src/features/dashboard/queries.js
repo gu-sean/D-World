@@ -9,12 +9,13 @@ export const dashboardKeys = {
 /**
  * M05. Asked again whenever the period changes.
  * @param {{from: string, to: string}} params
- * @param {{enabled?: boolean}} [options] `enabled: false` while the period is not valid
+ * @param {{enabled?: boolean, refetchInterval?: number}} [options] `enabled: false` while the period is not valid
  */
-export const useDashboardSummary = (params, { enabled = true } = {}) =>
+export const useDashboardSummary = (params, { enabled = true, refetchInterval } = {}) =>
   useQuery({
     queryKey: dashboardKeys.summary(params),
     queryFn: () => fetchDashboardSummary(params),
     placeholderData: keepPreviousData,
     enabled,
+    refetchInterval,
   });

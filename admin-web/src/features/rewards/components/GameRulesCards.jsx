@@ -12,8 +12,8 @@ export function DailyLimitRules() {
       <Alert
         showIcon
         type="info"
-        style={{ marginBottom: 16 }}
-        message={t(
+        className="mb-16"
+        title={t(
           '앱에서 실제로 적용되는 규칙이에요. 값은 서버에 고정돼 있어 이 화면에서 바꾸지 않아요.',
         )}
       />
@@ -36,7 +36,7 @@ export function DailyLimitRules() {
       <Alert
         type="warning"
         style={{ marginTop: 16, maxWidth: 560 }}
-        message={t(
+        title={t(
           '한도를 넘는 포인트는 지급되지 않고, 펫 XP는 지갑에 쌓였다가 사용자가 "경험치 주기"로 펫에게 먹여요.',
         )}
       />
@@ -51,8 +51,8 @@ export function GrowthRules() {
       <Alert
         showIcon
         type="info"
-        style={{ marginBottom: 16 }}
-        message={t(
+        className="mb-16"
+        title={t(
           '앱에서 실제로 적용되는 규칙이에요. 모든 펫 종류에 똑같이 적용되고 이 화면에서 바꾸지 않아요.',
         )}
       />

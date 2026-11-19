@@ -11,6 +11,7 @@ import { AccountActionsTable } from '../components/AccountActionsTable.jsx';
 import { UserActivityTab } from '../components/UserActivityTab.jsx';
 import { useLiftAccountAction, useUser } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 
 function BasicTab({ user }) {
   const [liftTarget, setLiftTarget] = useState(null);
@@ -115,7 +116,7 @@ export default function UserDetailPage() {
 
   return (
     <>
-      <Typography.Title level={3}>{t('회원 상세')}</Typography.Title>
+      <PageHeader title={t('회원 상세')} />
       <QueryBoundary query={query}>
         {(user) => (
           <Tabs

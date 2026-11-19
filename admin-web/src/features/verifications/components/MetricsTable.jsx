@@ -96,7 +96,7 @@ export default function MetricsTable({ metrics }) {
       </Descriptions.Item>
       {issues.length > 0 && (
         <Descriptions.Item label={t('자세 문제 구간')} span={2}>
-          <Typography.Text code style={{ whiteSpace: 'pre-wrap' }}>
+          <Typography.Text code className="pre-wrap">
             {JSON.stringify(issues)}
           </Typography.Text>
         </Descriptions.Item>

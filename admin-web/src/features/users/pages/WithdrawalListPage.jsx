@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Space, Typography } from 'antd';
+import { Button, Space } from 'antd';
 import { message } from '../../../lib/message.jsx';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { DataTable } from '../../../components/DataTable.jsx';
@@ -11,8 +11,10 @@ import { useListParams } from '../../../components/useListParams.js';
 import { labels } from '../../../constants/labels.js';
 import { useUpdateWithdrawal, useWithdrawals } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { ListCard } from '../../../components/ListCard.jsx';
 
-const DEFAULT_SORT = 'requestedAt,asc'; // docs/09 M15: oldest request first
+const DEFAULT_SORT = 'requestedAt,desc'; // newest first (all lists: newest date on top)
 
 const FIELDS = [
   MEMBER_FIELD,
@@ -98,9 +100,14 @@ export default function WithdrawalListPage() {
 
   return (
     <>
-      <Typography.Title level={3}>{t('탈퇴 요청')}</Typography.Title>
-      <FilterBar fields={FIELDS} value={params} onChange={setParams} />
-      <DataTable query={query} columns={columns} defaultSort={DEFAULT_SORT} />
+      <PageHeader
+        title={t('탈퇴 요청')}
+        description={t('탈퇴를 요청한 회원을 확인하고 처리해요.')}
+      />
+      <ListCard>
+        <FilterBar fields={FIELDS} value={params} onChange={setParams} />
+        <DataTable query={query} columns={columns} defaultSort={DEFAULT_SORT} />
+      </ListCard>
       <ConfirmActionModal
         open={target !== null}
         title={action?.title ?? ''}

@@ -39,7 +39,7 @@ INSERT INTO achievement_versions
 SELECT v.id::short_id, v.achievement_id::short_id, 1, v.title, v.description, v.rarity, v.condition_type, v.target_count,
        (SELECT id FROM goal_categories WHERE code = v.category_code),
        v.points, 0, 0, v.badge_id::short_id,
-       timestamptz '2026-01-01 00:00:00+09', 'd4000001'
+       timestamptz '2026-09-01 00:00:00+09', 'd4000001'
   FROM (VALUES
     ('d4000221', 'd4000201', '첫 목표 달성', '목표를 처음으로 완료했어요', 'common', 'first_goal_completed', 1, NULL, 100, 'd4000211'),
     ('d4000222', 'd4000202', '미션 10개', '미션을 10개 완료했어요', 'common', 'approved_mission_count', 10, NULL, 100, 'd4000212'),

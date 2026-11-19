@@ -2,12 +2,14 @@
 //
 // AI가 확신하지 못해 보류(review_required)한 인증만 여기서 관리자가 승인·거절한다.
 import { Link, useNavigate, useParams } from 'react-router';
-import { Card, Space, Typography } from 'antd';
+import { Card, Typography } from 'antd';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import DecisionForm from '../components/DecisionForm.jsx';
 import RecordSummary from '../components/RecordSummary.jsx';
 import { useDecideVerification, useVerification } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { Stack } from '../../../components/Stack.jsx';
 
 const LABELS = { approved: t('승인'), rejected: t('거절') };
 const BACK = '/verifications/appeals?tab=hold';
@@ -19,8 +21,8 @@ export default function HoldReviewPage() {
   const decide = useDecideVerification();
 
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Typography.Title level={3}>{t('AI 판정 보류 검토')}</Typography.Title>
+    <Stack size="middle">
+      <PageHeader title={t('AI 판정 보류 검토')} />
       <Link to={BACK}>{t('← 처리 대기')}</Link>
       <QueryBoundary query={query}>
         {(record) => (
@@ -46,6 +48,6 @@ export default function HoldReviewPage() {
           </>
         )}
       </QueryBoundary>
-    </Space>
+    </Stack>
   );
 }

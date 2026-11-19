@@ -37,8 +37,8 @@ import { REASON_RULE_OPTIONS } from '../admin-members/admin-members.service.js';
 const nullable = (rule) => (raw) =>
   raw === null ? { value: null } : rule(raw);
 
-/** 요일: 1=월 … 7=일, null이면 매일 */
-const weekdayRule = () => integer({ min: 1, max: 7, optional: true });
+/** 요일: 1=월 … 7=일 (필수) */
+const weekdayRule = (options = {}) => integer({ min: 1, max: 7, ...options });
 
 const view = (row) => ({
   id: row.id,
@@ -62,7 +62,7 @@ function assertPeriod({ startsAt, endsAt }) {
 
 /**
  * 관리자 추천 문구 API: 목록(M98), 등록(M99), 수정(M100)
- * 문구는 요일별로 정한다(weekday 1=월 … 7=일, null=매일). 홈 화면은 오늘 요일의 문구를 보여 준다.
+ * 문구는 요일별로 정한다(weekday 1=월 … 7=일). 홈 화면은 오늘 요일의 문구를 보여 준다.
  */
 @Controller('admin/v1/recommendation-messages')
 @AdminOnly()
@@ -73,13 +73,12 @@ export class AdminRecommendationMessagesController {
     this.mutation = mutation;
   }
 
-  /** M98: 기본 정렬은 매일 문구 → 월~일 순 */
+  /** M98: 기본 정렬은 월~일 순 */
   @Get()
   @Bind(Query())
   async list(query) {
     const active = pickEnum(query, 'isActive', ['true', 'false']);
     const weekday = pickEnum(query, 'weekday', [
-      'all',
       '1',
       '2',
       '3',
@@ -89,18 +88,16 @@ export class AdminRecommendationMessagesController {
       '7',
     ]);
     const paging = parseAdminPage(query, {
-      'weekday,asc': 'weekday ASC NULLS FIRST, created_at DESC, id DESC',
+      'weekday,asc': 'weekday ASC, created_at DESC, id DESC',
       'createdAt,desc': 'created_at DESC, id DESC',
     });
     const params = [
       active === undefined ? null : active === 'true',
-      // all: 매일(요일 없음) 문구만, 1~7: 그 요일 문구만, 생략: 전부
+      // 1~7: 그 요일 문구만, 생략: 전부
       weekday ?? null,
     ];
     const where = `($1::boolean IS NULL OR is_active = $1)
-      AND ($2::text IS NULL
-           OR ($2 = 'all' AND weekday IS NULL)
-           OR ($2 <> 'all' AND weekday = $2::smallint))`;
+      AND ($2::text IS NULL OR weekday = $2::smallint)`;
     const [{ rows }, count] = await Promise.all([
       this.database.query(
         `SELECT * FROM recommendation_messages WHERE ${where}
@@ -121,7 +118,7 @@ export class AdminRecommendationMessagesController {
   create(request, body) {
     const input = validateBody(body, {
       message: string({ min: 1, max: 200, pattern: /\S/ }),
-      weekday: nullable(weekdayRule()),
+      weekday: weekdayRule(),
       categoryId: shortId({ optional: true }),
       startsAt: timestamp({ optional: true }),
       endsAt: timestamp({ optional: true }),
@@ -145,7 +142,7 @@ export class AdminRecommendationMessagesController {
           [
             newId(),
             input.message.trim(),
-            input.weekday ?? null,
+            input.weekday,
             input.categoryId ?? null,
             input.startsAt ?? null,
             input.endsAt ?? null,
@@ -166,14 +163,14 @@ export class AdminRecommendationMessagesController {
     });
   }
 
-  /** M100: 보낸 필드만 바꿈, 요일·시작·종료 시각과 분야는 null로 비울 수 있음(요일 null = 매일) */
+  /** M100: 보낸 필드만 바꿈, 시작·종료 시각과 분야는 null로 비울 수 있음(요일은 바꾸기만 가능) */
   @Patch(':messageId')
   @Bind(Req(), Param('messageId'), Body())
   update(request, messageId, body) {
     const id = idOf(messageId);
     const input = validateBody(body, {
       message: string({ min: 1, max: 200, pattern: /\S/, optional: true }),
-      weekday: nullable(weekdayRule()),
+      weekday: weekdayRule({ optional: true }),
       categoryId: nullable(shortId({ optional: true })),
       startsAt: nullable(timestamp({ optional: true })),
       endsAt: nullable(timestamp({ optional: true })),

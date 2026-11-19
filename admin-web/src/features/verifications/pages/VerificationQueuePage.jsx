@@ -3,7 +3,7 @@
 // 모든 미션 인증과 판정 결과를 나중에 찾아볼 수 있게 남겨 두는 이력 화면이다.
 // 판정은 여기서 하지 않는다: AI가 먼저 판정하고, 관리자는 "처리 대기"(이의 신청·AI 판정 보류)에서만 손댄다.
 import { Link, useNavigate } from 'react-router';
-import { Alert, Space, Typography } from 'antd';
+import { Alert } from 'antd';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';
@@ -14,6 +14,9 @@ import { labels } from '../../../constants/labels.js';
 import { formatConfidence, formatTarget, METHOD_LABEL } from '../components/format.js';
 import { useVerifications } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { ListCard } from '../../../components/ListCard.jsx';
+import { Stack } from '../../../components/Stack.jsx';
 
 const STATUS_VALUES = ['approved', 'rejected', 'review_required', 'submitted'];
 const FIELDS = [
@@ -21,7 +24,7 @@ const FIELDS = [
   {
     name: 'status',
     type: 'select',
-    label: t('상태 (전체)'),
+    label: t('상태'),
     options: STATUS_VALUES.map((value) => ({ value, label: labels.recordStatus[value].text })),
   },
   {
@@ -46,7 +49,8 @@ export default function VerificationQueuePage() {
       sorter: true,
       render: (value, row) => (
         <Link to={`/verifications/${row.recordId}`}>
-          <DateText value={value} />
+          {/* 제출 전(녹화 중·업로드 중·중단) 기록은 제출 시각이 없어 시작 시각을 보여 줌 */}
+          <DateText value={value ?? row.startedAt} />
         </Link>
       ),
     },
@@ -67,8 +71,8 @@ export default function VerificationQueuePage() {
   ];
 
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Typography.Title level={3}>{t('인증 기록')}</Typography.Title>
+    <Stack size="middle">
+      <PageHeader title={t('인증 기록')} />
       <Alert
         type="info"
         showIcon
@@ -82,14 +86,16 @@ export default function VerificationQueuePage() {
           </>
         }
       />
-      <FilterBar fields={FIELDS} value={params} onChange={setParams} />
-      <DataTable
-        query={query}
-        rowKey="recordId"
-        columns={columns}
-        defaultSort="submittedAt,desc"
-        onRowClick={(row) => navigate(`/verifications/${row.recordId}`)}
-      />
-    </Space>
+      <ListCard>
+        <FilterBar fields={FIELDS} value={params} onChange={setParams} />
+        <DataTable
+          query={query}
+          rowKey="recordId"
+          columns={columns}
+          defaultSort="submittedAt,desc"
+          onRowClick={(row) => navigate(`/verifications/${row.recordId}`)}
+        />
+      </ListCard>
+    </Stack>
   );
 }

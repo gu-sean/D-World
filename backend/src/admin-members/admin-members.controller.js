@@ -425,8 +425,8 @@ export class AdminMembersController {
   async listWithdrawals(query) {
     const status = pickEnum(query, 'status', WITHDRAWAL_STATUSES);
     const paging = parseAdminPage(query, {
-      'requestedAt,asc': 'w.requested_at ASC, w.id ASC',
       'requestedAt,desc': 'w.requested_at DESC, w.id DESC',
+      'requestedAt,asc': 'w.requested_at ASC, w.id ASC',
     });
     // member: 닉네임 또는 회원 ID (common/member-query.js)
     const member = memberQueryParams(query.member);

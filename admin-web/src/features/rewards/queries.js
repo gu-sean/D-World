@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as api from './api.js';
+import { REFERENCE_STALE_MS } from '../../api/staleTime.js';
 
 export const rewardKeys = {
   transactions: (params) => ['rewards', 'transactions', params],
@@ -51,10 +52,18 @@ export const useRewardRates = (params) =>
   useQuery({ queryKey: rewardKeys.rates(params), queryFn: () => api.listRewardRates(params) });
 
 export const useCategories = () =>
-  useQuery({ queryKey: rewardKeys.categories, queryFn: api.fetchCategories });
+  useQuery({
+    queryKey: rewardKeys.categories,
+    queryFn: api.fetchCategories,
+    staleTime: REFERENCE_STALE_MS,
+  });
 
 export const useDifficultyLevels = () =>
-  useQuery({ queryKey: rewardKeys.difficulties, queryFn: api.fetchDifficultyLevels });
+  useQuery({
+    queryKey: rewardKeys.difficulties,
+    queryFn: api.fetchDifficultyLevels,
+    staleTime: REFERENCE_STALE_MS,
+  });
 
 export const useStreakMilestones = () =>
   useQuery({ queryKey: rewardKeys.streaks, queryFn: api.listStreakMilestones });

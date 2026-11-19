@@ -2,6 +2,7 @@ import { RequestMethod } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { requestIdMiddleware } from './common/http/request-id.middleware.js';
 import { mobileCompatMiddleware } from './common/http/mobile-compat.middleware.js';
+import { noStoreMiddleware } from './common/http/no-store.middleware.js';
 import { ERROR_CODES } from './common/errors/error-codes.js';
 
 /**
@@ -14,6 +15,7 @@ export function configureApp(app) {
   // JSON 본문 상한 1MB(기본 100KB): 약관 본문 등 긴 글을 받기 위함, 초과는 413 표준 오류
   app.useBodyParser('json', { limit: '1mb' });
   app.use(requestIdMiddleware);
+  app.use(noStoreMiddleware); // 관리자·앱 API 응답은 캐시하지 않음
   app.use(mobileCompatMiddleware); // 모바일 클라이언트 경로 별칭
   app.use(cookieParser()); // 관리자 리프레시 쿠키
   app.setGlobalPrefix('api/v1', {

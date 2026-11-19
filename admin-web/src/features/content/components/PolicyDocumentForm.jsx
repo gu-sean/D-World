@@ -55,7 +55,7 @@ export function PolicyDocumentForm({ onConfirm, onClose }) {
           {t('게시하기 전까지는 회원에게 보이지 않아요.')}
         </>
       ),
-      submit: async ({ reason, idempotencyKey }) => {
+      run: async ({ reason, idempotencyKey }) => {
         await create.mutateAsync({ body: { ...input, reason }, idempotencyKey });
         onClose();
       },
@@ -93,7 +93,7 @@ export function PolicyDocumentForm({ onConfirm, onClose }) {
           <Input
             type="datetime-local"
             aria-label={t('시행 시각')}
-            style={{ maxWidth: 240 }}
+            className="field-narrow"
             value={form.effectiveAt}
             onChange={(event) => set({ effectiveAt: event.target.value })}
           />

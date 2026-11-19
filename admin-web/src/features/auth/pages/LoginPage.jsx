@@ -1,5 +1,6 @@
 // LOGIN Admin login screen
-import { Button, Card, Form, Input, Typography } from 'antd';
+import { useEffect } from 'react';
+import { Alert, Button, Card, Form, Input, Typography } from 'antd';
 import { Navigate, useSearchParams } from 'react-router';
 import { getAccessToken } from '../../../api/session.js';
 import { useLogin } from '../queries.js';
@@ -17,6 +18,10 @@ export default function LoginPage() {
   const login = useLogin();
   const next = safeNextPath(searchParams.get('next'));
 
+  useEffect(() => {
+    document.title = `${t('D-World 관리자')} · ${t('로그인')}`;
+  }, []);
+
   // After a successful login the session exists, so this page redirects by itself.
   if (getAccessToken()) return <Navigate to={next} replace />;
 
@@ -29,6 +34,14 @@ export default function LoginPage() {
         <Typography.Title level={3} style={{ textAlign: 'center' }}>
           {t('D-World 관리자')}
         </Typography.Title>
+        {searchParams.get('reason') === 'idle' && (
+          <Alert
+            type="info"
+            showIcon
+            title={t('오래 사용하지 않아 안전을 위해 로그아웃했어요. 다시 로그인해 주세요.')}
+            style={{ marginBottom: 16 }}
+          />
+        )}
         <Form layout="vertical" onFinish={(values) => login.mutate(values)}>
           <Form.Item
             label={t('아이디')}

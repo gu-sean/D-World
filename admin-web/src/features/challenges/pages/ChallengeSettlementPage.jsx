@@ -1,6 +1,6 @@
 // ADM-20 챌린지 정산과 보상
 import { useState } from 'react';
-import { Alert, Button, Descriptions, Space, Typography } from 'antd';
+import { Alert, Button, Descriptions, Space } from 'antd';
 import { message } from '../../../lib/message.jsx';
 import { useParams, useSearchParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
@@ -17,7 +17,9 @@ import {
   useRetryPayments,
   useSettlementRun,
 } from '../queries.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 import { t } from '../../../i18n/index.js';
+import { Stack } from '../../../components/Stack.jsx';
 
 export default function ChallengeSettlementPage() {
   const { challengeId } = useParams();
@@ -63,10 +65,8 @@ export default function ChallengeSettlementPage() {
   };
 
   return (
-    <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
-        {t('챌린지 정산과 보상')}
-      </Typography.Title>
+    <Stack size="middle">
+      <PageHeader title={t('챌린지 정산과 보상')} />
       <QueryBoundary query={challenge}>
         {(data) => (
           <Descriptions bordered size="small" column={2}>
@@ -107,7 +107,7 @@ export default function ChallengeSettlementPage() {
       {runId && (
         <QueryBoundary query={run}>
           {(data) => (
-            <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+            <Stack size="middle">
               <Descriptions size="small" column={3}>
                 <Descriptions.Item label={t('회차')}>{data.runNo}</Descriptions.Item>
                 <Descriptions.Item label={t('상태')}>
@@ -155,7 +155,7 @@ export default function ChallengeSettlementPage() {
               ) : (
                 <SettlementPreviewTable entries={data.entries} />
               )}
-            </Space>
+            </Stack>
           )}
         </QueryBoundary>
       )}
@@ -168,6 +168,6 @@ export default function ChallengeSettlementPage() {
         onSubmit={submit}
         onCancel={() => setAction(null)}
       />
-    </Space>
+    </Stack>
   );
 }

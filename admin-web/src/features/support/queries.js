@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { addTicketEvent, assignTicket, fetchTicket, fetchTickets, resolveTicket } from './api.js';
+import { dashboardKeys } from '../dashboard/queries.js';
 
 export const supportKeys = {
   all: ['support'],
@@ -24,7 +25,12 @@ function useMenuMutation(mutationFn) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: supportKeys.all }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: supportKeys.all }),
+        // the waiting counts of the dashboard and the menu badges change as well
+        queryClient.invalidateQueries({ queryKey: dashboardKeys.all }),
+      ]),
   });
 }
 

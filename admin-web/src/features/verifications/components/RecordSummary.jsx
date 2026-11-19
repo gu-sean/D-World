@@ -1,4 +1,4 @@
-import { Descriptions, Space, Table, Tag, Typography } from 'antd';
+import { Descriptions, Table, Tag, Typography } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
 import { MemberCell } from '../../../components/MemberCell.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
@@ -7,6 +7,7 @@ import { formatConfidence, formatTarget, METHOD_LABEL } from './format.js';
 import MetricsTable from './MetricsTable.jsx';
 import RunRouteImage from './RunRouteImage.jsx';
 import { t } from '../../../i18n/index.js';
+import { Stack } from '../../../components/Stack.jsx';
 
 const resultColumns = [
   { title: t('회차'), dataIndex: 'resultNo', width: 64 },
@@ -47,7 +48,7 @@ const appealColumns = [
 export default function RecordSummary({ record }) {
   const { mission } = record;
   return (
-    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
+    <Stack size="large">
       <Descriptions title={t('수행 회차')} bordered size="small" column={2}>
         <Descriptions.Item label={t('회차 ID')}>{record.recordId}</Descriptions.Item>
         <Descriptions.Item label={t('상태')}>
@@ -132,6 +133,6 @@ export default function RecordSummary({ record }) {
           locale={{ emptyText: t('이의 제기가 없어요.') }}
         />
       </div>
-    </Space>
+    </Stack>
   );
 }

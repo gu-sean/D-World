@@ -1,5 +1,5 @@
 // ADM-13 미션 틀 목록
-import { Button, Space, Typography } from 'antd';
+import { Button } from 'antd';
 import { Link } from 'react-router';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
@@ -8,7 +8,9 @@ import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { EXERCISE_OPTIONS, FILTER_STATUS_OPTIONS, labelOf, ORIGIN_OPTIONS } from '../constants.js';
 import { useCatalog, useDefinitions } from '../queries.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 import { t } from '../../../i18n/index.js';
+import { ListCard } from '../../../components/ListCard.jsx';
 
 export default function MissionDefinitionListPage() {
   const [params, setParams] = useListParams({ sort: 'createdAt,desc' }); // API default (docs/09)
@@ -68,16 +70,19 @@ export default function MissionDefinitionListPage() {
 
   return (
     <div>
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          {t('미션 틀')}
-        </Typography.Title>
-        <Link to="/missions/definitions/new">
-          <Button type="primary">{t('미션 등록')}</Button>
-        </Link>
-      </Space>
-      <FilterBar fields={fields} value={params} onChange={setParams} />
-      <DataTable query={query} columns={columns} defaultSort="createdAt,desc" />
+      <PageHeader
+        title={t('미션 틀')}
+        description={t('회원이 고를 수 있는 미션의 기본 형태를 관리해요.')}
+        actions={
+          <Link to="/missions/definitions/new">
+            <Button type="primary">{t('미션 등록')}</Button>
+          </Link>
+        }
+      />
+      <ListCard>
+        <FilterBar fields={fields} value={params} onChange={setParams} />
+        <DataTable query={query} columns={columns} defaultSort="createdAt,desc" />
+      </ListCard>
     </div>
   );
 }

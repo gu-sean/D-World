@@ -8,6 +8,24 @@ const STATUS_FALLBACKS = {
   401: { code: 'COMMON_UNAUTHORIZED', message: t('로그인이 필요해요.') },
   403: { code: 'COMMON_FORBIDDEN', message: t('권한이 없어요.') },
   404: { code: 'COMMON_NOT_FOUND', message: t('찾을 수 없어요.') },
+  413: { code: 'COMMON_PAYLOAD_TOO_LARGE', message: t('보내는 내용이 너무 커요.') },
+  429: {
+    code: 'COMMON_RATE_LIMITED',
+    message: t('요청이 너무 많아요. 잠시 후 다시 시도해 주세요.'),
+  },
+  // a proxy or load balancer answered instead of the server (no JSON body)
+  502: {
+    code: 'COMMON_UNAVAILABLE',
+    message: t('서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.'),
+  },
+  503: {
+    code: 'COMMON_UNAVAILABLE',
+    message: t('서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.'),
+  },
+  504: {
+    code: 'COMMON_UNAVAILABLE',
+    message: t('서버 응답이 너무 늦어요. 잠시 후 다시 시도해 주세요.'),
+  },
 };
 const INTERNAL_ERROR = { code: 'COMMON_INTERNAL', message: t('잠시 후 다시 시도해 주세요.') };
 

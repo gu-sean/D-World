@@ -45,8 +45,10 @@ export class AdminVerificationsController {
     const method = pickEnum(query, 'method', ['camera', 'sensor']);
     const userId = query.userId ? idOf(query.userId) : undefined;
     const paging = parseAdminPage(query, {
-      'submittedAt,asc': 'r.submitted_at ASC, r.id ASC',
-      'submittedAt,desc': 'r.submitted_at DESC, r.id DESC',
+      // 제출 전(녹화 중·업로드 중·중단) 기록은 submitted_at이 없어 시작 시각으로 대신 정렬
+      'submittedAt,desc':
+        'COALESCE(r.submitted_at, r.started_at) DESC, r.id DESC',
+      'submittedAt,asc': 'COALESCE(r.submitted_at, r.started_at) ASC, r.id ASC',
     });
     const { page, completedToday } = await this.reviews.list({
       status,

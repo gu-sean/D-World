@@ -31,6 +31,7 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
   const keyRef = useRef(null);
   const [reason, setReason] = useState('');
   const [submitError, setSubmitError] = useState(null);
+  const [submitFields, setSubmitFields] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [triedOnce, setTriedOnce] = useState(false);
 
@@ -40,6 +41,7 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
     keyRef.current = newIdempotencyKey();
     setReason('');
     setSubmitError(null);
+    setSubmitFields([]);
     setSubmitting(false);
     setTriedOnce(false);
   }, [open]);
@@ -47,6 +49,7 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
   const handleOk = async () => {
     const trimmed = reason.trim();
     setSubmitError(null);
+    setSubmitFields([]);
     setSubmitting(true);
     try {
       // 비어 있으면 보내지 않는다 (서버가 기본 문구를 채움)
@@ -54,6 +57,8 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
     } catch (error) {
       setTriedOnce(true);
       setSubmitError(error?.message || FALLBACK_ERROR_TEXT);
+      // validation errors list which input was wrong: `details.fields = { 'rules.minX': 'reason' }`
+      setSubmitFields(Object.entries(error?.details?.fields ?? {}));
     } finally {
       setSubmitting(false);
     }
@@ -73,7 +78,7 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
       onOk={handleOk}
       onCancel={submitting ? undefined : onCancel}
     >
-      <div style={{ marginBottom: 16 }}>{summary}</div>
+      <div className="mb-16">{summary}</div>
       <label htmlFor="confirm-action-reason">{t('사유 (선택)')}</label>
       {/* The character count is drawn below the box; the padding keeps it off the footer buttons. */}
       <div style={{ paddingBottom: 24 }}>
@@ -91,6 +96,13 @@ export function ConfirmActionModal({ open, title, summary, onSubmit, onCancel, d
       {submitError && (
         <div role="alert" style={{ color: '#ff4d4f', marginTop: 12 }}>
           {submitError}
+          {submitFields.length > 0 && (
+            <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+              {submitFields.map(([field, reason]) => (
+                <li key={field}>{`${field}: ${reason}`}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </Modal>

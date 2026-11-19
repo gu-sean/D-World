@@ -1,7 +1,7 @@
-import { Typography } from 'antd';
 import { useLocation } from 'react-router';
 import { NotImplementedPanel } from '../../../components/NotImplementedPanel.jsx';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 
 // The four routes share this page (docs/parts/admin-web.md §3: ADM-28~31).
 const TITLES = {
@@ -16,7 +16,7 @@ export default function BillingPlaceholderPage() {
   const { pathname } = useLocation();
   return (
     <>
-      <Typography.Title level={3}>{TITLES[pathname] ?? t('결제·구독')}</Typography.Title>
+      <PageHeader title={TITLES[pathname] ?? t('결제·구독')} />
       <NotImplementedPanel />
     </>
   );

@@ -1,4 +1,4 @@
-// 추천 문구의 요일: 1=월 … 7=일(한국 요일), 비어 있으면(null) 매일
+// 추천 문구의 요일: 1=월 … 7=일(한국 요일)
 import { t } from '../../i18n/index.js';
 
 export const WEEKDAYS = [
@@ -11,6 +11,6 @@ export const WEEKDAYS = [
   { value: 7, label: t('일요일') },
 ];
 
-/** 목록·양식에 보여 줄 이름 (null이면 '매일') */
+/** 목록·양식에 보여 줄 이름 */
 export const weekdayLabel = (weekday) =>
-  weekday == null ? t('매일') : (WEEKDAYS.find((day) => day.value === weekday)?.label ?? '-');
+  WEEKDAYS.find((day) => day.value === weekday)?.label ?? '-';

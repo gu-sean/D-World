@@ -8,6 +8,7 @@ import {
   liftAccountAction,
   updateWithdrawal,
 } from './api.js';
+import { dashboardKeys } from '../dashboard/queries.js';
 
 export const userKeys = {
   all: ['users'],
@@ -50,7 +51,12 @@ function useMenuMutation(mutationFn) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.all }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: userKeys.all }),
+        // the waiting counts of the dashboard and the menu badges change as well
+        queryClient.invalidateQueries({ queryKey: dashboardKeys.all }),
+      ]),
   });
 }
 

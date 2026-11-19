@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Spin } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
@@ -12,13 +13,18 @@ import { getAccessToken, refresh } from '../api/session.js';
 export default function RequireAuth() {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState(getAccessToken() ? 'authenticated' : 'checking');
 
   // When the session cannot be renewed later, move with the router instead of a full reload.
   useEffect(() => {
-    setOnAuthFailure((loginUrl) => navigate(loginUrl, { replace: true }));
+    setOnAuthFailure((loginUrl) => {
+      // nothing of this admin's data stays in memory once the session is over
+      queryClient.clear();
+      navigate(loginUrl, { replace: true });
+    });
     return () => setOnAuthFailure();
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   useEffect(() => {
     if (status !== 'checking') return undefined;

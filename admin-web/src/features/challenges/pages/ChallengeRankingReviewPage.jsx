@@ -1,6 +1,6 @@
 // ADM-21 랭킹 검토와 정정
 import { useState } from 'react';
-import { Button, Drawer, Space, Table, Tag, Typography } from 'antd';
+import { Button, Drawer, Table, Tag, Typography } from 'antd';
 import { message } from '../../../lib/message.jsx';
 import { useParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
@@ -10,7 +10,9 @@ import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useChallenge, useModerate, useParticipantDays, useRankings } from '../queries.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 import { t } from '../../../i18n/index.js';
+import { Stack } from '../../../components/Stack.jsx';
 
 export default function ChallengeRankingReviewPage() {
   const { challengeId } = useParams();
@@ -89,10 +91,8 @@ export default function ChallengeRankingReviewPage() {
   ];
 
   return (
-    <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
-        {t('랭킹 검토와 정정')}
-      </Typography.Title>
+    <Stack size="middle">
+      <PageHeader title={t('랭킹 검토와 정정')} />
       {challenge.data && (
         <Typography.Text type="secondary">
           {challenge.data.title}
@@ -177,6 +177,6 @@ export default function ChallengeRankingReviewPage() {
         }}
         onCancel={() => setPending(null)}
       />
-    </Space>
+    </Stack>
   );
 }

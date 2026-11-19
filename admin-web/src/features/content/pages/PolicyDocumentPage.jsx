@@ -6,15 +6,17 @@ import { useListParams } from '../../../components/useListParams.js';
 import { PolicyDocumentForm } from '../components/PolicyDocumentForm.jsx';
 import { policyDocumentType } from '../labels.js';
 import { usePolicyDocuments, usePublishPolicyDocument } from '../queries.js';
-import { useConfirm } from '../useConfirm.jsx';
+import { useConfirmedChange } from '../../../components/useConfirmedChange.jsx';
+import { ListCard } from '../../../components/ListCard.jsx';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 
 /** ADM-34 약관·정책 (M95~M97): a version is added, never edited, and fixed once published. */
 export default function PolicyDocumentPage() {
   const [params] = useListParams();
   const query = usePolicyDocuments(params);
   const publish = usePublishPolicyDocument();
-  const [confirmElement, ask] = useConfirm();
+  const [ask, confirmElement] = useConfirmedChange();
   const [creating, setCreating] = useState(false);
   const [viewing, setViewing] = useState(null);
 
@@ -29,7 +31,7 @@ export default function PolicyDocumentPage() {
           {t('게시하면 수정할 수 없어요.')}
         </>
       ),
-      submit: ({ reason, idempotencyKey }) =>
+      run: ({ reason, idempotencyKey }) =>
         publish.mutateAsync({ versionId: item.id, body: { reason }, idempotencyKey }),
     });
 
@@ -83,29 +85,32 @@ export default function PolicyDocumentPage() {
 
   return (
     <>
-      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-        <Typography.Title level={3}>{t('약관·정책')}</Typography.Title>
-        {!creating && (
-          <Button type="primary" onClick={() => setCreating(true)}>
-            {t('새 버전 만들기')}
-          </Button>
-        )}
-      </Space>
+      <PageHeader
+        title={t('약관·정책')}
+        description={t('약관은 수정하지 않고 새 버전을 추가해요.')}
+        actions={
+          !creating && (
+            <Button type="primary" onClick={() => setCreating(true)}>
+              {t('새 버전 만들기')}
+            </Button>
+          )
+        }
+      />
       {creating && (
         <div style={{ marginBottom: 24 }}>
           <PolicyDocumentForm onConfirm={ask} onClose={() => setCreating(false)} />
         </div>
       )}
-      <DataTable query={query} columns={columns} />
+      <ListCard>
+        <DataTable query={query} columns={columns} />
+      </ListCard>
       <Modal
         open={Boolean(viewing)}
         title={viewing ? `${policyDocumentType[viewing.documentType]} ${viewing.version}` : ''}
         footer={null}
         onCancel={() => setViewing(null)}
       >
-        <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>
-          {viewing?.body}
-        </Typography.Paragraph>
+        <Typography.Paragraph className="pre-wrap">{viewing?.body}</Typography.Paragraph>
       </Modal>
       {confirmElement}
     </>

@@ -13,7 +13,10 @@ import { useListParams } from '../../../components/useListParams.js';
 import { labels } from '../../../constants/labels.js';
 import { label, PHASE, toOptions } from '../labels.js';
 import { useChallengeAction, useChallenges } from '../queries.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 import { t } from '../../../i18n/index.js';
+import { ListCard } from '../../../components/ListCard.jsx';
+import { Stack } from '../../../components/Stack.jsx';
 
 const kindOptions = (kind) =>
   Object.entries(labels[kind]).map(([value, item]) => ({ value, label: item.text }));
@@ -135,17 +138,24 @@ export default function ChallengeListPage() {
   ];
 
   return (
-    <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-      <Space style={{ justifyContent: 'space-between', width: '100%' }} wrap>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          {t('챌린지 운영 목록')}
-        </Typography.Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/challenges/new')}>
-          {t('공식 챌린지 등록')}
-        </Button>
-      </Space>
-      <FilterBar fields={FIELDS} value={params} onChange={setParams} />
-      <DataTable query={query} columns={columns} defaultSort="startDate,desc" />
+    <Stack size="middle">
+      <PageHeader
+        title={t('챌린지 운영 목록')}
+        description={t('공개 상태와 정산 상태를 확인하고 공식 챌린지를 등록해요.')}
+        actions={
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => navigate('/challenges/new')}
+          >
+            {t('공식 챌린지 등록')}
+          </Button>
+        }
+      />
+      <ListCard>
+        <FilterBar fields={FIELDS} value={params} onChange={setParams} />
+        <DataTable query={query} columns={columns} defaultSort="startDate,desc" />
+      </ListCard>
       <ConfirmActionModal
         open={Boolean(target)}
         title={target?.title ?? ''}
@@ -163,6 +173,6 @@ export default function ChallengeListPage() {
         }}
         onCancel={() => setTarget(null)}
       />
-    </Space>
+    </Stack>
   );
 }

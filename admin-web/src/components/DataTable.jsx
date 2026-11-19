@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Table } from 'antd';
 import { QueryBoundary } from './QueryBoundary.jsx';
 import { StatePanel } from './StatePanel.jsx';
@@ -39,15 +40,49 @@ const parseSort = (sort) => {
 export function DataTable({ columns, query, rowKey = 'id', onRowClick, defaultSort }) {
   const [params, setParams] = useListParams();
   const currentSort = parseSort(params.sort ?? defaultSort);
+  const wrapperRef = useRef(null);
+  const [moreRight, setMoreRight] = useState(false);
 
-  const tableColumns = columns.map((column) =>
-    column.sorter
+  // Show a shadow on the right edge while columns are still hidden to the right.
+  useEffect(() => {
+    const root = wrapperRef.current;
+    if (!root) return undefined;
+    let scroller = null;
+    const update = () => {
+      if (scroller)
+        setMoreRight(scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 2);
+    };
+    const attach = () => {
+      const next = root.querySelector('.ant-table-content, .ant-table-body');
+      if (next === scroller) return update();
+      scroller?.removeEventListener('scroll', update);
+      scroller = next;
+      scroller?.addEventListener('scroll', update, { passive: true });
+      return update();
+    };
+    attach();
+    // data, page size or window width changes can change whether the table overflows
+    const observer = new MutationObserver(attach);
+    observer.observe(root, { childList: true, subtree: true });
+    window.addEventListener('resize', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+      scroller?.removeEventListener('scroll', update);
+    };
+    // the table only exists once the query has data, so attach again when it arrives
+  }, [query.isSuccess]);
+
+  // The first column (who / when) stays in view while the rest scrolls sideways.
+  const tableColumns = columns.map((column, index) => {
+    const withSort = column.sorter
       ? {
           ...column,
           sortOrder: currentSort?.field === sortFieldOf(column) ? currentSort.order : null,
         }
-      : column,
-  );
+      : column;
+    return index === 0 && withSort.fixed === undefined ? { ...withSort, fixed: 'left' } : withSort;
+  });
 
   const handleChange = (pagination, _filters, sorter, extra) => {
     if (extra.action === 'sort') {
@@ -67,29 +102,47 @@ export function DataTable({ columns, query, rowKey = 'id', onRowClick, defaultSo
   return (
     <QueryBoundary query={query}>
       {(data) => (
-        <Table
-          columns={tableColumns}
-          dataSource={data.items}
-          rowKey={rowKey}
-          // On a narrow screen scroll sideways instead of squeezing text into one character per line
-          scroll={{ x: 'max-content' }}
-          loading={query.isFetching}
-          locale={{ emptyText: <StatePanel type="empty" /> }}
-          pagination={{
-            current: data.page,
-            pageSize: data.size,
-            total: data.totalCount,
-            showSizeChanger: true,
-            pageSizeOptions: PAGE_SIZE_OPTIONS,
-            showTotal: (total) => t('총 {0}건', total),
-          }}
-          onChange={handleChange}
-          onRow={
-            onRowClick
-              ? (record) => ({ onClick: () => onRowClick(record), style: { cursor: 'pointer' } })
-              : undefined
-          }
-        />
+        <div ref={wrapperRef} style={{ position: 'relative' }}>
+          <Table
+            columns={tableColumns}
+            dataSource={data.items}
+            rowKey={rowKey}
+            // On a narrow screen scroll sideways instead of squeezing text into one character per line
+            scroll={{ x: 'max-content' }}
+            // header row stays visible under the (sticky) top bar while the page scrolls
+            sticky={{ offsetHeader: 64 }}
+            loading={query.isFetching}
+            locale={{ emptyText: <StatePanel type="empty" /> }}
+            pagination={{
+              current: data.page,
+              pageSize: data.size,
+              total: data.totalCount,
+              showSizeChanger: true,
+              pageSizeOptions: PAGE_SIZE_OPTIONS,
+              showTotal: (total) => t('총 {0}건', total),
+            }}
+            onChange={handleChange}
+            onRow={
+              onRowClick
+                ? (record) => ({ onClick: () => onRowClick(record), style: { cursor: 'pointer' } })
+                : undefined
+            }
+          />
+          {moreRight && (
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 56, // keeps the pagination row clear
+                width: 28,
+                pointerEvents: 'none',
+                background: 'linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.14))',
+              }}
+            />
+          )}
+        </div>
       )}
     </QueryBoundary>
   );

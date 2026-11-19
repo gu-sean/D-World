@@ -10,8 +10,10 @@ import { useListParams } from '../../../components/useListParams.js';
 import { labels } from '../../../constants/labels.js';
 import { useTickets } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { ListCard } from '../../../components/ListCard.jsx';
 
-const DEFAULT_SORT = 'receivedAt,asc'; // docs/09 M20: the oldest ticket waits the longest
+const DEFAULT_SORT = 'receivedAt,desc'; // newest first (all lists: newest date on top)
 
 const optionsOf = (kind) =>
   Object.entries(labels[kind]).map(([value, { text }]) => ({ value, label: text }));
@@ -110,14 +112,16 @@ export function TicketList({ ticketType, basePath, title }) {
 
   return (
     <>
-      <Typography.Title level={3}>{title}</Typography.Title>
-      <FilterBar fields={fields} value={params} onChange={setParams} />
-      <DataTable
-        query={query}
-        columns={columns}
-        defaultSort={DEFAULT_SORT}
-        onRowClick={(ticket) => navigate(`${basePath}/${ticket.id}`)}
-      />
+      <PageHeader title={title} />
+      <ListCard>
+        <FilterBar fields={fields} value={params} onChange={setParams} />
+        <DataTable
+          query={query}
+          columns={columns}
+          defaultSort={DEFAULT_SORT}
+          onRowClick={(ticket) => navigate(`${basePath}/${ticket.id}`)}
+        />
+      </ListCard>
     </>
   );
 }

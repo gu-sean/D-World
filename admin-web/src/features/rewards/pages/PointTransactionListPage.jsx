@@ -1,5 +1,5 @@
 // ADM-22 Point transaction list
-import { Button, Space, Statistic, Typography } from 'antd';
+import { Button, Statistic, Typography } from 'antd';
 import { Link } from 'react-router';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
@@ -9,6 +9,8 @@ import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { optionsOf } from '../components/labels.js';
 import { usePointTransactions } from '../queries.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { ListCard } from '../../../components/ListCard.jsx';
 import { t } from '../../../i18n/index.js';
 
 const DEFAULT_SORT = 'occurredAt,desc'; // docs/09 M70
@@ -72,25 +74,28 @@ export default function PointTransactionListPage() {
 
   return (
     <div>
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          {t('포인트 내역')}
-        </Typography.Title>
-        <Link to="/rewards/points/adjust">
-          <Button type="primary">{t('포인트 수동 조정')}</Button>
-        </Link>
-      </Space>
+      <PageHeader
+        title={t('포인트 내역')}
+        description={t('회원의 포인트 지급·사용·회수 기록이에요.')}
+        actions={
+          <Link to="/rewards/points/adjust">
+            <Button type="primary">{t('포인트 수동 조정')}</Button>
+          </Link>
+        }
+      />
 
-      <FilterBar fields={fields} value={params} onChange={setParams} />
       {query.data && (
         <Statistic
           title={t('검수 대기 중인 보상 합계')}
           value={query.data.pendingPoints}
           suffix="P"
-          style={{ marginBottom: 16 }}
+          className="mb-16"
         />
       )}
-      <DataTable query={query} columns={columns} defaultSort={DEFAULT_SORT} />
+      <ListCard>
+        <FilterBar fields={fields} value={params} onChange={setParams} />
+        <DataTable query={query} columns={columns} defaultSort={DEFAULT_SORT} />
+      </ListCard>
     </div>
   );
 }

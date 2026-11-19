@@ -1,6 +1,7 @@
 import { Alert, Image, Space, Typography } from 'antd';
 import { StatusTag } from '../../../components/StatusTag.jsx';
 import { t } from '../../../i18n/index.js';
+import { Stack } from '../../../components/Stack.jsx';
 
 const isImage = (file) => file.mimeType?.startsWith('image/');
 const isVideo = (file) => file.mimeType?.startsWith('video/');
@@ -15,7 +16,7 @@ const isVideo = (file) => file.mimeType?.startsWith('video/');
  */
 export default function EvidenceViewer({ files = [], duplicateOfMediaId = null }) {
   return (
-    <Space orientation="vertical" size="small" style={{ width: '100%' }}>
+    <Stack size="small">
       {duplicateOfMediaId && (
         <Alert
           type="warning"
@@ -44,6 +45,6 @@ export default function EvidenceViewer({ files = [], duplicateOfMediaId = null }
           })}
         </Space>
       )}
-    </Space>
+    </Stack>
   );
 }

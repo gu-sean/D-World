@@ -1,6 +1,6 @@
 // ADM-10 Verification criteria: versions are append-only, so "edit" means "add a new version"
 import { useState } from 'react';
-import { Button, DatePicker, Form, Modal, Select, Space, Typography } from 'antd';
+import { Button, DatePicker, Form, Modal, Select, Typography } from 'antd';
 import { message } from '../../../lib/message.jsx';
 import dayjs from 'dayjs';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
@@ -12,6 +12,8 @@ import CriteriaVersionList from '../components/CriteriaVersionList.jsx';
 import { METHOD_LABEL } from '../components/format.js';
 import { useCategories, useCreateCriteria, useCriteria } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { Stack } from '../../../components/Stack.jsx';
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL).map(([value, label]) => ({ value, label }));
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -46,14 +48,21 @@ export default function VerificationCriteriaPage() {
   };
 
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Typography.Title level={3}>{t('판정 기준')}</Typography.Title>
-      <Space wrap>
-        <FilterBar fields={filterFields} value={params} onChange={setParams} />
-        <Button type="primary" style={{ marginBottom: 16 }} onClick={() => setFormOpen(true)}>
-          {t('새 버전 추가')}
-        </Button>
-      </Space>
+    <Stack size="middle">
+      <PageHeader
+        title={t('판정 기준')}
+        description={t('정책은 수정하지 않고 새 버전을 추가해요.')}
+      />
+      <FilterBar
+        fields={filterFields}
+        value={params}
+        onChange={setParams}
+        extra={
+          <Button type="primary" onClick={() => setFormOpen(true)}>
+            {t('새 버전 추가')}
+          </Button>
+        }
+      />
       <QueryBoundary query={criteria}>
         {(versions) =>
           versions.length === 0 ? (
@@ -126,6 +135,6 @@ export default function VerificationCriteriaPage() {
           closeForm();
         }}
       />
-    </Space>
+    </Stack>
   );
 }

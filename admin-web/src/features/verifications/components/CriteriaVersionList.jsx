@@ -37,7 +37,7 @@ export default function CriteriaVersionList({ versions, categoryName }) {
       pagination={false}
       expandable={{
         expandedRowRender: (version) => (
-          <Typography.Text code style={{ whiteSpace: 'pre-wrap' }}>
+          <Typography.Text code className="pre-wrap">
             {JSON.stringify(version.rules, null, 2)}
           </Typography.Text>
         ),

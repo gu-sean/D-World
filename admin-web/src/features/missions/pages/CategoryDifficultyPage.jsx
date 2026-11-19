@@ -1,11 +1,12 @@
 // ADM-15 분야·난이도 (미션 보상표는 보상 관리 > 포인트 정책 > 미션 보상표 한 곳에서 관리)
 import { useState } from 'react';
-import { Button, Form, Input, InputNumber, Modal, Switch, Table, Tabs, Typography } from 'antd';
+import { Button, Form, Input, InputNumber, Modal, Switch, Table, Tabs } from 'antd';
 import { message } from '../../../lib/message.jsx';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
 import { useCatalog, useCreateCatalogItem, useUpdateCatalogItem } from '../queries.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 import { t } from '../../../i18n/index.js';
 
 const KIND_LABEL = { categories: t('분야'), difficulties: t('난이도') };
@@ -48,7 +49,7 @@ function CatalogTab({ kind }) {
         <>
           <Button
             type="primary"
-            style={{ marginBottom: 16 }}
+            className="mb-16"
             onClick={() => {
               form.resetFields();
               form.setFieldValue('displayOrder', data.length + 1);
@@ -128,10 +129,10 @@ function CatalogTab({ kind }) {
 export default function CategoryDifficultyPage() {
   return (
     <div>
-      <Typography.Title level={4}>{t('분야·난이도')}</Typography.Title>
-      <Typography.Paragraph type="secondary">
-        {t('미션 보상표는 보상 관리 > 포인트 정책 > 미션 보상표에서 관리해요.')}
-      </Typography.Paragraph>
+      <PageHeader
+        title={t('분야·난이도')}
+        description={t('미션 보상표는 보상 관리 > 포인트 정책 > 미션 보상표에서 관리해요.')}
+      />
       <Tabs
         items={[
           { key: 'categories', label: t('분야'), children: <CatalogTab kind="categories" /> },

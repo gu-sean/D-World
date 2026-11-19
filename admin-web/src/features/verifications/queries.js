@@ -12,6 +12,7 @@ import {
   resolveAppeal,
 } from './api.js';
 import { dashboardKeys } from '../dashboard/queries.js';
+import { REFERENCE_STALE_MS } from '../../api/staleTime.js';
 
 export const verificationKeys = {
   all: ['verifications'],
@@ -80,7 +81,11 @@ export const useResolveAppeal = () => {
 };
 
 export const useCategories = () =>
-  useQuery({ queryKey: verificationKeys.categories, queryFn: fetchCategories });
+  useQuery({
+    queryKey: verificationKeys.categories,
+    queryFn: fetchCategories,
+    staleTime: REFERENCE_STALE_MS,
+  });
 
 export const useCriteria = (params) =>
   useQuery({

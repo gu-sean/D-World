@@ -45,7 +45,56 @@ const en = {
   '사유 (선택)': 'Reason (optional)',
   "비워 두면 '관리자 처리'로 기록돼요.": "If left empty, it is recorded as 'Admin action'.",
   '총 {0}건': '{0} in total',
+  '회원에게 푸시 알림을 보내요.': 'Send push notifications to members.',
+  '앱에 보여 줄 공지를 관리해요.': 'Manage the notices shown in the app.',
+  '홈 화면에 요일마다 보여 줄 문구예요.':
+    'Messages shown on the home screen, one set for each weekday.',
+  '약관은 수정하지 않고 새 버전을 추가해요.': 'Terms are never edited; add a new version instead.',
+  '공개 상태와 정산 상태를 확인하고 공식 챌린지를 등록해요.':
+    'Check publication and settlement status, and register official challenges.',
+  '회원이 고를 수 있는 미션의 기본 형태를 관리해요.':
+    'Manage the basic forms of the missions members can pick.',
+  '회원의 포인트 지급·사용·회수 기록이에요.': 'Points earned, spent and taken back by members.',
+  '가입한 회원을 찾고 상태를 확인해요.': 'Find members and check their status.',
+  '탈퇴를 요청한 회원을 확인하고 처리해요.': "Review and handle members' withdrawal requests.",
+  '관리자가 한 작업의 기록이에요.': 'A record of what admins did.',
+  '이의 신청과 AI 판정 보류 건을 처리해요.': 'Handle appeals and AI-held verifications.',
+  '정책은 수정하지 않고 새 버전을 추가해요.':
+    'Policies are never edited; add a new version instead.',
+  '회원이 만든 미션을 공개해도 되는지 검토해요.':
+    'Check whether member-made missions can be made public.',
+  '닉네임이나 회원 ID로 찾아요': 'Search by nickname or member ID',
+  '찾는 회원이 없어요.': 'No member found.',
+  선택하세요: 'Select',
+  '처리할 일이 없어요': 'Nothing to do',
+  '{0}일째 대기': 'Waiting for {0} days',
+  '처리할 일을 먼저 보고, 아래에서 기간별 현황을 확인해요.':
+    'See what needs handling first, then check the period statistics below.',
+  '기간별 현황': 'Statistics for the period',
+  '계정 메뉴': 'Account menu',
+  '추천 미션': 'Featured missions',
+  '새 버전이 나왔어요.': 'A new version is available.',
+  '새로고침하면 최신 화면으로 바뀌어요.': 'Reload to get the latest screen.',
+  '화면을 보여 주지 못했어요.': 'This screen could not be shown.',
+  '다시 시도해도 계속되면 관리자에게 알려 주세요.': 'If it keeps happening, tell an administrator.',
+  새로고침: 'Reload',
+  '인터넷에 연결되어 있지 않아요. 연결되면 자동으로 다시 불러와요.':
+    'You are offline. Data loads again by itself when the connection is back.',
+  '오래 사용하지 않아 안전을 위해 로그아웃했어요. 다시 로그인해 주세요.':
+    'You were logged out for safety because the screen was not used for a while. Please log in again.',
+  '보내는 내용이 너무 커요.': 'The request is too large.',
+  '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.':
+    'Too many requests. Please try again in a moment.',
+  '서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.':
+    'Cannot reach the server. Please try again in a moment.',
+  '서버 응답이 너무 늦어요. 잠시 후 다시 시도해 주세요.':
+    'The server is taking too long. Please try again in a moment.',
+  '업로드가 너무 오래 걸려요. 다시 시도해 주세요.':
+    'The upload is taking too long. Please try again.',
+  '예정 버전': 'Upcoming versions',
   검색: 'Search',
+  전체: 'All',
+  '검색어를 입력하세요': 'Enter a search term',
   초기화: 'Reset',
   'PNG, WebP, JPEG 이미지만 올릴 수 있어요.': 'Only PNG, WebP and JPEG images can be uploaded.',
   'PNG, WebP, JPEG, GIF 이미지만 올릴 수 있어요.':
@@ -879,7 +928,6 @@ const en = {
   금요일: 'Friday',
   토요일: 'Saturday',
   일요일: 'Sunday',
-  매일: 'Every day',
   요일: 'Weekday',
   '보여줄 요일': 'Weekday to show',
   '홈 화면은 오늘 요일의 문구를 보여줘요. 같은 요일에 여러 개면 날마다 하나씩 골라요.':

@@ -9,6 +9,7 @@ import {
   updateCatalogItem,
   updateDefinition,
 } from './api.js';
+import { REFERENCE_STALE_MS } from '../../api/staleTime.js';
 
 export const missionKeys = {
   definitions: ['missions', 'definitions'],
@@ -64,7 +65,11 @@ export const useReviewDefinition = () => {
 
 /** kind: 'categories' | 'difficulties' */
 export const useCatalog = (kind) =>
-  useQuery({ queryKey: missionKeys.catalog(kind), queryFn: () => fetchCatalog(kind) });
+  useQuery({
+    queryKey: missionKeys.catalog(kind),
+    queryFn: () => fetchCatalog(kind),
+    staleTime: REFERENCE_STALE_MS,
+  });
 
 /** variables: `{body, idempotencyKey}` */
 export const useCreateCatalogItem = (kind) => {

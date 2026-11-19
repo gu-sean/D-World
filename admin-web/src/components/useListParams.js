@@ -35,15 +35,20 @@ export function useListParams(defaults = {}) {
 
   const setParams = useCallback(
     (patch) => {
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        if (!('page' in patch)) next.delete('page');
-        for (const [key, value] of Object.entries(patch)) {
-          if (value === undefined || value === null || value === '') next.delete(key);
-          else next.set(key, String(value));
-        }
-        return next;
-      });
+      // `replace`: a filter, sort or page change updates the current history entry, so the back
+      // button leaves the list instead of stepping through every filter that was tried.
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          if (!('page' in patch)) next.delete('page');
+          for (const [key, value] of Object.entries(patch)) {
+            if (value === undefined || value === null || value === '') next.delete(key);
+            else next.set(key, String(value));
+          }
+          return next;
+        },
+        { replace: true },
+      );
     },
     [setSearchParams],
   );

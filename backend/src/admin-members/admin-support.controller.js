@@ -124,8 +124,8 @@ export class AdminSupportController {
     ]);
     const assigned = pickEnum(query, 'assigned', ['me', 'none']);
     const paging = parseAdminPage(query, {
-      'receivedAt,asc': 't.received_at ASC, t.id ASC',
       'receivedAt,desc': 't.received_at DESC, t.id DESC',
+      'receivedAt,asc': 't.received_at ASC, t.id ASC',
     });
     // member: 접수자 또는 신고 대상 회원의 닉네임·회원 ID (common/member-query.js)
     const member = memberQueryParams(query.member);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Tag, Tooltip, Typography } from 'antd';
+import { Button, Tag, Tooltip } from 'antd';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';
@@ -9,6 +9,8 @@ import { AuditLogDetailModal } from '../components/AuditLogDetailModal.jsx';
 import { auditAction, auditActionGroups, auditResult } from '../labels.js';
 import { useAuditLogs } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { ListCard } from '../../../components/ListCard.jsx';
 
 const DEFAULT_SORT = 'recordedAt,desc'; // docs/09 M101
 
@@ -77,9 +79,11 @@ export default function AuditLogPage() {
 
   return (
     <>
-      <Typography.Title level={3}>{t('감사 로그')}</Typography.Title>
-      <FilterBar fields={FIELDS} value={params} onChange={setParams} />
-      <DataTable query={query} columns={columns} defaultSort={DEFAULT_SORT} />
+      <PageHeader title={t('감사 로그')} description={t('관리자가 한 작업의 기록이에요.')} />
+      <ListCard>
+        <FilterBar fields={FIELDS} value={params} onChange={setParams} />
+        <DataTable query={query} columns={columns} defaultSort={DEFAULT_SORT} />
+      </ListCard>
       <AuditLogDetailModal log={viewing} onClose={() => setViewing(null)} />
     </>
   );

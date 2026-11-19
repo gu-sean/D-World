@@ -8,16 +8,13 @@ import { WEEKDAYS } from '../weekdays.js';
 import { t } from '../../../i18n/index.js';
 
 const MESSAGE_MAX_LENGTH = 200; // docs/07 RecommendationMessageAdmin
-// 라디오 값은 문자열: 'all' = 매일(요일 없음), '1'~'7' = 월~일
-const weekdayOptions = [
-  { value: 'all', label: t('매일') },
-  ...WEEKDAYS.map((day) => ({ value: String(day.value), label: day.label })),
-];
+// 라디오 값은 문자열 '1'~'7' = 월~일
+const weekdayOptions = WEEKDAYS.map((day) => ({ value: String(day.value), label: day.label }));
 
 function initialState(item) {
   return {
     message: item?.message ?? '',
-    weekday: item?.weekday == null ? 'all' : String(item.weekday),
+    weekday: String(item?.weekday ?? 1),
     categoryCode: item?.categoryCode ?? '',
     startsAt: toInputValue(item?.startsAt),
     endsAt: toInputValue(item?.endsAt),
@@ -60,7 +57,7 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
     }
     const input = {
       message: form.message.trim(),
-      weekday: form.weekday === 'all' ? null : Number(form.weekday),
+      weekday: Number(form.weekday),
       categoryCode: form.categoryCode.trim() || null,
       startsAt: fromInputValue(form.startsAt),
       endsAt: fromInputValue(form.endsAt),
@@ -69,7 +66,7 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
     onConfirm({
       title: item ? t('추천 문구 수정') : t('추천 문구 저장'),
       summary: input.message,
-      submit: async ({ reason, idempotencyKey }) => {
+      run: async ({ reason, idempotencyKey }) => {
         const body = { ...input, reason };
         if (item) await update.mutateAsync({ messageId: item.id, body, idempotencyKey });
         else await create.mutateAsync({ body, idempotencyKey });
@@ -106,7 +103,7 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
         <Field label={t('분야 코드 (선택)')}>
           <Input
             aria-label={t('분야 코드')}
-            style={{ maxWidth: 240 }}
+            className="field-narrow"
             value={form.categoryCode}
             onChange={(event) => set({ categoryCode: event.target.value })}
           />
@@ -115,7 +112,7 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
           <Input
             type="datetime-local"
             aria-label={t('시작 시각 (기간)')}
-            style={{ maxWidth: 240 }}
+            className="field-narrow"
             value={form.startsAt}
             onChange={(event) => set({ startsAt: event.target.value })}
           />
@@ -124,7 +121,7 @@ export function RecommendationMessageForm({ item, onConfirm, onClose }) {
           <Input
             type="datetime-local"
             aria-label={t('종료 시각 (기간)')}
-            style={{ maxWidth: 240 }}
+            className="field-narrow"
             value={form.endsAt}
             onChange={(event) => set({ endsAt: event.target.value })}
           />

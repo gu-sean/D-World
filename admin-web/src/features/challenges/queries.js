@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as api from './api.js';
+import { REFERENCE_STALE_MS } from '../../api/staleTime.js';
 
 export const challengeKeys = {
   all: ['challenges'],
@@ -29,10 +30,18 @@ export const useChallenge = (id) =>
   });
 
 export const useCategories = () =>
-  useQuery({ queryKey: challengeKeys.categories, queryFn: api.fetchCategories });
+  useQuery({
+    queryKey: challengeKeys.categories,
+    queryFn: api.fetchCategories,
+    staleTime: REFERENCE_STALE_MS,
+  });
 
 export const useDifficultyLevels = () =>
-  useQuery({ queryKey: challengeKeys.difficulties, queryFn: api.fetchDifficultyLevels });
+  useQuery({
+    queryKey: challengeKeys.difficulties,
+    queryFn: api.fetchDifficultyLevels,
+    staleTime: REFERENCE_STALE_MS,
+  });
 
 export const useRankings = (id) =>
   useQuery({ queryKey: challengeKeys.rankings(id), queryFn: () => api.fetchRankings(id) });

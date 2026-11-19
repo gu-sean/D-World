@@ -16,6 +16,7 @@ DELETE FROM pet_xp_wallets WHERE user_id LIKE 'sd%';
 DELETE FROM pet_xp_wallet_transactions WHERE id LIKE 'sd%';
 DELETE FROM point_monthly_usage WHERE user_id LIKE 'sd%';
 DELETE FROM point_wallets WHERE user_id LIKE 'sd%';
+DELETE FROM point_recovery_claims WHERE id LIKE 'sd%';
 DELETE FROM point_transactions WHERE id LIKE 'sd%';
 DELETE FROM user_inventory_events WHERE id LIKE 'sd%';
 DELETE FROM user_inventory WHERE user_id LIKE 'sd%';

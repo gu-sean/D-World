@@ -137,7 +137,7 @@ export function NoticeForm({ notice, pushMode = false, onConfirm, onClose }) {
           {t('저장한 뒤에 목록에서 게시하거나 예약할 수 있어요.')}
         </>
       ),
-      submit: async ({ reason, idempotencyKey }) => {
+      run: async ({ reason, idempotencyKey }) => {
         const body = { ...input, reason };
         if (notice) await update.mutateAsync({ noticeId: notice.id, body, idempotencyKey });
         else await create.mutateAsync({ body, idempotencyKey });
@@ -265,7 +265,7 @@ export function NoticeForm({ notice, pushMode = false, onConfirm, onClose }) {
           <Input
             type="datetime-local"
             aria-label={t('예약 시각')}
-            style={{ maxWidth: 240 }}
+            className="field-narrow"
             disabled={locked}
             value={form.scheduledAt}
             onChange={(event) => set({ scheduledAt: event.target.value })}

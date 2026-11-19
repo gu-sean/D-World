@@ -60,7 +60,7 @@ export class AdminReviewService {
       this.database.query(
         `SELECT r.id, r.mission_id, r.user_id, ${nicknameOf('r.user_id')} AS nickname,
                 r.attempt_no, r.submission_no, r.evidence_kind,
-                r.submitted_at, r.metrics AS record_metrics, r.status,
+                r.started_at, r.submitted_at, r.metrics AS record_metrics, r.status,
                 m.title, m.description, m.verification_method, m.target_value, m.target_unit,
                 m.category_id, m.scheduled_date, m.status AS mission_status,
                 vr.engine_version, vr.confidence, vr.reason AS ai_reason, vr.metrics AS ai_metrics,
@@ -94,6 +94,7 @@ export class AdminReviewService {
           attemptNo: row.attempt_no,
           submissionNo: row.submission_no,
           evidenceKind: row.evidence_kind,
+          startedAt: row.started_at,
           submittedAt: row.submitted_at,
           recordMetrics: row.record_metrics,
           mission: {

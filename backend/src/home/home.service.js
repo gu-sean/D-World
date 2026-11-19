@@ -37,9 +37,9 @@ export function stableIndex(text, n) {
 }
 
 /**
- * 오늘 보여 줄 문구: 오늘 요일의 문구 → 없으면 '매일'(요일 없음) 문구 → 없으면 null
+ * 오늘 보여 줄 문구: 오늘 요일의 문구 → 없으면 null
  * 같은 요일에 문구가 여러 개면 사용자·날짜마다 정해진 하나(화면을 새로 고쳐도 바뀌지 않음)
- * @param {{message: string, weekday: number|null, category_id: string|null}[]} messages id 순으로 정렬된 활성 문구
+ * @param {{message: string, weekday: number, category_id: string|null}[]} messages id 순으로 정렬된 활성 문구
  * @param {{date: string, userId: string, categoryIds: Set<string>}} context
  */
 export function chooseMessage(messages, { date, userId, categoryIds }) {
@@ -47,9 +47,7 @@ export function chooseMessage(messages, { date, userId, categoryIds }) {
     (row) => row.category_id === null || categoryIds.has(row.category_id),
   );
   const weekday = weekdayOf(date);
-  const today = usable.filter((row) => row.weekday === weekday);
-  const pool =
-    today.length > 0 ? today : usable.filter((row) => row.weekday === null);
+  const pool = usable.filter((row) => row.weekday === weekday);
   if (pool.length === 0) return null;
   return pool[stableIndex(`${userId}:${date}`, pool.length)].message;
 }
@@ -180,7 +178,7 @@ export class HomeService {
     };
   }
 
-  /** 오늘 요일의 활성 문구(없으면 매일 문구), 그것도 없으면 기본 문구 */
+  /** 오늘 요일의 활성 문구, 없으면 기본 문구 */
   async pickMessage(context) {
     const { rows } = await this.database.query(
       `SELECT message, weekday, category_id

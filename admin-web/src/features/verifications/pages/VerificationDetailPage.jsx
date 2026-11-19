@@ -2,19 +2,21 @@
 //
 // 증거·AI 결과·판정 이력을 본다. 판정 버튼은 없다: AI 판정 보류 건은 처리 대기에서 판정한다.
 import { Link, useParams } from 'react-router';
-import { Alert, Button, Space, Typography } from 'antd';
+import { Alert, Button } from 'antd';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import RecordSummary from '../components/RecordSummary.jsx';
 import { useVerification } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { Stack } from '../../../components/Stack.jsx';
 
 export default function VerificationDetailPage() {
   const { recordId } = useParams();
   const query = useVerification(recordId);
 
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Typography.Title level={3}>{t('인증 기록 상세')}</Typography.Title>
+    <Stack size="middle">
+      <PageHeader title={t('인증 기록 상세')} />
       <Link to="/verifications">{t('← 인증 기록')}</Link>
       <QueryBoundary query={query}>
         {(record) => (
@@ -37,6 +39,6 @@ export default function VerificationDetailPage() {
           </>
         )}
       </QueryBoundary>
-    </Space>
+    </Stack>
   );
 }

@@ -3,7 +3,7 @@
 //   AI 판정 보류: AI가 확신하지 못해 관리자 판정을 기다리는 건 (예전 "검수 대기")
 // 판정이 끝난 인증은 모두 "인증 기록"에 남는다.
 import { Link, useNavigate } from 'react-router';
-import { Space, Tabs, Typography } from 'antd';
+import { Tabs, Typography } from 'antd';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';
@@ -13,6 +13,9 @@ import { useListParams } from '../../../components/useListParams.js';
 import { formatConfidence, formatTarget, METHOD_LABEL } from '../components/format.js';
 import { useAppeals, useVerifications } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { ListCard } from '../../../components/ListCard.jsx';
+import { Stack } from '../../../components/Stack.jsx';
 
 const APPEAL_FIELDS = [MEMBER_FIELD];
 const COMPLETED_FIELDS = [
@@ -39,7 +42,7 @@ const HOLD_FIELDS = [
 
 function AppealsTab({ params, setParams }) {
   const navigate = useNavigate();
-  const query = useAppeals({ status: 'open', sort: 'filedAt,asc', ...params });
+  const query = useAppeals({ status: 'open', sort: 'filedAt,desc', ...params });
 
   const columns = [
     {
@@ -65,13 +68,15 @@ function AppealsTab({ params, setParams }) {
 
   return (
     <>
-      <FilterBar fields={APPEAL_FIELDS} value={params} onChange={setParams} />
-      <DataTable
-        query={query}
-        columns={columns}
-        defaultSort="filedAt,asc"
-        onRowClick={(row) => navigate(`/verifications/appeals/${row.id}`)}
-      />
+      <ListCard>
+        <FilterBar fields={APPEAL_FIELDS} value={params} onChange={setParams} />
+        <DataTable
+          query={query}
+          columns={columns}
+          defaultSort="filedAt,desc"
+          onRowClick={(row) => navigate(`/verifications/appeals/${row.id}`)}
+        />
+      </ListCard>
     </>
   );
 }
@@ -128,8 +133,12 @@ function CompletedTab({ params, setParams }) {
 
 function HoldTab({ params, setParams }) {
   const navigate = useNavigate();
-  // 가장 오래 기다린 것부터 (docs/09 §5)
-  const query = useVerifications({ sort: 'submittedAt,asc', ...params, status: 'review_required' });
+  // 최신 제출부터
+  const query = useVerifications({
+    sort: 'submittedAt,desc',
+    ...params,
+    status: 'review_required',
+  });
 
   const columns = [
     {
@@ -161,7 +170,7 @@ function HoldTab({ params, setParams }) {
         query={query}
         rowKey="recordId"
         columns={columns}
-        defaultSort="submittedAt,asc"
+        defaultSort="submittedAt,desc"
         onRowClick={(row) => navigate(`/verifications/appeals/hold/${row.recordId}`)}
       />
     </>
@@ -179,8 +188,11 @@ export default function AppealListPage() {
   const count = (n) => (typeof n === 'number' ? ` (${n})` : '');
 
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Typography.Title level={3}>{t('처리 대기')}</Typography.Title>
+    <Stack size="middle">
+      <PageHeader
+        title={t('처리 대기')}
+        description={t('이의 신청과 AI 판정 보류 건을 처리해요.')}
+      />
       <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
         {t(
           'AI가 먼저 판정하고, 관리자는 회원이 이의를 낸 건과 AI가 판정을 보류한 건만 처리해요. 모든 인증 결과는',
@@ -213,6 +225,6 @@ export default function AppealListPage() {
           },
         ]}
       />
-    </Space>
+    </Stack>
   );
 }

@@ -94,7 +94,7 @@ function TicketBody({ ticket, listPath }) {
       <Descriptions bordered size="small" column={2} items={items} style={{ marginTop: 12 }} />
       {sectionTitle(t('내용'))}
       <Card size="small">
-        <div style={{ whiteSpace: 'pre-wrap' }}>{ticket.body}</div>
+        <div className="pre-wrap">{ticket.body}</div>
       </Card>
       {sectionTitle(t('진행 기록'))}
       <TicketEvents events={ticket.events} />

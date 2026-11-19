@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { toAdminError } from './errors.js';
 import { newIdempotencyKey } from './idempotency.js';
-import { getAccessToken, refresh } from './session.js';
+import { clearSession, getAccessToken, refresh } from './session.js';
 
 export const http = axios.create({
   baseURL: import.meta.env.VITE_ADMIN_API_BASE_URL,
@@ -52,7 +52,9 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-// Response: 401 AUTH_TOKEN_EXPIRED -> refresh -> repeat the request once (docs/05 §4).
+// Response: any 401 on a normal request (expired or otherwise not accepted token, e.g. after the
+// server restarted) -> refresh -> repeat the request once (docs/05 §4). If the refresh fails, or the
+// repeated request is refused again, the session is over and the admin goes to the login page.
 // Other errors become AdminError. Failed 429/5xx requests are never repeated automatically
 // (docs/05 §5.3).
 http.interceptors.response.use(
@@ -62,9 +64,15 @@ http.interceptors.response.use(
 
     const adminError = toAdminError(error);
     const config = error.config;
-    const isExpired = adminError.status === 401 && adminError.code === 'AUTH_TOKEN_EXPIRED';
+    const isUnauthorized = adminError.status === 401 && config && !isAuthRequest(config);
 
-    if (isExpired && config && !config.hasRetried) {
+    if (isUnauthorized && config.hasRetried) {
+      // A fresh token was refused too: the account or its session is no longer valid.
+      clearSession();
+      redirectToLogin();
+      throw adminError;
+    }
+    if (isUnauthorized) {
       config.hasRetried = true;
       try {
         await refresh();

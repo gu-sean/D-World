@@ -40,7 +40,7 @@ export function AuditLogDetailModal({ log, onClose }) {
     <Modal open={Boolean(log)} title={t('변경 내용')} footer={null} width={720} onCancel={onClose}>
       {log && (
         <>
-          <Descriptions column={1} size="small" style={{ marginBottom: 16 }}>
+          <Descriptions column={1} size="small" className="mb-16">
             <Descriptions.Item label={t('작업')}>
               {auditAction[log.action] ?? log.action}
               {auditAction[log.action] && (

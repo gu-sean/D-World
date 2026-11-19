@@ -1,12 +1,13 @@
 // ADM-14 Mission definition create / edit
 import { useState } from 'react';
-import { Button, Form, Input, InputNumber, Select, Space, Typography } from 'antd';
+import { Button, Card, Col, Form, Input, InputNumber, Row, Select, Space } from 'antd';
 import { message } from '../../../lib/message.jsx';
 import { useNavigate, useParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { ADMIN_STATUS_OPTIONS, EXERCISE_OPTIONS, METHOD_OPTIONS } from '../constants.js';
 import { useCatalog, useCreateDefinition, useDefinition, useUpdateDefinition } from '../queries.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 import { t } from '../../../i18n/index.js';
 
 const FIELDS = [
@@ -60,74 +61,91 @@ function DefinitionForm({ definition }) {
 
   return (
     <>
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={submit}
-        initialValues={definition ?? { publicationStatus: 'public', verificationMethod: 'camera' }}
-      >
-        <Form.Item
-          label={t('제목')}
-          name="title"
-          rules={[
-            { required: true, whitespace: true, message: t('제목을 입력해 주세요.') },
-            { max: 200, message: t('200자 이하로 입력해 주세요.') },
-          ]}
+      <Card>
+        <Form
+          className="form-fill"
+          form={form}
+          layout="vertical"
+          onFinish={submit}
+          initialValues={
+            definition ?? { publicationStatus: 'public', verificationMethod: 'camera' }
+          }
         >
-          <Input />
-        </Form.Item>
-        <Form.Item label={t('설명')} name="description" rules={[{ max: 2000 }]}>
-          <Input.TextArea rows={3} />
-        </Form.Item>
-        <Space align="start" wrap>
           <Form.Item
-            label={t('분야')}
-            name="categoryId"
-            rules={[{ required: true, message: t('분야를 선택해 주세요.') }]}
+            label={t('제목')}
+            name="title"
+            rules={[
+              { required: true, whitespace: true, message: t('제목을 입력해 주세요.') },
+              { max: 200, message: t('200자 이하로 입력해 주세요.') },
+            ]}
           >
-            <Select style={{ width: 200 }} options={options(categories)} />
+            <Input />
           </Form.Item>
-          <Form.Item
-            label={t('난이도')}
-            name="difficultyId"
-            rules={[{ required: true, message: t('난이도를 선택해 주세요.') }]}
-          >
-            <Select style={{ width: 200 }} options={options(difficulties)} />
+          <Form.Item label={t('설명')} name="description" rules={[{ max: 2000 }]}>
+            <Input.TextArea rows={3} />
           </Form.Item>
-        </Space>
-        <Space align="start" wrap>
-          <Form.Item label={t('운동 종류')} name="exerciseCode">
-            <Select allowClear style={{ width: 200 }} options={EXERCISE_OPTIONS} />
-          </Form.Item>
-          <Form.Item
-            label={t('인증 방식')}
-            name="verificationMethod"
-            rules={[{ required: true, message: t('인증 방식을 선택해 주세요.') }]}
-          >
-            <Select style={{ width: 200 }} options={METHOD_OPTIONS} />
-          </Form.Item>
-        </Space>
-        <Space align="start" wrap>
-          <Form.Item label={t('목표 값')} name="targetValue">
-            <InputNumber min={0.01} max={99999999.99} />
-          </Form.Item>
-          <Form.Item label={t('목표 단위')} name="targetUnit" rules={[{ max: 20 }]}>
-            <Input style={{ width: 120 }} />
-          </Form.Item>
-          <Form.Item label={t('예상 소요 시간(초)')} name="estimatedDurationSeconds">
-            <InputNumber min={1} max={86400} precision={0} />
-          </Form.Item>
-        </Space>
-        <Form.Item label={t('공개 상태')} name="publicationStatus">
-          <Select style={{ width: 200 }} options={ADMIN_STATUS_OPTIONS} />
-        </Form.Item>
-        <Space>
-          <Button onClick={() => navigate('/missions/definitions')}>{t('취소')}</Button>
-          <Button type="primary" htmlType="submit">
-            {isEdit ? t('수정') : t('등록')}
-          </Button>
-        </Space>
-      </Form>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item
+                label={t('분야')}
+                name="categoryId"
+                rules={[{ required: true, message: t('분야를 선택해 주세요.') }]}
+              >
+                <Select placeholder={t('선택하세요')} options={options(categories)} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item
+                label={t('난이도')}
+                name="difficultyId"
+                rules={[{ required: true, message: t('난이도를 선택해 주세요.') }]}
+              >
+                <Select placeholder={t('선택하세요')} options={options(difficulties)} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item label={t('운동 종류')} name="exerciseCode">
+                <Select allowClear placeholder={t('선택하세요')} options={EXERCISE_OPTIONS} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item
+                label={t('인증 방식')}
+                name="verificationMethod"
+                rules={[{ required: true, message: t('인증 방식을 선택해 주세요.') }]}
+              >
+                <Select placeholder={t('선택하세요')} options={METHOD_OPTIONS} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item label={t('목표 값')} name="targetValue">
+                <InputNumber min={0.01} max={99999999.99} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item label={t('목표 단위')} name="targetUnit" rules={[{ max: 20 }]}>
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item label={t('예상 소요 시간(초)')} name="estimatedDurationSeconds">
+                <InputNumber min={1} max={86400} precision={0} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item label={t('공개 상태')} name="publicationStatus">
+                <Select options={ADMIN_STATUS_OPTIONS} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Space>
+            <Button onClick={() => navigate('/missions/definitions')}>{t('취소')}</Button>
+            <Button type="primary" htmlType="submit">
+              {isEdit ? t('수정') : t('등록')}
+            </Button>
+          </Space>
+        </Form>
+      </Card>
       <ConfirmActionModal
         open={Boolean(body)}
         title={isEdit ? t('미션 틀 수정') : t('미션 틀 등록')}
@@ -155,10 +173,8 @@ export default function MissionDefinitionFormPage() {
   const query = useDefinition(definitionId);
 
   return (
-    <div style={{ maxWidth: 640 }}>
-      <Typography.Title level={4}>
-        {definitionId ? t('미션 틀 수정') : t('미션 틀 등록')}
-      </Typography.Title>
+    <div style={{ maxWidth: 760 }}>
+      <PageHeader title={definitionId ? t('미션 틀 수정') : t('미션 틀 등록')} />
       {definitionId ? (
         <QueryBoundary query={query}>
           {(definition) => <DefinitionForm definition={definition} />}

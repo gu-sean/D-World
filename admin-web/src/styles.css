@@ -1,0 +1,21 @@
+/* Small shared classes for what used to be repeated inline styles. */
+
+/* Number inputs and selects fill their column (use on a <Form> that lays its fields out in a grid). */
+.form-fill .ant-input-number,
+.form-fill .ant-select {
+  width: 100%;
+}
+
+/* Keep line breaks the writer typed (ticket bodies, notices, JSON). */
+.pre-wrap {
+  white-space: pre-wrap;
+}
+
+/* Short fields such as a date or a number. */
+.field-narrow {
+  max-width: 240px;
+}
+
+.mb-16 {
+  margin-bottom: 16px;
+}

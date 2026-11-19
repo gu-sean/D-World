@@ -1,6 +1,6 @@
 // ADM-09 Appeal review: accept (change the decision) or dismiss (keep it)
 import { Link, useNavigate, useParams } from 'react-router';
-import { Card, Descriptions, Space, Typography } from 'antd';
+import { Card, Descriptions, Typography } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatusTag } from '../../../components/StatusTag.jsx';
@@ -8,6 +8,8 @@ import DecisionForm from '../components/DecisionForm.jsx';
 import RecordSummary from '../components/RecordSummary.jsx';
 import { useAppeal, useResolveAppeal } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { Stack } from '../../../components/Stack.jsx';
 
 const LABELS = { approved: t('이의 인정'), rejected: t('기각') };
 
@@ -18,8 +20,8 @@ export default function AppealReviewPage() {
   const resolve = useResolveAppeal();
 
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Typography.Title level={3}>{t('이의 신청 검토')}</Typography.Title>
+    <Stack size="middle">
+      <PageHeader title={t('이의 신청 검토')} />
       <Link to="/verifications/appeals">{t('← 이의 신청 목록')}</Link>
       <QueryBoundary query={query}>
         {({ appeal, verification }) => (
@@ -66,6 +68,6 @@ export default function AppealReviewPage() {
           </>
         )}
       </QueryBoundary>
-    </Space>
+    </Stack>
   );
 }

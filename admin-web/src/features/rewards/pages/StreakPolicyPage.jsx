@@ -5,9 +5,10 @@ import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { EffectiveAtItem } from '../components/EffectiveAtItem.jsx';
 import { pickCurrent, toIso } from '../components/helpers.js';
 import { MAX_POINTS, STREAK_TARGET_DAYS } from '../components/labels.js';
-import { useConfirmedChange } from '../components/useConfirmedChange.jsx';
+import { useConfirmedChange } from '../../../components/useConfirmedChange.jsx';
 import { useCreateStreakMilestone, useStreakMilestones } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 
 const numberItem = (name, label) => (
   <Form.Item
@@ -45,7 +46,7 @@ export default function StreakPolicyPage() {
   return (
     <div>
       {modal}
-      <Typography.Title level={3}>{t('연속 일수 정책')}</Typography.Title>
+      <PageHeader title={t('연속 일수 정책')} />
       <Typography.Paragraph type="secondary">
         {t('정책은 수정하지 않고 새 버전을 추가해요. 이전 버전은 이력으로 남아요.')}
       </Typography.Paragraph>

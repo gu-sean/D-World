@@ -72,17 +72,6 @@ export const MENU = [
 
 const leaves = MENU.flatMap((entry) => entry.children ?? [entry]);
 
-/** antd Menu `items`: leaves use their path as key, groups use their own key. */
-export const menuItems = MENU.map((entry) =>
-  entry.children
-    ? {
-        key: entry.key,
-        label: entry.label,
-        children: entry.children.map((child) => ({ key: child.path, label: child.label })),
-      }
-    : { key: entry.path, label: entry.label },
-);
-
 /**
  * The leaf that should be highlighted for a URL path: the longest leaf path that is the
  * path itself or one of its parents (/users/withdrawals -> '/users/withdrawals',
@@ -97,6 +86,11 @@ export function findSelectedPath(pathname) {
     if (matches && (best === null || path.length > best.length)) best = path;
   }
   return best;
+}
+
+/** Menu name of a leaf path (used for the browser tab title), or null. */
+export function findLabel(path) {
+  return leaves.find((leaf) => leaf.path === path)?.label ?? null;
 }
 
 /**

@@ -1,6 +1,6 @@
 // ADM-16 사용자 미션 검수
 import { useState } from 'react';
-import { Button, Space, Typography } from 'antd';
+import { Button, Space } from 'antd';
 import { message } from '../../../lib/message.jsx';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { DataTable } from '../../../components/DataTable.jsx';
@@ -11,7 +11,9 @@ import { StatusTag } from '../../../components/StatusTag.jsx';
 import { useListParams } from '../../../components/useListParams.js';
 import { EXERCISE_OPTIONS, labelOf } from '../constants.js';
 import { useDefinitions, useReviewDefinition } from '../queries.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 import { t } from '../../../i18n/index.js';
+import { ListCard } from '../../../components/ListCard.jsx';
 
 const DECISIONS = {
   approved: { text: t('승인'), title: t('미션 공개 승인') },
@@ -33,7 +35,7 @@ const fields = [
 export default function UserMissionReviewPage() {
   const [params, setParams] = useListParams({
     publicationStatus: 'review_pending',
-    sort: 'createdAt,asc', // API default (docs/09)
+    sort: 'createdAt,desc', // newest first
   });
   const query = useDefinitions({ ...params, origin: 'user' });
   const review = useReviewDefinition();
@@ -89,9 +91,14 @@ export default function UserMissionReviewPage() {
 
   return (
     <div>
-      <Typography.Title level={4}>{t('사용자 미션 검수')}</Typography.Title>
-      <FilterBar fields={fields} value={params} onChange={setParams} />
-      <DataTable query={query} columns={columns} defaultSort="createdAt,asc" />
+      <PageHeader
+        title={t('사용자 미션 검수')}
+        description={t('회원이 만든 미션을 공개해도 되는지 검토해요.')}
+      />
+      <ListCard>
+        <FilterBar fields={fields} value={params} onChange={setParams} />
+        <DataTable query={query} columns={columns} defaultSort="createdAt,desc" />
+      </ListCard>
       <ConfirmActionModal
         open={Boolean(target)}
         title={decision?.title ?? ''}

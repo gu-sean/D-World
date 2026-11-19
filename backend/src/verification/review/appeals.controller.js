@@ -101,8 +101,8 @@ export class AdminAppealsController {
         'completed',
       ]) ?? 'open';
     const paging = parseAdminPage(query, {
-      'filedAt,asc': 'a.filed_at ASC, a.id ASC',
       'filedAt,desc': 'a.filed_at DESC, a.id DESC',
+      'filedAt,asc': 'a.filed_at ASC, a.id ASC',
       'resolvedAt,desc': 'a.resolved_at DESC NULLS LAST, a.id DESC',
       'resolvedAt,asc': 'a.resolved_at ASC NULLS LAST, a.id ASC',
     });

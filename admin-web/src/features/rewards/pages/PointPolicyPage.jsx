@@ -1,6 +1,6 @@
 // ADM-24 Point policies: daily limit (read-only, app rules) and mission reward table
 import { useState } from 'react';
-import { Button, Collapse, Form, InputNumber, Select, Table, Tabs, Typography } from 'antd';
+import { Button, Form, InputNumber, Select, Table, Tabs, Typography } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
@@ -9,7 +9,7 @@ import { DailyLimitRules } from '../components/GameRulesCards.jsx';
 import { GAME_RULES } from '../components/gameRules.js';
 import { toIso } from '../components/helpers.js';
 import { MAX_POINTS } from '../components/labels.js';
-import { useConfirmedChange } from '../components/useConfirmedChange.jsx';
+import { useConfirmedChange } from '../../../components/useConfirmedChange.jsx';
 import {
   useCategories,
   useCreateRewardRate,
@@ -17,6 +17,7 @@ import {
   useRewardRates,
 } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 
 function RewardRateTab() {
   const [form] = Form.useForm();
@@ -62,8 +63,9 @@ function RewardRateTab() {
     <>
       {modal}
       <Form
+        name="rateFilter"
         layout="inline"
-        style={{ marginBottom: 16 }}
+        className="mb-16"
         onValuesChange={(_, all) =>
           setFilter({ categoryId: all.categoryId, difficultyId: all.difficultyId })
         }
@@ -96,18 +98,19 @@ function RewardRateTab() {
       <QueryBoundary query={list}>
         {(items) => {
           if (items.length === 0) return <StatePanel type="empty" />;
-          // 시행 시각 내림차순: 분야·난이도마다 이미 시행된 첫 버전이 '현재 적용 중', 나머지는 이력
+          // 시행 시각 내림차순: 분야·난이도마다 이미 시행된 첫 버전이 '현재 적용 중'.
+          // 이미 대체된 이전 버전은 보여 주지 않고, 아직 시행 전인 '예정' 버전만 따로 보여 준다.
           const now = Date.now();
           const seen = new Set();
           const current = [];
-          const history = [];
+          const upcoming = [];
           for (const row of items) {
             const key = `${row.categoryId}:${row.difficultyId}`;
-            if (!seen.has(key) && new Date(row.effectiveAt).getTime() <= now) {
+            if (new Date(row.effectiveAt).getTime() > now) {
+              upcoming.push(row);
+            } else if (!seen.has(key)) {
               seen.add(key);
               current.push(row);
-            } else {
-              history.push(row);
             }
           }
           const columns = [
@@ -134,25 +137,13 @@ function RewardRateTab() {
             <>
               <Typography.Title level={5}>{t('현재 적용 중')}</Typography.Title>
               <Table rowKey="id" pagination={false} dataSource={current} columns={columns} />
-              {history.length > 0 && (
-                <Collapse
-                  ghost
-                  style={{ marginTop: 8 }}
-                  items={[
-                    {
-                      key: 'history',
-                      label: t('이전·예정 버전 이력 ({0})', history.length),
-                      children: (
-                        <Table
-                          rowKey="id"
-                          pagination={false}
-                          dataSource={history}
-                          columns={columns}
-                        />
-                      ),
-                    },
-                  ]}
-                />
+              {upcoming.length > 0 && (
+                <>
+                  <Typography.Title level={5} style={{ marginTop: 24 }}>
+                    {t('예정 버전')}
+                  </Typography.Title>
+                  <Table rowKey="id" pagination={false} dataSource={upcoming} columns={columns} />
+                </>
               )}
             </>
           );
@@ -161,7 +152,13 @@ function RewardRateTab() {
       <Typography.Title level={5} style={{ marginTop: 24 }}>
         {t('새 보상표 버전 추가')}
       </Typography.Title>
-      <Form form={form} layout="vertical" style={{ maxWidth: 420 }} onFinish={onFinish}>
+      <Form
+        name="rateCreate"
+        form={form}
+        layout="vertical"
+        style={{ maxWidth: 420 }}
+        onFinish={onFinish}
+      >
         <Form.Item
           name="categoryId"
           label={t('분야')}
@@ -190,7 +187,7 @@ function RewardRateTab() {
 export default function PointPolicyPage() {
   return (
     <div>
-      <Typography.Title level={3}>{t('포인트 정책')}</Typography.Title>
+      <PageHeader title={t('포인트 정책')} />
       <Typography.Paragraph type="secondary">
         {t('정책은 수정하지 않고 새 버전을 추가해요. 이전 버전은 이력으로 남아요.')}
       </Typography.Paragraph>

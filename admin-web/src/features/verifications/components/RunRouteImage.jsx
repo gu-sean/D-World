@@ -1,6 +1,7 @@
 import { Alert, Space, Spin, Typography } from 'antd';
 import { useVerificationRoute } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { Stack } from '../../../components/Stack.jsx';
 
 // Static drawing of a running record's route (no map tiles, no external service).
 // The server turns the raw GPS file into segments and distance markers; this only draws them.
@@ -148,7 +149,7 @@ export default function RunRouteImage({ recordId }) {
 
   const hasVehicle = route.segments.some((s) => s.kind === 'vehicle');
   return (
-    <Space orientation="vertical" size="small" style={{ width: '100%' }}>
+    <Stack size="small">
       <RouteSvg route={route} />
       <Space size="large" wrap>
         <Typography.Text type="secondary">
@@ -160,6 +161,6 @@ export default function RunRouteImage({ recordId }) {
           </Typography.Text>
         )}
       </Space>
-    </Space>
+    </Stack>
   );
 }

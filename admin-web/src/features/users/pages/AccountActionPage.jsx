@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Alert, Button, InputNumber, Radio, Space, Typography } from 'antd';
+import { Alert, Button, InputNumber, Radio, Space } from 'antd';
 import { message } from '../../../lib/message.jsx';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal.jsx';
 import { useCreateAccountAction, useUser } from '../queries.js';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
 
 const MIN_DAYS = 1; // docs/07 §16 AccountActionInput
 const MAX_DAYS = 365;
@@ -58,7 +59,7 @@ export default function AccountActionPage() {
 
   return (
     <>
-      <Typography.Title level={3}>{t('계정 조치')}</Typography.Title>
+      <PageHeader title={t('계정 조치')} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 480 }}>
         <div>{t('대상: {0}', user.data?.nickname ?? userId)}</div>
         <Radio.Group

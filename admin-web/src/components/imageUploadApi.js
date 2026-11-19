@@ -3,6 +3,9 @@ import { AdminError } from '../api/errors.js';
 import { http } from '../api/httpClient.js';
 import { t } from '../i18n/index.js';
 
+// A 2MB image on a slow connection still finishes well inside this.
+const UPLOAD_TIMEOUT_MS = 60 * 1000;
+
 /**
  * M84 POST /assets/upload-urls (docs/09 §8, ADM-25·26). Asks for a signed upload URL.
  * @param {{assetKind: 'badge'|'pet_stage', ownerId: string, mimeType: string, sizeBytes: number,
@@ -22,9 +25,21 @@ export const createUploadUrl = (body, idempotencyKey) =>
  */
 export const putToStorage = async (ticket, file) => {
   try {
-    await axios.put(ticket.uploadUrl, file, { headers: ticket.uploadHeaders });
-  } catch {
+    await axios.put(ticket.uploadUrl, file, {
+      headers: ticket.uploadHeaders,
+      timeout: UPLOAD_TIMEOUT_MS,
+    });
+  } catch (error) {
     // The storage answers in its own format (and 403 here does not mean "no admin permission").
+    if (!error?.response) {
+      const timedOut = error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT';
+      throw new AdminError({
+        code: timedOut ? 'NETWORK_TIMEOUT' : 'NETWORK_ERROR',
+        message: timedOut
+          ? t('업로드가 너무 오래 걸려요. 다시 시도해 주세요.')
+          : t('인터넷 연결을 확인해 주세요.'),
+      });
+    }
     throw new AdminError({ code: 'COMMON_INTERNAL', message: t('잠시 후 다시 시도해 주세요.') });
   }
 };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Button, Input, Modal, Space, Typography } from 'antd';
+import { Alert, Button, Input, Modal, Space } from 'antd';
 import { DataTable } from '../../../components/DataTable.jsx';
 import { DateText } from '../../../components/DateText.jsx';
 import { FilterBar } from '../../../components/FilterBar.jsx';
@@ -9,9 +9,11 @@ import { labels } from '../../../constants/labels.js';
 import { audienceType as audienceLabels } from '../labels.js';
 import { useCancelNotice, useNotices, usePublishNotice } from '../queries.js';
 import { fromInputValue, isFuture } from '../time.js';
-import { useConfirm } from '../useConfirm.jsx';
+import { useConfirmedChange } from '../../../components/useConfirmedChange.jsx';
 import { NoticeForm } from './NoticeForm.jsx';
 import { t } from '../../../i18n/index.js';
+import { PageHeader } from '../../../components/PageHeader.jsx';
+import { ListCard } from '../../../components/ListCard.jsx';
 
 const optionsOf = (kind) =>
   Object.entries(labels[kind]).map(([value, { text }]) => ({ value, label: text }));
@@ -92,7 +94,7 @@ export function NoticeManager({ title, pushMode = false }) {
   const query = useNotices(pushMode ? { ...params, sendPush: 'true' } : params);
   const publish = usePublishNotice();
   const cancel = useCancelNotice();
-  const [confirmElement, ask] = useConfirm();
+  const [ask, confirmElement] = useConfirmedChange();
   const [editing, setEditing] = useState(null); // null: closed, {}: new, {notice}: edit
   const [scheduling, setScheduling] = useState(null);
 
@@ -108,7 +110,7 @@ export function NoticeManager({ title, pushMode = false }) {
             : t('지금 바로 게시하고 받는 회원에게 알림이 가요.')}
         </>
       ),
-      submit: ({ reason, idempotencyKey }) =>
+      run: ({ reason, idempotencyKey }) =>
         publish.mutateAsync({
           noticeId: notice.id,
           body: { scheduledAt: scheduledAt ?? null, reason },
@@ -127,7 +129,7 @@ export function NoticeManager({ title, pushMode = false }) {
           {t('취소한 공지는 다시 게시할 수 없어요.')}
         </>
       ),
-      submit: ({ reason, idempotencyKey }) =>
+      run: ({ reason, idempotencyKey }) =>
         cancel.mutateAsync({ noticeId: notice.id, body: { reason }, idempotencyKey }),
     });
 
@@ -183,14 +185,19 @@ export function NoticeManager({ title, pushMode = false }) {
 
   return (
     <>
-      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-        <Typography.Title level={3}>{title}</Typography.Title>
-        {!editing && (
-          <Button type="primary" onClick={() => setEditing({})}>
-            {pushMode ? t('푸시 알림 만들기') : t('공지 만들기')}
-          </Button>
-        )}
-      </Space>
+      <PageHeader
+        title={title}
+        description={
+          pushMode ? t('회원에게 푸시 알림을 보내요.') : t('앱에 보여 줄 공지를 관리해요.')
+        }
+        actions={
+          !editing && (
+            <Button type="primary" onClick={() => setEditing({})}>
+              {pushMode ? t('푸시 알림 만들기') : t('공지 만들기')}
+            </Button>
+          )
+        }
+      />
       {editing && (
         <div style={{ marginBottom: 24 }}>
           <NoticeForm
@@ -203,8 +210,10 @@ export function NoticeManager({ title, pushMode = false }) {
           />
         </div>
       )}
-      <FilterBar fields={FIELDS} value={params} onChange={setParams} />
-      <DataTable query={query} columns={columns} />
+      <ListCard>
+        <FilterBar fields={FIELDS} value={params} onChange={setParams} />
+        <DataTable query={query} columns={columns} />
+      </ListCard>
       {scheduling && (
         <ScheduleModal
           notice={scheduling}
