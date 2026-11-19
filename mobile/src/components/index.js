@@ -30,3 +30,7 @@ export { default as SectionTitle } from './SectionTitle';
 export { default as StatusTag, STATUS_TONE } from './StatusTag';
 export { default as TextField } from './TextField';
 export { default as WeekStrip } from './WeekStrip';
+export { default as WeeklyBarChart } from './WeeklyBarChart';
+export { default as DayMissionsDialog } from './DayMissionsDialog';
+export { default as MonthlyHeatmap } from './MonthlyHeatmap';
+export { default as LifetimeStats } from './LifetimeStats';
