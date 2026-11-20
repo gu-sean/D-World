@@ -1,17 +1,19 @@
 // REPORT-02 월별 달력
 //
-// 한 달을 격자로 펼쳐 날마다 연속 달성 상태를 색으로 보여 준다.
-// 날짜를 누르면 그날 완료한 미션 목록이 아래에 펼쳐진다.
+// 한 달을 격자로 펼쳐 날마다 연속 달성 상태를 색으로 보여 준다 (일요일 시작).
+// 날짜를 누르면 그날 완료한 미션 창(DayMissionsDialog)이 뜬다.
 //
-// 상태는 서버가 준 값 그대로다 — 성공·실패·판정 대기·기록 없음·앞으로의 날.
+// 상태는 서버(A64 CalendarDay)의 streakStatus 그대로다 — 성공·실패·판정 대기, 값이 없으면 기록 없음.
+// 오늘 이후 날짜는 점을 그리지 않고 누를 수 없다.
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { format, useCalendar } from '../../client';
-import { Card, Icon, QueryState, Screen, SectionTitle } from '../../components';
+import { Card, DayMissionsDialog, Icon, QueryState, Screen } from '../../components';
+import Routes from '../../navigation/routes';
 import { colors, radius, spacing, typography } from '../../theme';
 
-const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일'];
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 const STATUS_COLOR = {
   success: colors.success,
@@ -21,11 +23,23 @@ const STATUS_COLOR = {
   future: 'transparent',
 };
 
-/** 이번 달 1일이 무슨 요일인지 보고 앞에 빈 칸을 몇 개 둘지 정한다 (월요일 시작). */
+/**
+ * 이번 달 1일이 무슨 요일인지 보고 앞에 빈 칸을 몇 개 둘지 정한다 (일요일 시작: 일=0 … 토=6).
+ * `YYYY-MM-DD`를 숫자로 나눠 UTC로 계산한다 — 시간대가 붙은 날짜 문자열은 앱(Hermes)에서
+ * 읽지 못해 빈 칸이 0개가 되고 날짜가 요일과 어긋났었다.
+ */
 function leadingBlanks(firstDate) {
-  const ms = Date.parse(`${firstDate}T00:00:00+09:00`);
-  const weekday = new Date(ms + 9 * 3600000).getUTCDay();
-  return weekday === 0 ? 6 : weekday - 1;
+  const [y, m, d] = firstDate.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/** 칸 배열을 7칸씩 끊어 주(줄)로 만든다. 마지막 주도 7칸을 채워 열이 어긋나지 않게 한다. */
+function toWeeks(cells) {
+  const padded = [...cells];
+  while (padded.length % 7 !== 0) padded.push(null);
+  const weeks = [];
+  for (let i = 0; i < padded.length; i += 7) weeks.push(padded.slice(i, i + 7));
+  return weeks;
 }
 
 function shiftMonth(month, delta) {
@@ -39,9 +53,13 @@ export default function MonthlyCalendarScreen({ navigation, route }) {
   const [picked, setPicked] = useState(null);
 
   const calendar = useCalendar(month);
-  const days = useMemo(() => calendar.data ?? [], [calendar.data]);
+  const today = format.todayKst();
 
-  const pickedDay = useMemo(() => days.find((d) => d.date === picked) ?? null, [days, picked]);
+  const weeks = useMemo(() => {
+    const days = calendar.data ?? [];
+    if (days.length === 0) return [];
+    return toWeeks([...Array(leadingBlanks(days[0].date)).fill(null), ...days]);
+  }, [calendar.data]);
 
   return (
     <Screen title="월별 기록" onBack={() => navigation.goBack()} padded={false}>
@@ -75,31 +93,45 @@ export default function MonthlyCalendarScreen({ navigation, route }) {
                 ))}
               </View>
 
-              <View style={styles.grid}>
-                {Array.from({ length: leadingBlanks(data[0].date) }).map((_, index) => (
-                  <View key={`blank-${index}`} style={styles.cell} />
-                ))}
-
-                {data.map((day) => {
-                  const selected = day.date === picked;
-                  return (
-                    <TouchableOpacity
-                      key={day.date}
-                      style={styles.cell}
-                      onPress={() => setPicked(selected ? null : day.date)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${Number(day.date.slice(8))}일`}
-                      accessibilityState={{ selected }}>
-                      <View style={[styles.dayBox, selected && styles.dayBoxSelected]}>
-                        <Text style={[styles.dayNumber, selected && styles.dayNumberSelected]}>
-                          {Number(day.date.slice(8))}
-                        </Text>
-                      </View>
-                      <View style={[styles.dot, { backgroundColor: STATUS_COLOR[day.status] }]} />
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              {weeks.map((week, weekIndex) => (
+                <View key={`week-${weekIndex}`} style={styles.week}>
+                  {week.map((day, dayIndex) => {
+                    if (!day) return <View key={`blank-${dayIndex}`} style={styles.cell} />;
+                    const future = day.date > today;
+                    const status = future ? 'future' : day.streakStatus ?? 'none';
+                    const isToday = day.date === today;
+                    const selected = day.date === picked;
+                    const dayNumber = Number(day.date.slice(8));
+                    return (
+                      <TouchableOpacity
+                        key={day.date}
+                        style={styles.cell}
+                        disabled={future}
+                        onPress={() => setPicked(day.date)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${dayNumber}일`}
+                        accessibilityState={{ selected, disabled: future }}>
+                        <View
+                          style={[
+                            styles.dayBox,
+                            isToday && styles.dayBoxToday,
+                            selected && styles.dayBoxSelected,
+                          ]}>
+                          <Text
+                            style={[
+                              styles.dayNumber,
+                              future && styles.dayNumberFuture,
+                              selected && styles.dayNumberSelected,
+                            ]}>
+                            {dayNumber}
+                          </Text>
+                        </View>
+                        <View style={[styles.dot, { backgroundColor: STATUS_COLOR[status] }]} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ))}
 
               <View style={styles.legend}>
                 <Legend color={colors.success} label="성공" />
@@ -108,27 +140,18 @@ export default function MonthlyCalendarScreen({ navigation, route }) {
                 <Legend color={colors.border} label="기록 없음" />
               </View>
             </Card>
-
-            {!!pickedDay && (
-              <View>
-                <SectionTitle title={format.formatDate(pickedDay.date)} />
-                <Card style={styles.dayCard}>
-                  {pickedDay.completedMissions.length === 0 ? (
-                    <Text style={styles.empty}>완료한 미션이 없어요.</Text>
-                  ) : (
-                    pickedDay.completedMissions.map((mission) => (
-                      <View key={mission.missionId} style={styles.missionRow}>
-                        <Icon name="check" size={14} color={colors.success} strokeWidth={2.4} />
-                        <Text style={styles.missionTitle}>{mission.title}</Text>
-                      </View>
-                    ))
-                  )}
-                </Card>
-              </View>
-            )}
           </ScrollView>
         )}
       </QueryState>
+
+      <DayMissionsDialog
+        date={picked}
+        onClose={() => setPicked(null)}
+        onMissionPress={(mission) => {
+          setPicked(null);
+          navigation.navigate(Routes.MISSION_DETAIL, { missionId: mission.id });
+        }}
+      />
     </Screen>
   );
 }
@@ -156,11 +179,12 @@ const styles = StyleSheet.create({
   weekday: {
     ...typography.caption,
     color: colors.textSub,
-    width: `${100 / 7}%`,
+    flex: 1,
     textAlign: 'center',
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: `${100 / 7}%`, alignItems: 'center', paddingVertical: spacing.xs, gap: 3 },
+  // 한 주를 한 줄로 그리고 칸은 flex: 1로 나눈다 (100/7% 너비는 반올림 때문에 6칸에서 줄이 넘어갔었다)
+  week: { flexDirection: 'row' },
+  cell: { flex: 1, alignItems: 'center', paddingVertical: spacing.xs, gap: 3 },
   dayBox: {
     width: 32,
     height: 32,
@@ -168,8 +192,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  dayBoxToday: { borderWidth: 1.5, borderColor: colors.primary },
   dayBoxSelected: { backgroundColor: colors.primary },
   dayNumber: { ...typography.caption, color: colors.text },
+  dayNumberFuture: { color: colors.textSub },
   dayNumberSelected: { color: colors.onPrimary, fontWeight: '600' },
   dot: { width: 6, height: 6, borderRadius: radius.full },
   legend: {
@@ -181,8 +207,4 @@ const styles = StyleSheet.create({
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendLabel: { ...typography.caption, color: colors.textSub },
-  dayCard: { gap: spacing.sm },
-  empty: { ...typography.caption, color: colors.textSub },
-  missionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  missionTitle: { ...typography.body, color: colors.text, flex: 1 },
 });
