@@ -26,6 +26,7 @@ import goHome from '../../navigation/goHome';
 import Routes from '../../navigation/routes';
 import { colors, radius, spacing, typography } from '../../theme';
 import RunRoute from './RunRoute';
+import { READY_ACCURACY_M } from '../../client/flows/runSession.js';
 
 const UPLOAD_MESSAGES = {
   finishing: '기록을 정리하고 있어요',
@@ -166,7 +167,8 @@ export default function RunTrackingScreen({ navigation, route }) {
                 ? `위치 정확도 약 ${Math.round(gpsAccuracyM)}m`
                 : '위치를 아직 잡는 중이에요'}
             </Text>
-            {!!error && error.code === 'GPS_UNAVAILABLE' && (
+            {/* 30초 안에 못 잡았어도 그 뒤에 정확도가 좋아지면 경고를 거둔다 */}
+            {!!error && error.code === 'GPS_UNAVAILABLE' && !(gpsAccuracyM <= READY_ACCURACY_M) && (
               <Text style={styles.warn}>
                 신호가 약해요. 그대로 시작할 수 있지만 기록이 덜 정확할 수 있어요.
               </Text>

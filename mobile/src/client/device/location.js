@@ -7,6 +7,15 @@ import Geolocation from '@react-native-community/geolocation';
 
 import AppError from '../http/AppError.js';
 
+// 라이브러리 기본값은 안드로이드 GPS 칩만 쓰는 LocationManager라서, 실내·출발 직후에는
+// 위치를 수십 초 못 잡아 "신호가 약해요"가 자주 떴다. Play 서비스의 Fused 위치(GPS + Wi-Fi·기지국 보정)를
+// 쓰면 첫 위치가 빨리 잡히고 정확도도 금방 좋아진다. Play 서비스가 없는 기기는 라이브러리가 기존 방식으로 둔다.
+try {
+  Geolocation.setRNConfiguration({ skipPermissionRequests: true, locationProvider: 'playServices' });
+} catch {
+  // 설정을 못 바꿔도 기본 방식으로 동작한다.
+}
+
 /** A90 상황 추천이 위치를 기다리는 시간 (tasks/mobile-client MC-10). */
 export const QUICK_FIX_TIMEOUT_MS = 5000;
 

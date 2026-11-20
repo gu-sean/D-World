@@ -31,7 +31,8 @@ import { afterVerificationDecided } from '../queries/invalidate.js';
 import { MEDIA_LIMITS } from './cameraVerification.js';
 
 /** §7.2의 기준값. */
-export const READY_ACCURACY_M = 20;
+// 준비 완료로 볼 위치 정확도. 서버는 35m보다 나쁜 점만 버리므로(run-rules maxAccuracyM) 30m면 충분하다
+export const READY_ACCURACY_M = 30;
 export const READY_TIMEOUT_MS = 30 * 1000;
 export const MAX_RUN_SECONDS = 7200;
 const TICK_MS = 1000;

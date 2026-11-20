@@ -37,8 +37,10 @@ export class JobLock {
   async connect() {
     const { connectionString, ssl, connectionTimeoutMillis } =
       this.database.pool.options;
+    // 세션 락이므로 트랜잭션 풀러(Supabase 6543)로는 잡은 연결과 푸는 연결이 달라질 수 있다.
+    // DATABASE_LOCK_URL(세션 모드 주소)이 있으면 락 전용 연결만 그쪽으로 붙는다.
     const client = new pg.Client({
-      connectionString,
+      connectionString: process.env.DATABASE_LOCK_URL || connectionString,
       ssl,
       connectionTimeoutMillis,
       application_name: 'd-world-job-lock',

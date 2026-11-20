@@ -184,7 +184,11 @@ export default function VerifyResultScreen({ navigation, route }) {
                 {rejected && (
                   <>
                     <Button
-                      title="다시 찍는 방법 보기"
+                      title={
+                        result?.metrics?.exerciseCode === 'running'
+                          ? '다시 달리는 방법 보기'
+                          : '다시 찍는 방법 보기'
+                      }
                       onPress={() =>
                         navigation.navigate(Routes.VERIFY_RETRY_GUIDE, {
                           missionId: data.missionId,

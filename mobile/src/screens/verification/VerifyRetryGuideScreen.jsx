@@ -38,6 +38,24 @@ const COMMON_TIPS = [
   '동작 전체가 화면에 들어오는지 미리 확인해 주세요.',
 ];
 
+/** 러닝(GPS) 판정 코드 → 다시 달릴 때 고칠 점 (backend run-rules.js). 카메라 안내와 섞지 않는다. */
+const RUN_FLAG_TIPS = {
+  too_few_points: '위치가 거의 기록되지 않았어요. 하늘이 보이는 곳에서 위치 정확도가 30m 아래로 내려간 뒤 출발해 주세요.',
+  below_target: '목표 거리를 채운 뒤에 종료를 눌러 주세요. 화면의 거리가 목표를 넘었는지 확인해 주세요.',
+  mock_location: '모의 위치(가짜 GPS) 앱을 끄고 다시 달려 주세요.',
+  mock_location_detected: '모의 위치(가짜 GPS) 앱을 끄고 다시 달려 주세요.',
+  vehicle_detected: '차·자전거 같은 탈것으로 이동한 구간은 인정되지 않아요. 직접 달려 주세요.',
+  vehicle_segments_excluded: '탈것으로 보이는 구간은 거리에서 빠졌어요. 처음부터 끝까지 직접 달려 주세요.',
+  no_body_signal: '걸음이 감지되지 않았어요. 휴대폰을 손에 들거나 주머니에 넣고 달려 주세요.',
+  gps_unstable: '건물 사이나 실내를 피하고 하늘이 보이는 곳에서 달려 주세요.',
+  distance_mismatch: '중간에 멈추지 말고 한 번에 달려 주세요.',
+};
+
+const RUN_COMMON_TIPS = [
+  '하늘이 보이는 곳에서 위치 정확도가 30m 아래로 내려간 뒤 출발해 주세요.',
+  '러닝 화면을 켜 둔 채 휴대폰을 가지고 목표 거리를 끝까지 달려 주세요.',
+];
+
 export default function VerifyRetryGuideScreen({ navigation, route }) {
   const { missionId, recordId } = route.params ?? {};
   const mission = useMission(missionId);
@@ -45,10 +63,13 @@ export default function VerifyRetryGuideScreen({ navigation, route }) {
 
   const metrics = record.data?.currentResult?.metrics;
   const flags = metrics?.flags ?? [];
+  const running = mission.data?.exerciseCode === 'running';
+  const flagTips = running ? RUN_FLAG_TIPS : FLAG_TIPS;
+  const commonTips = running ? RUN_COMMON_TIPS : COMMON_TIPS;
   // AI가 이번 영상 수치를 보고 쓴 코칭이 있으면 그것을, 없으면 판정 코드별 안내를 보여 준다
   const coaching = (metrics?.coachingTips ?? []).filter((t) => typeof t === 'string' && t);
-  const tips = [...new Set(flags.map((flag) => FLAG_TIPS[flag]).filter(Boolean))];
-  const shown = coaching.length > 0 ? coaching : tips.length > 0 ? tips : COMMON_TIPS;
+  const tips = [...new Set(flags.map((flag) => flagTips[flag]).filter(Boolean))];
+  const shown = coaching.length > 0 ? coaching : tips.length > 0 ? tips : commonTips;
   const byAi = coaching.length > 0 && metrics?.coachingSource === 'gemini';
 
   const retry = (detail) => {
@@ -60,7 +81,7 @@ export default function VerifyRetryGuideScreen({ navigation, route }) {
   };
 
   return (
-    <Screen title="다시 찍기" onBack={() => navigation.goBack()} padded={false}>
+    <Screen title={running ? '다시 달리기' : '다시 찍기'} onBack={() => navigation.goBack()} padded={false}>
       <QueryState query={mission}>
         {(detail) => (
           <>
@@ -89,7 +110,7 @@ export default function VerifyRetryGuideScreen({ navigation, route }) {
 
               {!!detail.guide && (
                 <Card>
-                  <Text style={styles.reasonLabel}>촬영 안내</Text>
+                  <Text style={styles.reasonLabel}>{running ? '러닝 안내' : '촬영 안내'}</Text>
                   <Text style={styles.reason}>{detail.guide}</Text>
                 </Card>
               )}
