@@ -15,6 +15,7 @@
 import { Platform } from 'react-native';
 
 import { registerPushDevice as apiRegister, unregisterPushDevice as apiUnregister } from '../client/api/meApi.js';
+import permissions from '../client/device/permissions.js';
 
 /** 마지막으로 등록한 토큰. 로그아웃 때 이 값으로 해제한다. */
 let currentToken = null;
@@ -29,7 +30,25 @@ async function loadMessaging() {
 }
 
 /**
- * 알림 권한을 확인하고 토큰을 서버에 등록한다 (A15). 로그인 직후에 부른다.
+ * 휴대폰 알림 권한을 요청한다. 이미 허용돼 있으면 묻지 않는다.
+ *
+ * Android 13+(POST_NOTIFICATIONS)는 사용자가 허용하기 전까지 알림이 꺼져 있어, 앱이 직접 물어야
+ * 홈 화면에 "인증이 승인됐어요" 같은 푸시가 뜬다. Firebase의 `requestPermission()`은 Android에서
+ * 창을 띄우지 않고 항상 허용(1)만 돌려주므로 쓰지 않고 `react-native-permissions`로 묻는다.
+ * 앱을 켤 때마다(로그인 상태가 될 때마다) 부르므로, 거절하면 다음에 켤 때 다시 묻는다.
+ * Android가 더 묻지 못하게 막은 뒤(두 번 거절)에는 창 없이 `'blocked'`가 돌아온다.
+ *
+ * @returns {Promise<'granted'|'denied'|'blocked'|'unavailable'>}
+ */
+export async function requestNotificationPermission() {
+  const current = await permissions.check('notifications');
+  if (current === 'granted' || current === 'unavailable') return current;
+  return permissions.request('notifications');
+}
+
+/**
+ * 토큰을 서버에 등록한다 (A15). 알림 권한이 켜져 있을 때만 등록한다 (묻지는 않는다 —
+ * 묻는 것은 `requestNotificationPermission`). 로그인 직후와 설정에서 알림을 켜고 돌아왔을 때 부른다.
  * @returns {Promise<boolean>} 등록했으면 true, 건너뛰었으면 false
  */
 export async function registerPushDevice() {
@@ -38,9 +57,13 @@ export async function registerPushDevice() {
 
   try {
     const messaging = fm.getMessaging();
-    const authStatus = await fm.requestPermission(messaging);
-    // 1 = AUTHORIZED, 2 = PROVISIONAL
-    if (authStatus !== 1 && authStatus !== 2) return false;
+    if (Platform.OS === 'ios') {
+      const authStatus = await fm.requestPermission(messaging);
+      // 1 = AUTHORIZED, 2 = PROVISIONAL
+      if (authStatus !== 1 && authStatus !== 2) return false;
+    } else if ((await permissions.check('notifications')) !== 'granted') {
+      return false;
+    }
 
     const token = await fm.getToken(messaging);
     if (!token) return false;
@@ -145,6 +168,7 @@ export async function onForegroundMessage(handler) {
 }
 
 export default {
+  requestNotificationPermission,
   registerPushDevice,
   unregisterPushDevice,
   onNotificationOpened,
