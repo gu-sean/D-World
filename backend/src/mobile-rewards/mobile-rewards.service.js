@@ -2,8 +2,13 @@ import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AchievementsService } from '../achievements/achievements.service.js';
 import { AppException } from '../common/errors/app-exception.js';
 import { DatabaseService } from '../database/database.service.js';
+import { OBJECT_STORAGE } from '../media/storage/object-storage.js';
+import { presignGetCached } from '../media/storage/presign-cache.js';
 
 const num = (value) => Number(value);
+
+/** 배지 이미지 임시 URL 유효 시간 (펫 이미지와 같은 1시간) */
+const BADGE_URL_TTL_SEC = 3600;
 
 /** 완료한 미션 수로 진행도를 세는 업적 조건 (achievements.service.js getProgress와 같은 구분) */
 const COUNT_CONDITIONS = new Set([
@@ -31,11 +36,26 @@ export function transactionTitle({ sourceType, sourceName, availableDelta }) {
 
 /** 모바일 클라이언트 보상 조회 API: 인벤토리·포인트 내역·업적 목록 (08 A72·A74·A76, 07 §11·§12) */
 @Injectable()
-@Dependencies(DatabaseService, AchievementsService)
+@Dependencies(DatabaseService, AchievementsService, OBJECT_STORAGE)
 export class MobileRewardsService {
-  constructor(database, achievements) {
+  constructor(database, achievements, storage) {
     this.database = database;
     this.achievements = achievements;
+    this.storage = storage;
+  }
+
+  /** 관리자가 올린 배지 이미지 키 → 앱이 바로 읽을 수 있는 임시 URL, 키가 없거나 실패하면 null */
+  async badgeUrl(key) {
+    if (!key) return null;
+    try {
+      return await presignGetCached(this.storage, {
+        key,
+        expiresInSec: BADGE_URL_TTL_SEC,
+      });
+    } catch {
+      // 이미지 주소를 못 만들어도 업적 목록은 보여 준다 (앱은 기본 아이콘으로 대신 그림)
+      return null;
+    }
   }
 
   /** A72 InventoryItem[] */
@@ -133,6 +153,7 @@ export class MobileRewardsService {
               cur.condition_type, cur.target_count, cur.reward_points,
               cur.reward_user_xp, cur.reward_pet_xp,
               cur.category_id, cur.id AS version_id,
+              gc.name AS category_name, bi.r2_object_key AS badge_key,
               ua.status AS grant_status, ua.awarded_at
          FROM achievement_definitions ad
          JOIN LATERAL (
@@ -140,6 +161,8 @@ export class MobileRewardsService {
             WHERE v.achievement_id = ad.id AND v.effective_at <= now()
             ORDER BY v.effective_at DESC, v.version_no DESC LIMIT 1
          ) cur ON true
+         LEFT JOIN goal_categories gc ON gc.id = cur.category_id
+         LEFT JOIN achievement_badge_images bi ON bi.id = cur.badge_image_id
          LEFT JOIN user_achievements ua
                 ON ua.achievement_id = ad.id AND ua.user_id = $1
         WHERE ad.status = 'public' AND ($2::text IS NULL OR cur.rarity = $2)
@@ -182,6 +205,9 @@ export class MobileRewardsService {
         return source ? row.target_count : 0;
       }),
     );
+    const badgeUrls = await Promise.all(
+      rows.map((row) => this.badgeUrl(row.badge_key)),
+    );
     const items = [];
     for (const [index, row] of rows.entries()) {
       const earned = row.grant_status === 'active';
@@ -194,10 +220,12 @@ export class MobileRewardsService {
         rarity: row.rarity,
         conditionType: row.condition_type,
         targetCount: row.target_count,
+        // 분야별 조건(category_approved_mission_count)일 때만 값이 있음
+        categoryName: row.category_name ?? null,
         progressCount,
         earned,
         earnedAt: earned ? row.awarded_at : null,
-        badgeImageUrl: null,
+        badgeImageUrl: badgeUrls[index],
         rewardPoints: row.reward_points,
         rewardPetXp: row.reward_pet_xp,
       });
