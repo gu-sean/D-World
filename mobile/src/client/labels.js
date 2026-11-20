@@ -98,6 +98,14 @@ export const pointTransactionKind = {
 };
 export const streakDayStatus = { pending: '판정 대기', success: '성공', failed: '실패' };
 export const achievementRarity = { common: '일반', rare: '희귀', legendary: '전설' };
+/** 업적 달성 조건 종류 (관리자 웹 '보상 → 업적 정책'의 달성 조건과 같은 값) */
+export const achievementCondition = {
+  first_goal_completed: '첫 목표 완료',
+  approved_mission_count: '승인된 미션 수',
+  category_approved_mission_count: '분야별 승인된 미션 수',
+  streak_milestone: '연속 달성',
+  challenge_completed: '챌린지 완주',
+};
 export const petStageCode = { egg: '알', baby: '아기', adult: '성체' };
 export const shopItemKind = { consumable: '소모품', permanent: '영구' };
 export const shopOrderStatus = { completed: '완료', cancelled: '취소' };
@@ -257,6 +265,7 @@ export const labels = {
   pointTransactionKind,
   streakDayStatus,
   achievementRarity,
+  achievementCondition,
   petStageCode,
   shopItemKind,
   shopOrderStatus,

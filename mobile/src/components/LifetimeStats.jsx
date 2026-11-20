@@ -5,7 +5,7 @@
  *   완료한 미션   ReportSummary(A60, period=all)의 `completedMissionCount` — 화면에서 넘겨받는다
  *   최장 연속     StreakStatus(A75)의 `bestSuccessDays`
  *   보유 포인트   PointBalance(A73)의 `availablePoints` (누적 획득량은 API에 없어 지금 쓸 수 있는 값)
- *   획득 배지     Achievement[](A76) 중 `status === 'earned'` 개수 / 전체 개수
+ *   획득 배지     Achievement[](A76) 중 `earned === true` 개수 / 전체 개수
  * 타일을 누르면 `onNavigate(routeName)`으로 해당 화면 이름을 넘긴다 (완료한 미션 타일은 이동 없음).
  *
  * @param {{completedMissionCount: number, onNavigate?: (route: string) => void}} props
@@ -49,7 +49,10 @@ export default function LifetimeStats({ completedMissionCount, onNavigate }) {
   const best = streak.data?.bestSuccessDays;
   const available = points.data?.availablePoints;
   const allBadges = achievements.data ?? [];
-  const earnedBadges = allBadges.filter((item) => item.status === 'earned').length;
+  // 서버는 획득 여부를 `earned`(불리언)로 준다 (예전 모양 `status: 'earned'`도 함께 받음)
+  const earnedBadges = allBadges.filter(
+    (item) => item.earned === true || item.status === 'earned',
+  ).length;
 
   const go = (route) => (onNavigate ? () => onNavigate(route) : undefined);
 
