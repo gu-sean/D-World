@@ -367,18 +367,21 @@ export class MissionsService {
           .category_id;
       }
       let rewardPoints = null;
+      let rewardPetXp = null;
       if (categoryId) {
         const reward = await this.rewards.resolve(tx, {
           categoryId,
           difficultyId: await this.difficultyIdOf(tx, judged.difficultyCode),
         });
         rewardPoints = reward.points;
+        rewardPetXp = reward.petXp;
       }
       return {
         difficultyCode: judged.difficultyCode,
         difficultyName: difficultyName(judged.difficultyCode),
         reason: judged.reason,
         rewardPoints,
+        rewardPetXp,
       };
     });
   }
@@ -605,33 +608,8 @@ export class MissionsService {
           throw badRequest('targetValue와 targetUnit은 함께 지정해야 함');
         }
 
-        // 보상은 만들 때 고정되므로, 수치를 바꿔 난이도가 달라지면 수정 대신 새로 만들게 한다
-        const contentChanged = [
-          'targetValue',
-          'targetUnit',
-          'estimatedDurationSeconds',
-        ].some((key) => patch[key] !== undefined);
-        if (contentChanged && mission.source_type !== 'template') {
-          const next = assessDifficulty({
-            exerciseCode: mission.exercise_code,
-            targetValue,
-            targetUnit,
-            estimatedDurationSeconds:
-              patch.estimatedDurationSeconds ??
-              mission.estimated_duration_seconds,
-          }).difficultyCode;
-          const { rows: current } = await tx.query(
-            'SELECT code FROM difficulty_levels WHERE id = $1',
-            [mission.difficulty_id],
-          );
-          if (current[0]?.code !== next) {
-            throw conflict(
-              'difficulty_changed',
-              `이렇게 바꾸면 난이도가 '${difficultyName(next)}'(으)로 바뀌어요. 보상은 만들 때 정해져서, 이 미션을 취소하고 새로 만들어 주세요`,
-              { from: current[0]?.code ?? null, to: next },
-            );
-          }
-        }
+        // 보상은 모든 세부 미션이 같아서(30P·펫 XP 30) 수치를 고쳐도 보상이 달라지지 않는다.
+        // 난이도는 만들 때 값을 참고용으로 두고, 수정으로 다시 매기지 않는다.
 
         const date = patch.scheduledDate ?? mission.scheduled_date;
         if (

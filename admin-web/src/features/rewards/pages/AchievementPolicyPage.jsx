@@ -1,6 +1,6 @@
 // ADM-25 Achievement conditions and rewards (append-only versions, badge image upload)
 import { useState } from 'react';
-import { Button, Image, Table } from 'antd';
+import { Button, Image, Table, Typography } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
@@ -84,6 +84,9 @@ export default function AchievementPolicyPage() {
           </Button>
         }
       />
+      <Typography.Paragraph type="secondary">
+        {t('업적 보상은 하루 포인트 한도와 상관없이 전부 지급돼요.')}
+      </Typography.Paragraph>
       <QueryBoundary query={list}>
         {(items) =>
           items.length === 0 ? (

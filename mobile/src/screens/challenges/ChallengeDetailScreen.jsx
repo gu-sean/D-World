@@ -110,6 +110,7 @@ export default function ChallengeDetailScreen({ navigation, route }) {
                     {format.formatPoints(data.reward?.points ?? 0)}
                     {data.reward?.petXp ? ` · 펫 경험치 ${data.reward.petXp}` : ''}
                   </Text>
+                  <Text style={styles.cardLabel}>하루 포인트 한도와 상관없이 전부 받아요.</Text>
                   {!!data.reward?.badge && (
                     <View style={styles.row}>
                       <Icon name="trophy" size={16} color={colors.warning} />

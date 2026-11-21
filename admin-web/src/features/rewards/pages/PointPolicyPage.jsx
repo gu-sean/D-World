@@ -1,67 +1,26 @@
-// ADM-24 Point policies: daily limit (read-only, app rules) and mission reward table
+// ADM-24 Point policies: daily limit and mission reward table (both read-only: the app rule is fixed)
 import { useState } from 'react';
-import { Button, Form, InputNumber, Select, Table, Tabs, Typography } from 'antd';
+import { Form, Select, Table, Tabs, Typography } from 'antd';
 import { DateText } from '../../../components/DateText.jsx';
 import { QueryBoundary } from '../../../components/QueryBoundary.jsx';
 import { StatePanel } from '../../../components/StatePanel.jsx';
-import { EffectiveAtItem } from '../components/EffectiveAtItem.jsx';
 import { DailyLimitRules } from '../components/GameRulesCards.jsx';
 import { GAME_RULES } from '../components/gameRules.js';
-import { toIso } from '../components/helpers.js';
-import { MAX_POINTS } from '../components/labels.js';
-import { useConfirmedChange } from '../../../components/useConfirmedChange.jsx';
-import {
-  useCategories,
-  useCreateRewardRate,
-  useDifficultyLevels,
-  useRewardRates,
-} from '../queries.js';
+import { useCategories, useDifficultyLevels, useRewardRates } from '../queries.js';
 import { t } from '../../../i18n/index.js';
 import { PageHeader } from '../../../components/PageHeader.jsx';
 
 function RewardRateTab() {
-  const [form] = Form.useForm();
   const [filter, setFilter] = useState({});
   const categories = useCategories();
   const difficulties = useDifficultyLevels();
   const list = useRewardRates(filter);
-  const create = useCreateRewardRate();
-  const [ask, modal] = useConfirmedChange();
 
   const nameOf = (rows, id) => rows?.find((row) => row.id === id)?.name ?? id;
   const toOptions = (rows) => (rows ?? []).map((row) => ({ value: row.id, label: row.name }));
 
-  const onFinish = ({ effectiveAt, ...values }) =>
-    ask({
-      title: t('새 보상표 버전을 저장할까요?'),
-      summary: t(
-        '{0} · {1} · {2}P / 펫 {3}XP',
-        nameOf(categories.data, values.categoryId),
-        nameOf(difficulties.data, values.difficultyId),
-        values.points,
-        values.petXp,
-      ),
-      run: ({ reason, idempotencyKey }) =>
-        create.mutateAsync({
-          payload: { ...values, effectiveAt: toIso(effectiveAt), reason },
-          idempotencyKey,
-        }),
-      onDone: () => form.resetFields(),
-    });
-
-  const numberItem = (name, label) => (
-    <Form.Item
-      name={name}
-      label={label}
-      rules={[{ required: true, message: t('{0}를 입력해 주세요.', label) }]}
-    >
-      <InputNumber min={0} max={MAX_POINTS} precision={0} />
-    </Form.Item>
-  );
-
   return (
     <>
-      {modal}
       <Form
         name="rateFilter"
         layout="inline"
@@ -89,7 +48,7 @@ function RewardRateTab() {
       </Form>
       <Typography.Paragraph type="secondary">
         {t(
-          '앱 기준: 모든 분야·난이도의 세부 미션 1회는 {0} P · 펫 XP {1}이에요(하루 포인트 한도 {2} P). 새 버전은 이후에 만드는 미션부터 적용돼요.',
+          '앱 기준: 모든 분야·난이도의 세부 미션 1회는 {0} P · 펫 XP {1}로 고정이에요(하루 포인트 한도 {2} P). 이 표는 보기만 하고 바꿀 수 없어요.',
           GAME_RULES.missionPoints,
           GAME_RULES.missionPetXp,
           GAME_RULES.dailyPointLimit,
@@ -149,37 +108,6 @@ function RewardRateTab() {
           );
         }}
       </QueryBoundary>
-      <Typography.Title level={5} style={{ marginTop: 24 }}>
-        {t('새 보상표 버전 추가')}
-      </Typography.Title>
-      <Form
-        name="rateCreate"
-        form={form}
-        layout="vertical"
-        style={{ maxWidth: 420 }}
-        onFinish={onFinish}
-      >
-        <Form.Item
-          name="categoryId"
-          label={t('분야')}
-          rules={[{ required: true, message: t('분야를 선택해 주세요.') }]}
-        >
-          <Select options={toOptions(categories.data)} />
-        </Form.Item>
-        <Form.Item
-          name="difficultyId"
-          label={t('난이도')}
-          rules={[{ required: true, message: t('난이도를 선택해 주세요.') }]}
-        >
-          <Select options={toOptions(difficulties.data)} />
-        </Form.Item>
-        {numberItem('points', t('포인트'))}
-        {numberItem('petXp', t('펫 XP'))}
-        <EffectiveAtItem />
-        <Button type="primary" htmlType="submit" loading={create.isPending}>
-          {t('새 버전 저장')}
-        </Button>
-      </Form>
     </>
   );
 }
@@ -188,9 +116,6 @@ export default function PointPolicyPage() {
   return (
     <div>
       <PageHeader title={t('포인트 정책')} />
-      <Typography.Paragraph type="secondary">
-        {t('정책은 수정하지 않고 새 버전을 추가해요. 이전 버전은 이력으로 남아요.')}
-      </Typography.Paragraph>
       <Tabs
         items={[
           { key: 'daily', label: t('하루 한도'), children: <DailyLimitRules /> },

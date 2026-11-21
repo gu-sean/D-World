@@ -106,10 +106,11 @@ export function SpeciesDrawer({ target, onClose }) {
       status: values.status,
       effectiveAt: toIso(effectiveAt),
     });
-    body.stages = values.stages.map(({ stageNo, minTotalXp, bonusBasisPoints, imageAssetId }) => ({
+    // 단계별 보너스는 없앴다(보상 펫 XP는 모든 펫이 같다): 항상 0으로 보낸다
+    body.stages = values.stages.map(({ stageNo, minTotalXp, imageAssetId }) => ({
       stageNo,
       minTotalXp,
-      bonusBasisPoints,
+      bonusBasisPoints: 0,
       imageAssetId,
     }));
     ask({
@@ -256,14 +257,6 @@ export function SpeciesDrawer({ target, onClose }) {
                   rules={[{ required: true, message: t('필요 XP를 입력해 주세요.') }]}
                 >
                   <InputNumber min={0} precision={0} disabled />
-                </Form.Item>
-                <Form.Item
-                  name={[field.name, 'bonusBasisPoints']}
-                  label={t('보너스 (1/100 %)')}
-                  extra="0 ~ 2000"
-                  rules={[{ required: true, message: t('보너스를 입력해 주세요.') }]}
-                >
-                  <InputNumber min={0} max={2000} precision={0} />
                 </Form.Item>
                 <Form.Item
                   name={[field.name, 'imageAssetId']}

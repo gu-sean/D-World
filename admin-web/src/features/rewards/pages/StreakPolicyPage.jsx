@@ -48,7 +48,8 @@ export default function StreakPolicyPage() {
       {modal}
       <PageHeader title={t('연속 일수 정책')} />
       <Typography.Paragraph type="secondary">
-        {t('정책은 수정하지 않고 새 버전을 추가해요. 이전 버전은 이력으로 남아요.')}
+        {t('정책은 수정하지 않고 새 버전을 추가해요. 이전 버전은 이력으로 남아요.')}{' '}
+        {t('연속 일수 보상은 하루 포인트 한도와 상관없이 전부 지급돼요.')}
       </Typography.Paragraph>
 
       <QueryBoundary query={list}>

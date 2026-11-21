@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { format, labels, useCancelMission, useMission } from '../../client';
+import { format, labels, useCancelMission, useGoal, useMission } from '../../client';
 import {
   Button,
   Card,
@@ -26,13 +26,22 @@ import {
 import { STATUS_TONE } from '../../components/StatusTag';
 import Routes from '../../navigation/routes';
 import { colors, spacing, typography } from '../../theme';
+import { isRunningGoal } from './swapRules';
 
 export default function MissionDetailScreen({ navigation, route }) {
   const { missionId } = route.params ?? {};
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   const mission = useMission(missionId);
+  const goal = useGoal(mission.data?.goalId ?? null);
   const cancelMission = useCancelMission();
+
+  // 미션 수정 화면은 홈 탭 묶음 안에 있다 (이 화면은 루트 스택)
+  const openForm = (params) =>
+    navigation.navigate(Routes.MAIN, {
+      screen: Routes.HOME_TAB,
+      params: { screen: Routes.MISSION_FORM, params },
+    });
 
   const start = (detail) => {
     if (detail.exerciseCode === 'running') {
@@ -138,6 +147,55 @@ export default function MissionDetailScreen({ navigation, route }) {
                   />
                 )}
               </Card>
+
+              {detail.canEdit && detail.exerciseCode === 'running' && (
+                <Card style={styles.swapCard}>
+                  <Text style={styles.swapTitle}>날씨나 일정 때문에 못 뛰나요?</Text>
+                  {!!detail.goalId && goal.isLoading ? null : isRunningGoal(goal.data?.title) ? (
+                    <>
+                      <Text style={styles.swapText}>
+                        러닝이 목표라서 다른 날로 옮겨 주세요. 날짜는 수정에서 바꿀 수 있어요.
+                      </Text>
+                      <Button
+                        title="다른 날로 옮기기"
+                        variant="secondary"
+                        onPress={() => openForm({ missionId })}
+                        full
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.swapText}>
+                        다른 날로 옮기거나, 오늘은 실내 운동으로 바꿀 수 있어요.
+                      </Text>
+                      <View style={styles.editRow}>
+                        <View style={styles.editSlot}>
+                          <Button
+                            title="다른 날로 옮기기"
+                            variant="secondary"
+                            onPress={() => openForm({ missionId })}
+                            full
+                          />
+                        </View>
+                        <View style={styles.editSlot}>
+                          <Button
+                            title="실내 운동으로 바꾸기"
+                            onPress={() =>
+                              openForm({
+                                goalId: detail.goalId ?? undefined,
+                                goalStepId: detail.stepId ?? undefined,
+                                date: detail.scheduledDate,
+                                replaceMissionId: missionId,
+                              })
+                            }
+                            full
+                          />
+                        </View>
+                      </View>
+                    </>
+                  )}
+                </Card>
+              )}
             </ScrollView>
 
             <View style={styles.footer}>
@@ -159,13 +217,7 @@ export default function MissionDetailScreen({ navigation, route }) {
                     <Button
                       title="수정"
                       variant="secondary"
-                      onPress={() =>
-                        // 미션 수정 화면은 홈 탭 묶음 안에 있다 (이 화면은 루트 스택)
-                        navigation.navigate(Routes.MAIN, {
-                          screen: Routes.HOME_TAB,
-                          params: { screen: Routes.MISSION_FORM, params: { missionId } },
-                        })
-                      }
+                      onPress={() => openForm({ missionId })}
                       full
                     />
                   </View>
@@ -230,6 +282,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   submissionText: { ...typography.caption, color: colors.textSub, flex: 1 },
+  swapCard: { gap: spacing.sm },
+  swapTitle: { ...typography.bodyStrong, color: colors.text },
+  swapText: { ...typography.caption, color: colors.textSub },
   footer: {
     padding: spacing.lg,
     gap: spacing.sm,

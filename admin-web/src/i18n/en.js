@@ -903,6 +903,17 @@ const en = {
   '{0} (세부 미션 {1}개 × {2})': '{0} ({1} detailed missions × {2})',
   '하루 펫 XP': 'Daily pet XP',
   '{0} (하루 첫 미션 1회만 받아요)': '{0} (only for the first mission of the day)',
+  '하루 한도와 별개': 'Outside the daily limit',
+  '업적(배지)·챌린지·스트릭 보상은 하루 한도 없이 전부 지급돼요':
+    'Achievement (badge), challenge and streak rewards are paid in full with no daily limit',
+  '업적 보상은 하루 포인트 한도와 상관없이 전부 지급돼요.':
+    'Achievement rewards are paid in full regardless of the daily point limit.',
+  '연속 일수 보상은 하루 포인트 한도와 상관없이 전부 지급돼요.':
+    'Streak rewards are paid in full regardless of the daily point limit.',
+  '챌린지 보상은 하루 포인트 한도와 상관없이 전부 지급돼요.':
+    'Challenge rewards are paid in full regardless of the daily point limit.',
+  '앱 기준: 모든 분야·난이도의 세부 미션 1회는 {0} P · 펫 XP {1}로 고정이에요(하루 포인트 한도 {2} P). 이 표는 보기만 하고 바꿀 수 없어요.':
+    'App rule: every sub-mission in every category and difficulty gives {0} P · {1} pet XP (daily point limit {2} P). This table is read-only.',
   '미션 1회 보상': 'Reward per mission',
   '{0} · 펫 XP {1}': '{0} · Pet XP {1}',
   '한도를 넘는 포인트는 지급되지 않고, 펫 XP는 지갑에 쌓였다가 사용자가 "경험치 주기"로 펫에게 먹여요.':

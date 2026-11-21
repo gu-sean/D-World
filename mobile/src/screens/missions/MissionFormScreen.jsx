@@ -1,10 +1,9 @@
 // MISSION-10·11 미션 직접 만들기·수정
 //
 // `missionId`가 있으면 수정, 없으면 새로 만들기다.
-// 난이도는 고르지 않는다. 운동 종류·목표 수치·소요 시간을 보고 서버 규칙이 정하고,
-// 그 난이도의 보상(관리자 보상표)을 "예상 난이도 · 포인트"로 미리 보여 준다. 보상은 미션마다 받는다.
-// 수정일 때 분야·운동 종류는 바꿀 수 없고, 수치를 바꿔 난이도가 달라지면 저장되지 않는다
-// (보상이 만들 때 고정되므로 취소하고 새로 만들어야 한다).
+// 난이도는 고르지 않는다. 보상은 모든 세부 미션이 같아서(30P · 펫 경험치 30) 서버가 준 값을
+// "보상" 상자에 그대로 보여 준다. 하루 한도(포인트 120P, 펫 경험치 하루 1번)는 안내만 한다.
+// 수정일 때 분야·운동 종류는 바꿀 수 없다. 수치는 고칠 수 있고 보상은 달라지지 않는다.
 //
 // 운동을 고르면 목표 단위와 허용 범위가 그 운동의 것으로 바뀌고,
 // 범위를 벗어난 값은 보내기 전에 걸러 낸다.
@@ -14,6 +13,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import {
   format,
   labels,
+  useCancelMission,
   useCreateMission,
   useDifficultyPreview,
   useExerciseTypes,
@@ -35,8 +35,10 @@ import {
 import { colors, spacing, typography } from '../../theme';
 
 export default function MissionFormScreen({ navigation, route }) {
-  const { missionId, goalId, date } = route.params ?? {};
+  // replaceMissionId가 있으면 그 러닝 미션을 실내 운동 미션으로 바꾸는 화면이다 (새로 만들고 이전 것은 취소)
+  const { missionId, goalId, goalStepId, date, replaceMissionId } = route.params ?? {};
   const editing = Boolean(missionId);
+  const replacing = !editing && Boolean(replaceMissionId);
 
   const categories = useGoalCategories();
   const goal = useGoal(editing ? null : goalId);
@@ -44,11 +46,14 @@ export default function MissionFormScreen({ navigation, route }) {
   const existing = useMission(missionId);
   const createMission = useCreateMission();
   const updateMission = useUpdateMission();
+  const cancelMission = useCancelMission();
+  // 새 미션은 만들어졌는데 이전 미션 취소가 실패했을 때, 다시 누르면 취소만 다시 시도한다
+  const [swapCreated, setSwapCreated] = useState(false);
 
   const [form, setForm] = useState({
     title: '',
     description: '',
-    categoryCode: null,
+    categoryCode: replacing ? 'exercise' : null,
     exerciseCode: null,
     targetValue: '',
     estimatedDurationSeconds: '',
@@ -129,16 +134,14 @@ export default function MissionFormScreen({ navigation, route }) {
     return () => clearTimeout(timer);
   }, [previewInput]);
   const preview = useDifficultyPreview(debouncedInput);
-  const currentDifficulty = editing ? existing.data?.difficultyCode : null;
-  const difficultyWillChange =
-    editing &&
-    touched &&
-    !!preview.data &&
-    !!currentDifficulty &&
-    preview.data.difficultyCode !== currentDifficulty;
+  // 수정은 이미 정해진 보상을, 새로 만들 때는 서버 미리 보기 값을 보여 준다
+  const reward = editing
+    ? existing.data?.reward
+    : preview.data
+      ? { points: preview.data.rewardPoints, petXp: preview.data.rewardPetXp }
+      : null;
 
-  const ready =
-    titleCheck.ok && memoCheck.ok && targetCheck.ok && !!form.categoryCode && !difficultyWillChange;
+  const ready = titleCheck.ok && memoCheck.ok && targetCheck.ok && !!form.categoryCode;
 
   const submit = () => {
     if (editing) {
@@ -159,6 +162,13 @@ export default function MissionFormScreen({ navigation, route }) {
       return;
     }
 
+    const cancelReplaced = () =>
+      cancelMission.mutate({ missionId: replaceMissionId }, { onSuccess: () => navigation.goBack() });
+    if (replacing && swapCreated) {
+      cancelReplaced();
+      return;
+    }
+
     createMission.mutate(
       {
         title: form.title.trim(),
@@ -172,9 +182,19 @@ export default function MissionFormScreen({ navigation, route }) {
           : null,
         scheduledDate: form.scheduledDate,
         goalId,
+        ...(goalStepId ? { goalStepId } : {}),
         memo: form.memo.trim() || null,
       },
-      { onSuccess: () => navigation.goBack() },
+      {
+        onSuccess: () => {
+          if (!replacing) {
+            navigation.goBack();
+            return;
+          }
+          setSwapCreated(true);
+          cancelReplaced();
+        },
+      },
     );
   };
 
@@ -183,11 +203,17 @@ export default function MissionFormScreen({ navigation, route }) {
 
   return (
     <Screen
-      title={editing ? '미션 수정' : '미션 만들기'}
+      title={editing ? '미션 수정' : replacing ? '실내 운동으로 바꾸기' : '미션 만들기'}
       onBack={() => navigation.goBack()}
       padded={false}>
       <FormScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <ErrorBanner error={mutation.error} />
+        {replacing && <ErrorBanner error={cancelMission.error} />}
+        {replacing && (
+          <Text style={styles.note}>
+            실내 운동 미션을 새로 만들고, 러닝 미션은 취소해요. 난이도와 보상은 새 미션 기준이에요.
+          </Text>
+        )}
 
         <TextField
           label="미션"
@@ -215,13 +241,15 @@ export default function MissionFormScreen({ navigation, route }) {
             set('categoryCode')(value);
             if (value !== 'exercise') set('exerciseCode')(null);
           }}
-          disabled={editing}
+          disabled={editing || replacing}
         />
 
         {isExercise && (
           <OptionRow
             label={lockedLabel('운동 종류')}
-            options={(exercises.data ?? []).map((e) => ({ value: e.code, label: e.name }))}
+            options={(exercises.data ?? [])
+              .filter((e) => !replacing || e.code !== 'running')
+              .map((e) => ({ value: e.code, label: e.name }))}
             value={form.exerciseCode}
             onChange={set('exerciseCode')}
             disabled={editing}
@@ -251,36 +279,19 @@ export default function MissionFormScreen({ navigation, route }) {
           keyboardType="number-pad"
         />
 
-        <View style={styles.difficultyBox}>
-          <Text style={styles.difficultyLabel}>
-            {editing ? '난이도 (만들 때 정해졌어요)' : '예상 난이도'}
-          </Text>
-          {editing ? (
-            <Text style={styles.difficultyValue}>
-              {labels.difficulty[currentDifficulty] ?? currentDifficulty ?? '-'}
-              {existing.data?.reward?.points != null ? ` · ${existing.data.reward.points}P` : ''}
+        <View style={styles.rewardBox}>
+          <Text style={styles.rewardLabel}>보상</Text>
+          {reward?.points != null ? (
+            <Text style={styles.rewardValue}>
+              {format.formatPoints(reward.points)} · 펫 경험치 {reward.petXp ?? 0}
             </Text>
-          ) : preview.data ? (
-            <>
-              <Text style={styles.difficultyValue}>
-                {preview.data.difficultyName}
-                {preview.data.rewardPoints != null ? ` · ${preview.data.rewardPoints}P` : ''}
-              </Text>
-              <Text style={styles.difficultyReason}>{preview.data.reason}</Text>
-            </>
           ) : (
-            <Text style={styles.difficultyReason}>
-              {form.categoryCode
-                ? '목표 수치와 소요 시간을 보고 정해요'
-                : '분야를 고르면 난이도와 보상을 보여 드려요'}
-            </Text>
+            <Text style={styles.rewardNote}>분야를 고르면 보상을 보여 드려요</Text>
           )}
-          {difficultyWillChange && (
-            <Text style={styles.difficultyWarn}>
-              이렇게 바꾸면 난이도가 '{preview.data.difficultyName}'(으)로 바뀌어요. 보상은 만들 때
-              정해져서, 이 미션을 취소하고 새로 만들어 주세요.
-            </Text>
-          )}
+          <Text style={styles.rewardNote}>
+            세부 미션마다 같아요. 하루에 포인트는 120P(미션 4개)까지, 펫 경험치는 한 번만 받아요.
+            업적·챌린지 보상은 하루 한도와 상관없이 받아요.
+          </Text>
         </View>
 
         <DateField label="날짜" value={form.scheduledDate} onChange={set('scheduledDate')} />
@@ -296,15 +307,23 @@ export default function MissionFormScreen({ navigation, route }) {
 
         <View style={styles.footer}>
           <Button
-            title={editing ? '저장' : '미션 만들기'}
+            title={
+              editing
+                ? '저장'
+                : replacing
+                  ? swapCreated
+                    ? '이전 미션 취소 다시 시도'
+                    : '실내 운동으로 바꾸기'
+                  : '미션 만들기'
+            }
             onPress={submit}
-            loading={mutation.isPending}
+            loading={mutation.isPending || cancelMission.isPending}
             disabled={!ready}
             full
           />
           {editing && (
             <Text style={styles.note}>
-              분야·운동을 바꾸거나 난이도가 달라지게 고치려면 이 미션을 취소하고 새로 만들어 주세요.
+              분야·운동 종류를 바꾸려면 이 미션을 취소하고 새로 만들어 주세요.
             </Text>
           )}
         </View>
@@ -317,7 +336,7 @@ const styles = StyleSheet.create({
   body: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
   footer: { marginTop: spacing.md, gap: spacing.sm },
   note: { ...typography.caption, color: colors.textSub, textAlign: 'center' },
-  difficultyBox: {
+  rewardBox: {
     gap: spacing.xs,
     padding: spacing.md,
     borderRadius: 12,
@@ -325,8 +344,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  difficultyLabel: { ...typography.caption, color: colors.textSub },
-  difficultyValue: { ...typography.bodyStrong, color: colors.text },
-  difficultyReason: { ...typography.caption, color: colors.textSub },
-  difficultyWarn: { ...typography.caption, color: colors.danger },
+  rewardLabel: { ...typography.caption, color: colors.textSub },
+  rewardValue: { ...typography.bodyStrong, color: colors.text },
+  rewardNote: { ...typography.caption, color: colors.textSub },
 });

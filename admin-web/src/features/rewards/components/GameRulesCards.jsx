@@ -32,6 +32,9 @@ export function DailyLimitRules() {
         <Descriptions.Item label={t('미션 1회 보상')}>
           {t('{0} · 펫 XP {1}', point(R.missionPoints), R.missionPetXp)}
         </Descriptions.Item>
+        <Descriptions.Item label={t('하루 한도와 별개')}>
+          {t('업적(배지)·챌린지·스트릭 보상은 하루 한도 없이 전부 지급돼요')}
+        </Descriptions.Item>
       </Descriptions>
       <Alert
         type="warning"

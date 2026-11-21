@@ -12,7 +12,7 @@ export const ADVICE_LAST_HOUR = 22;
 
 export const ADVICE_TITLE = '오늘은 야외 러닝이 어려울 수 있어요';
 export const ADVICE_BODY =
-  '비·눈·미세먼지 때문에 오늘 러닝 미션을 실내 운동으로 바꿔 보세요';
+  '비·눈·미세먼지 때문에 오늘 러닝 미션을 다른 날로 옮기거나 실내 운동으로 바꿔 보세요';
 
 /** 하루에 한 번만 보내도록 날짜별로 같은 키를 쓴다 (user_notifications의 (user_id, event_key) 중복 방지) */
 export const adviceEventKey = (date) => `weather_run:${date}`;

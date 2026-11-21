@@ -226,6 +226,9 @@ export function ChallengeForm({ challenge, categories, difficulties }) {
             </Form.Item>
           </FormRow>
           <Typography.Title level={5}>{t('완주 보상')}</Typography.Title>
+          <Typography.Paragraph type="secondary">
+            {t('챌린지 보상은 하루 포인트 한도와 상관없이 전부 지급돼요.')}
+          </Typography.Paragraph>
           <FormRow>
             <Form.Item
               label={t('포인트')}

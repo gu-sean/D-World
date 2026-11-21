@@ -12,7 +12,13 @@ import {
   settleOutstanding,
 } from './points-ledger.js';
 
-/** 세부 미션 포인트 하루 한도 (30P × 4개) */
+/** 세부 미션 1회 포인트: 모든 분야·난이도가 같다 */
+export const MISSION_POINTS = 30;
+
+/**
+ * 세부 미션 포인트 하루 한도 (30P × 4개).
+ * 미션 보상에만 적용한다. 업적·챌린지·스트릭 보상은 하루 한도 없이 전부 지급하고 월 한도만 본다.
+ */
 export const DAILY_MISSION_POINT_LIMIT = 120;
 
 const MISSION = 'mission';
@@ -139,7 +145,8 @@ export class PointsService {
    * 스트릭·업적·챌린지 자동 보상 지급
    * sourceId의 소유 행(streak_milestone_awards, user_achievements, challenge_reward_grants)은
    * 호출자가 같은 트랜잭션에서 먼저 만들어 둬야 함(DB 트리거가 검증)
-   * 한도를 넘는 초과분은 소멸, 지급 행의 기록은 각 도메인이 소유
+   * 하루 한도는 적용하지 않는다(미션 보상만 하루 한도가 있다). 월 한도를 넘는 초과분은 소멸,
+   * 지급 행의 기록은 각 도메인이 소유
    */
   async awardAutoPoints(
     tx,

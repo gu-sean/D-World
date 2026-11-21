@@ -117,6 +117,7 @@ export default function AchievementListScreen({ navigation }) {
       </View>
 
       <ErrorBanner error={setBadge.error} />
+      <Text style={styles.limitNote}>업적 보상은 하루 포인트 한도와 상관없이 전부 받아요.</Text>
 
       <QueryState query={achievements} emptyTitle="업적이 없어요">
         {(items) => (
@@ -180,6 +181,12 @@ export default function AchievementListScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   filter: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  limitNote: {
+    ...typography.caption,
+    color: colors.textSub,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
   list: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xxl },
   card: { gap: spacing.sm },
   dim: { opacity: 0.7 },

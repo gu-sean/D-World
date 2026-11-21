@@ -1,5 +1,5 @@
 import { newId } from '../common/ids.js';
-import { Dependencies, Injectable } from '@nestjs/common';
+import { Dependencies, HttpStatus, Injectable } from '@nestjs/common';
 import { AdminMutationService } from '../admin-auth/admin-mutation.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import {
@@ -8,6 +8,9 @@ import {
   resolveEffectiveAt,
 } from './policy-support.js';
 import { CatalogService } from './catalog.service.js';
+import { AppException } from '../common/errors/app-exception.js';
+import { MISSION_PET_XP } from '../experience-pets/pet-xp.service.js';
+import { MISSION_POINTS } from '../points/points.service.js';
 
 /** 보상표·판정 기준: 카테고리×난이도 / 카테고리×인증 방식별 추가 전용 버전 */
 @Injectable()
@@ -44,6 +47,15 @@ export class RewardPoliciesService {
   }
 
   createRewardRate(adminId, input, key) {
+    // 세부 미션 보상은 모든 분야·난이도가 같다(앱 규칙). 다른 값의 보상표는 만들 수 없다
+    if (input.points !== MISSION_POINTS || input.petXp !== MISSION_PET_XP) {
+      throw new AppException(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'reward_fixed',
+        `세부 미션 보상은 모든 분야·난이도가 ${MISSION_POINTS}P · 펫 XP ${MISSION_PET_XP}로 같음`,
+        { details: { points: MISSION_POINTS, petXp: MISSION_PET_XP } },
+      );
+    }
     return this.mutation.run(adminId, {
       key,
       operation: 'reward_rate.create',
