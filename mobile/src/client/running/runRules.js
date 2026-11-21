@@ -16,7 +16,7 @@
  * 심박수는 폰으로 잴 수 없어 쓰지 않는다.
  */
 
-export const RUN_RULE_VERSION = 'run-rule@1.0.0';
+export const RUN_RULE_VERSION = 'run-rule@1.1.0';
 
 export const RULES = {
   maxAccuracyM: 35, // 이보다 나쁜 GPS 점은 거리에서 뺀다
@@ -25,6 +25,8 @@ export const RULES = {
   windowSeconds: 30,
   movingSpeedMps: 0.5, // 이보다 느리면 멈춘 구간
   maxRunSpeedMps: 6.5, // 30초 평균이 이보다 빠르면 사람이 아니다 (1km 2분 34초)
+  startZoneMeters: 200, // 뛰기 시작해서 이 거리까지는 오버페이스로 달릴 수 있어 상한을 높인다
+  startMaxRunSpeedMps: 12, // 시작 구간의 상한. 사람 최고 속도(초속 10.4m)보다 높아 차는 여전히 걸린다
   checkSpeedMps: 2.0, // 이보다 빠를 때만 몸의 신호를 확인한다 (걷기는 통과)
   minCadenceSpm: 60, // 위 속도에서 분당 걸음이 이보다 적으면 탈것
   minMotionG: 0.12, // 위 속도에서 흔들림이 이보다 작으면 탈것
@@ -158,6 +160,7 @@ export function analyzeRun(file, { weightKg = null } = {}) {
 
   const windows = [];
   const size = RULES.windowSeconds;
+  let metersBefore = 0; // 이 구간 앞까지 달린 거리 (시작 구간 판단용)
   for (let from = 0; from < endT; from += size) {
     const to = Math.min(from + size, endT);
     const span = to - from;
@@ -183,7 +186,12 @@ export function analyzeRun(file, { weightKg = null } = {}) {
     let reason = null;
     if (activeSeconds <= 0) kind = 'paused';
     else if (speed < RULES.movingSpeedMps) kind = 'still';
-    else if (speed > RULES.maxRunSpeedMps) {
+    else if (
+      speed >
+      (metersBefore < RULES.startZoneMeters
+        ? RULES.startMaxRunSpeedMps
+        : RULES.maxRunSpeedMps)
+    ) {
       kind = 'vehicle';
       reason = 'speed';
     } else if (speed > RULES.checkSpeedMps) {
@@ -195,6 +203,7 @@ export function analyzeRun(file, { weightKg = null } = {}) {
         reason = 'motion';
       }
     }
+    if (kind !== 'vehicle') metersBefore += meters;
     windows.push({
       from,
       to,
