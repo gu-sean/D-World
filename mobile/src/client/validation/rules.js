@@ -27,7 +27,7 @@ export const EXERCISE_TARGET_RANGE = {
   squat: { reps: { min: 1, max: 200 } },
   lunge: { reps: { min: 2, max: 100 } },
   plank: { seconds: { min: 10, max: 90 } },
-  running: { meters: { min: 500, max: 21000 }, seconds: { min: 300, max: 7200 } },
+  running: { meters: { min: 100, max: 21000 }, seconds: { min: 300, max: 7200 } },
 };
 
 /** 11 §8.4 길이 제한. `[최소, 최대]` */

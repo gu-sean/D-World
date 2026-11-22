@@ -49,7 +49,7 @@ export const EXERCISE_TYPES = Object.freeze([
     name: '러닝',
     verificationMethod: 'sensor',
     targetUnit: 'meters',
-    minTarget: 500,
+    minTarget: 100,
     maxTarget: 21000,
   },
 ]);
